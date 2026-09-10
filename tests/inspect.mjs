@@ -1,0 +1,11 @@
+﻿import { chromium } from '@playwright/test';
+import { mkdir } from 'node:fs/promises';
+await mkdir('test-results',{recursive:true});
+const browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const page=await browser.newPage({viewport:{width:1440,height:960},deviceScaleFactor:1});
+const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+await page.goto('http://localhost:5173',{waitUntil:'networkidle'});
+await page.waitForTimeout(3000);
+await page.screenshot({path:'test-results/desktop.png',fullPage:true});
+console.log(JSON.stringify({title:await page.title(),errors,body:(await page.locator('body').innerText()).slice(0,2800)},null,2));
+await browser.close();
