@@ -91,7 +91,7 @@ test('unknown Sagittarius distance creates an honest gap in 3D and retains the s
     const polis = terrestrial.objects.find(star => star.hip === unknownHip);
     assert.ok(polis && polis.altitudeDeg > 0);
     assert.equal(polis.distanceLy, null);
-    assert.match(polis.distance, /sconosciuta/);
+    assert.equal(polis.distance, 'Unknown distance');
     close(radial(polis.position), 60);
     assert.ok(lineHasVertex(terrestrial, polis.position));
     assert.equal(terrestrial.group.getObjectByName('constellation-lines').userData.segmentCount, figure('Sgr').segments.length);

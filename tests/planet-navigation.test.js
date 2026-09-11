@@ -45,8 +45,8 @@ test('every confirmed planet is searchable and opens in its own host system',()=
 test('missing astronomical measurements remain unknown in the mapped catalog',()=>{
  const missing=exoplanets.filter(p=>p.distancePc===null);
  assert.equal(missing.length,planetCatalogMetadata.missingDistanceCount);
- for(const planet of missing)assert.match(planet.distance,/sconosciuta/);
- for(const planet of exoplanets.filter(p=>p.radiusEarth===null))assert.match(planet.detail,/sconosciuto/);
+ for(const planet of missing)assert.match(planet.distance,/unknown/);
+ for(const planet of exoplanets.filter(p=>p.radiusEarth===null))assert.match(planet.detail,/unknown/);
  const trappist=exoplanets.find(p=>p.name==='TRAPPIST-1 e');
  assert.ok(trappist);
  assert.equal(planetsForHost(trappist.host).length,7);

@@ -149,3 +149,43 @@ dialog .observer-fields p{grid-column:1/-1;margin:0;font-size:10px;line-height:1
 .observer-preset small{flex-basis:100%;padding-left:21px;color:#8eaba2;font-size:9px}
 @media(max-width:900px){.constellation-controls:has(#earth-space-controls:not([hidden])){grid-template-columns:minmax(0,1fr)}.earth-space-controls{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center;gap:6px 10px;padding:8px 0}.earth-space-controls small{grid-column:1/-1;font-size:8px}.earth-space-controls .layer-row{font-size:9px}.earth-perspective-button{font-size:9px;padding:8px}.constellation-view:not(.earth-sky-view) .view-controls{bottom:345px}.constellation-view:not(.earth-sky-view) .toast{bottom:365px}}
 @media(max-height:800px) and (min-width:901px){.earth-space-controls{padding:7px 0;gap:6px}.earth-space-controls small{font-size:8px}.constellation-view .layers{margin-top:12px}}
+
+/* Reserve the bottom scale bar's space at every desktop height. Side panels
+   scroll within their own region when the viewport is short or zoomed. */
+.app-shell{min-height:0;--bottom-bar-height:103px;--footer-height:50px;--panel-clearance:18px}
+@media(min-width:901px){
+  .left-panel,.right-panel{bottom:calc(var(--bottom-bar-height) + var(--footer-height) + var(--panel-clearance));overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#455650 transparent;min-height:0}
+  .left-panel{padding:2px 7px 5px 0}
+  .right-panel{padding:2px 5px 5px 0}
+  .left-panel .section-heading,.left-panel .layer-row,.scale-button{flex-shrink:0}
+  .left-panel:focus-visible,.right-panel:focus-visible{outline-offset:-2px}
+}
+@media(max-height:800px) and (min-width:901px){.app-shell{--bottom-bar-height:88px}}
+
+/* Keep the icon in its own column. In particular, short-height sidebar rules
+   must never move a modal icon into the label or its explanatory text. */
+.constellation-mode.modal-constellation-mode button{
+  display:grid;grid-template-columns:21px minmax(0,1fr);grid-template-rows:auto auto;
+  align-content:center;align-items:center;column-gap:12px;row-gap:3px;
+  min-width:0;padding:15px 16px;text-align:left;font-size:12px;line-height:1.6
+}
+.constellation-mode.modal-constellation-mode button svg{
+  position:static;grid-column:1;grid-row:1 / 3;align-self:start;
+  width:19px;height:19px;margin:2px 0 0;flex-shrink:0
+}
+.constellation-mode.modal-constellation-mode button>span{grid-column:2;grid-row:1;min-width:0}
+.constellation-mode.modal-constellation-mode small{grid-column:2;grid-row:2;min-width:0;margin:0;line-height:1.6}
+@media(max-width:560px){
+  .constellation-mode.modal-constellation-mode{gap:8px}
+  .constellation-mode.modal-constellation-mode button{grid-template-columns:17px minmax(0,1fr);column-gap:8px;padding:12px 10px;font-size:11px;line-height:1.5}
+  .constellation-mode.modal-constellation-mode button svg{width:17px;height:17px;margin-top:1px}
+  .constellation-mode.modal-constellation-mode small{font-size:9px}
+}
+
+dialog label.readout-title{display:block;margin-bottom:10px}
+@media(max-width:900px) and (max-height:700px){
+  .constellation-view:not(.earth-sky-view) .view-controls{display:grid;grid-template-columns:repeat(2,33px);gap:6px}
+  .constellation-view:not(.earth-sky-view) .view-controls .separator{display:none}
+  .constellation-view:not(.earth-sky-view) .view-controls .immersion-button{width:33px;height:33px;padding:0;justify-content:center}
+  .constellation-view:not(.earth-sky-view) .view-controls .immersion-button span{display:none}
+}

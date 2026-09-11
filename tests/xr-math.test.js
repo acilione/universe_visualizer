@@ -115,7 +115,7 @@ test('denied VR access leaves the desktop state usable', async () => {
     assert.equal(app.isPresenting, false);
     assert.equal(controls.enabled, true);
     assert.deepEqual(camera.position.toArray(), [3, 4, 5]);
-    assert.match(messages.at(-1), /non consentito/);
+    assert.match(messages.at(-1), /access was denied/);
   }, { name: 'NotAllowedError' });
 });
 
@@ -268,7 +268,7 @@ function panelButtonPoint(scene, pixelX, THREE) {
   ));
 }
 
-test('AVVICINA forwards the complete selected planet and host context to the engine', async () => {
+test('FOCUS forwards the complete selected planet and host context to the engine', async () => {
   await withXRHarness(async ({ app, controllers, scene, focused, session, THREE }) => {
     await app.enter();
     app.update();
@@ -337,7 +337,7 @@ test('planet inspection animates its rendered center and radius without moving t
   });
 });
 
-test('LIBERA hides writing and a textless peripheral sphere restores the panel in VR', async () => {
+test('IMMERSIVE hides writing and a textless peripheral sphere restores the panel in VR', async () => {
   await withXRHarness(async ({ app, controllers, scene, immersiveChanges, targets, selected, session, THREE }) => {
     await app.enter();
     app.update();

@@ -1,3 +1,5 @@
+import { getLanguage, setLanguage } from '../src/i18n.js';
+import { validateObserver } from '../src/sky-math.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseCoordinate, dateInputInZone, zonedDateInputToIso } from '../src/observer-input.js';
@@ -31,4 +33,19 @@ test('ambiguous daylight-saving hours, nonexistent hours and invalid calendar da
     assert.throws(() => zonedDateInputToIso(value, 'Europe/Rome'), RangeError, value);
   }
   assert.equal(zonedDateInputToIso('2026-10-25T02:30', 'UTC'), '2026-10-25T02:30:00.000Z');
+});
+
+
+test('observer validation follows the explicit UI language while parsing remains language-independent', t => {
+  assert.equal(getLanguage(), 'en');
+  assert.throws(() => parseCoordinate('91', 'latitude'), /Enter a latitude/);
+  assert.throws(() => zonedDateInputToIso('2026-03-29T02:30', 'Europe/Rome'), /does not exist/);
+  assert.throws(() => validateObserver({ latitude: 91 }), /Latitude out of range/);
+  setLanguage('it');
+  t.after(() => setLanguage('en'));
+  assert.throws(() => parseCoordinate('91', 'latitude'), /Inserisci una latitudine/);
+  assert.throws(() => zonedDateInputToIso('2026-03-29T02:30', 'Europe/Rome'), /non esiste/);
+  assert.throws(() => validateObserver({ latitude: 91 }), /Latitudine fuori intervallo/);
+  assert.equal(parseCoordinate('38,1144', 'latitude'), 38.1144);
+  assert.equal(zonedDateInputToIso('2026-12-11T20:00', 'Europe/Rome'), '2026-12-11T19:00:00.000Z');
 });

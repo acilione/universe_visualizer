@@ -1,3 +1,4 @@
+import { t, locale } from './i18n.js';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { catalog, scales, seededRandom } from './data.js';
@@ -50,7 +51,7 @@ export class Universe {
     });
     canvas.addEventListener('pointercancel',this.onSkyCancel=e=>this.skyPointers.delete(e.pointerId));
     canvas.addEventListener('wheel',this.onSkyWheel=e=>{if(this.isSkyNavigation()){e.preventDefault();this.zoom(Math.exp(e.deltaY*.001));}},{passive:false});
-    canvas.addEventListener('webglcontextlost',this.onContextLost=(e)=>{e.preventDefault();this.onMessage('Il contesto grafico è stato interrotto. Ricarica la pagina per riprendere.');});
+    canvas.addEventListener('webglcontextlost',this.onContextLost=(e)=>{e.preventDefault();this.onMessage(t("The graphics context was interrupted. Reload the page to resume.","Il contesto grafico è stato interrotto. Ricarica la pagina per riprendere."));});
     this.setScale(0,true);
     this.lastTime=performance.now();this.renderer.setAnimationLoop((time)=>this.animate(time));this.ready=true;
   }
@@ -114,7 +115,7 @@ export class Universe {
       const glow=new THREE.Sprite(new THREE.SpriteMaterial({map:this.glowTexture,color:o.color,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:.85}));glow.scale.setScalar(2.3);glow.material.userData.baseOpacity=.85;g.add(glow);
     }
     const hit=new THREE.Mesh(new THREE.SphereGeometry(planetary?Math.max(size,.52):.5,12,8),new THREE.MeshBasicMaterial({visible:false}));hit.userData.object=o;g.add(hit);if(this.index!==7||o.altitudeDeg>=0)this.targets.push(hit);this.content.add(g);
-    const label=document.createElement('button');label.className='map-label'+(o.id==='solar-system'||o.id==='earth'?' home':'');label.textContent=o.name;label.setAttribute('aria-label',`Seleziona ${o.name}`);label.addEventListener('click',()=>this.isPlanet(o)?this.focusObject(o):this.selectObject(o));this.labelContainer.append(label);this.labels.push({element:label,object:g,data:o});return g;
+    const label=document.createElement('button');label.className='map-label'+(o.id==='solar-system'||o.id==='earth'?' home':'');label.textContent=o.name;label.setAttribute('aria-label',t(`Select ${o.name}`,`Seleziona ${o.name}`));label.addEventListener('click',()=>this.isPlanet(o)?this.focusObject(o):this.selectObject(o));this.labelContainer.append(label);this.labels.push({element:label,object:g,data:o});return g;
   }
   setScale(index,initial=false){
     index=Math.round(THREE.MathUtils.clamp(index,0,4));if(!initial&&index===this.index)return;
@@ -129,7 +130,7 @@ export class Universe {
     const current=this.constellationData;
     loadConstellations().then(({constellations})=>{
       if(this.constellationData!==current||this.index<6)return;
-      const ordered=[...constellations].sort((a,b)=>a.name.localeCompare(b.name,'it'));
+      const ordered=[...constellations].sort((a,b)=>a.name.localeCompare(b.name,locale()));
       const index=ordered.findIndex(item=>item.id===current.figure.id);
       const figure=ordered[(index+delta+ordered.length)%ordered.length];
       return this.showConstellation(figure.id,{mode:current.mode,observer:current.observer});
@@ -147,7 +148,7 @@ export class Universe {
     const view=createConstellationView({...data,renderer:this.renderer});
     this.constellationView=view;this.systemHost=null;view.context.earthVisible=this.earthVisible;view.context.earthPerspective=false;
     this.buildView(data.mode==='earth'?7:6,view.objects,view.context,false,view.group);
-    if(data.mode==='earth'&&view.context.visibleStarCount===0)this.onMessage('Questa costellazione è sotto l’orizzonte. Cambia luogo o ora per osservarla.');
+    if(data.mode==='earth'&&view.context.visibleStarCount===0)this.onMessage(t("This constellation is below the horizon. Change the location or time to observe it.","Questa costellazione è sotto l’orizzonte. Cambia luogo o ora per osservarla."));
     return true;
   }
   isSkyNavigation(){return this.index===7||(this.index===6&&this.earthPerspective);}
@@ -180,11 +181,11 @@ export class Universe {
   }
   returnToSpaceOrbit(){if(this.index===6)this.resetView();}
   makeEarthMarker(){
-    const marker=new THREE.Group(),object={id:'earth-reference',name:'Terra',position:[0,0,0],bodyKind:'reference-earth'};
+    const marker=new THREE.Group(),object={id:'earth-reference',name:t("Earth","Terra"),position:[0,0,0],bodyKind:'reference-earth'};
     const hit=new THREE.Mesh(new THREE.SphereGeometry(.72,16,12),new THREE.MeshBasicMaterial({visible:false}));
     hit.userData.object=object;marker.add(hit);this.targets.push(hit);this.content.add(marker);this.earthMarker=marker;
-    const element=document.createElement('button');element.className='map-label home';element.textContent='Terra';
-    element.setAttribute('aria-label','Guarda la costellazione dalla posizione della Terra, nello spazio 3D');
+    const element=document.createElement('button');element.className='map-label home';element.textContent=t("Earth","Terra");
+    element.setAttribute('aria-label',t("View the constellation from Earth’s position in 3D space","Guarda la costellazione dalla posizione della Terra, nello spazio 3D"));
     element.addEventListener('click',()=>this.viewFromEarth());this.labelContainer.append(element);
     this.earthLabel={element,object:marker,data:object};this.labels.push(this.earthLabel);
   }
@@ -250,7 +251,7 @@ export class Universe {
   focusObject(object){
     if(object.id==='earth-reference'){this.viewFromEarth();return;}
     this.selectObject(object);const target=vec(object.position);
-    if(this.isSkyNavigation()){if(this.index===7&&object.altitudeDeg<0){this.onMessage('Questa stella è sotto l’orizzonte all’ora scelta.');return;}this.lookAtSky(target);return;}
+    if(this.isSkyNavigation()){if(this.index===7&&object.altitudeDeg<0){this.onMessage(t("This star is below the horizon at the selected time.","Questa stella è sotto l’orizzonte all’ora scelta."));return;}this.lookAtSky(target);return;}
 
     if(this.isPlanet(object)){
       this.focusedPlanet=object;

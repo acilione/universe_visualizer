@@ -29,7 +29,7 @@ try {
   await expect(page.locator('.webgl-error')).toHaveCount(0);
   await page.locator('[data-action="constellations"]').first().click();
   await expect(page.locator('#constellation-results [data-constellation]')).toHaveCount(88);
-  await expect(page.locator('#constellation-count')).toContainText('88 costellazioni');
+  await expect(page.locator('#constellation-count')).toContainText('88 constellations');
   await expect(page.locator('#observer-fields')).toBeHidden();
   await page.locator('#constellation-search').fill('orione');
   await expect(page.locator('#constellation-results [data-constellation]')).toHaveCount(1);
@@ -37,8 +37,8 @@ try {
   await expect(page.locator('#modal')).not.toBeVisible({ timeout: 60000 });
   await expect(page.locator('.app-shell')).toHaveClass(/constellation-view/);
   await expect(page.locator('.app-shell')).not.toHaveClass(/earth-sky-view/);
-  await expect(page.locator('#scale-title')).toHaveText('Orione.');
-  await expect(page.locator('#constellation-status')).toContainText('21 stelle');
+  await expect(page.locator('#scale-title')).toHaveText('Orion.');
+  await expect(page.locator('#constellation-status')).toContainText('21 stars');
   await expect(page.locator('#object-card')).toContainText('J2000');
   await expect(page.locator('#scale-slider')).toBeHidden();
   await expect(page.locator('#scale-slider')).toBeDisabled();
@@ -53,7 +53,7 @@ try {
   await expect(page.locator('.app-shell')).toHaveClass(/earth-perspective-view/);
   await expect(page.locator('.app-shell')).not.toHaveClass(/earth-sky-view/);
   await expect(page.locator('[data-action="earth-orbit"]')).toBeVisible();
-  await expect(page.locator('#constellation-status')).toContainText('Sei alla Terra');
+  await expect(page.locator('#constellation-status')).toContainText('Earth origin');
   await page.screenshot({ path: 'test-results/constellation-ui-earth-perspective.png' });
   await page.locator('[data-action="earth-orbit"]').click();
   await expect(page.locator('.app-shell')).not.toHaveClass(/earth-perspective-view/);
@@ -65,7 +65,7 @@ try {
   await page.locator('[data-action="constellation-observer"]').click();
   await expect(page.locator('#observer-fields')).toBeVisible();
   await expect(page.locator('#observer-fields')).toContainText('Europe/Rome');
-  await expect(page.locator('#observer-fields')).toContainText('non sono simulati');
+  await expect(page.locator('#observer-fields')).toContainText('not simulated');
   await page.locator('#observer-latitude').fill('91');
   await page.locator('#observer-datetime').fill('2026-01-15T21:00');
   await page.locator('#constellation-apply').click();
@@ -83,10 +83,10 @@ try {
   await page.locator('#observer-datetime').fill('2026-01-15T21:00');
   await page.locator('#constellation-apply').click();
   await expect(page.locator('#modal')).not.toBeVisible({ timeout: 60000 });
-  await expect(page.locator('#constellation-status')).toContainText('21 stelle della figura sopra');
-  await expect(page.locator('#constellation-status')).toContainText('15 gen');
+  await expect(page.locator('#constellation-status')).toContainText('21 figure stars above');
+  await expect(page.locator('#constellation-status')).toContainText('Jan 15');
   await expect(page.locator('#constellation-status')).toContainText('21:00');
-  await expect(page.locator('.coordinates')).toContainText('ORIZZONTE LOCALE');
+  await expect(page.locator('.coordinates')).toContainText('LOCAL HORIZON');
   await expect(page.locator('#map-labels .map-label:visible').first()).toBeVisible();
   await page.screenshot({ path: 'test-results/constellation-ui-earth.png' });
 
@@ -109,8 +109,8 @@ try {
   await expect(page.locator('.app-shell')).not.toHaveClass(/earth-sky-view/);
   await page.locator('#constellation-controls [data-constellation-mode="earth"]').click();
   await expect(page.locator('.app-shell')).toHaveClass(/earth-sky-view/, { timeout: 60000 });
-  await expect(page.locator('#constellation-status')).toContainText('21 stelle della figura sopra');
-  await expect(page.locator('#constellation-status')).toContainText('11 dic');
+  await expect(page.locator('#constellation-status')).toContainText('21 figure stars above');
+  await expect(page.locator('#constellation-status')).toContainText('Dec 11');
   await expect(page.locator('#constellation-status')).toContainText('20:00');
   await expect(page.locator('#constellation-status time')).toHaveAttribute('datetime', '2026-12-11T19:00:00.000Z');
   await page.locator('[data-action="constellation-observer"]').click();
@@ -130,7 +130,7 @@ try {
   await page.screenshot({ path: 'test-results/constellation-ui-mobile.png' });
   await page.locator('.view-controls [data-action="object"]').click();
   await expect(page.locator('#modal-body')).toContainText('HIPPARCOS');
-  await expect(page.locator('#modal-body')).toContainText('ORIZZONTE');
+  await expect(page.locator('#modal-body')).toContainText('HORIZON');
   await page.keyboard.press('Escape');
   await page.locator('.immersion-button').click();
   await expect(page.locator('.app-shell')).toHaveClass(/cinematic/, { timeout: 10000 });
@@ -147,10 +147,10 @@ try {
   await expect(page.locator('#constellation-results [data-constellation]')).toHaveCount(1);
   await page.locator('[data-constellation="Cru"]').click();
   await expect(page.locator('#modal')).not.toBeVisible({ timeout: 60000 });
-  await expect(page.locator('#constellation-status')).toContainText('0 stelle della figura sopra');
+  await expect(page.locator('#constellation-status')).toContainText('0 figure stars above');
   await page.locator('#constellation-controls [data-constellation-mode="space"]').click();
   await expect(page.locator('.app-shell')).not.toHaveClass(/earth-sky-view/, { timeout: 60000 });
-  await expect(page.locator('#constellation-status')).toContainText('4 stelle');
+  await expect(page.locator('#constellation-status')).toContainText('4 stars');
   await expect(page.locator('[data-action="earth-visible"]')).toBeVisible();
   await expect(page.locator('[data-action="earth-perspective"]')).toBeVisible();
   await page.locator('[data-action="earth-perspective"]').click();

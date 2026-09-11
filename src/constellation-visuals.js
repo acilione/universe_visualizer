@@ -1,3 +1,4 @@
+import { t, locale, formatNumber } from './i18n.js';
 import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
@@ -141,12 +142,14 @@ export function createConstellationView({catalog,figure,mode,observer,renderer})
   const visibleStarCount=mode==='earth'?members.filter(s=>position(s)[1]>=0).length:known.length;
   const objects=(mode==='earth'?members:known).map(s=>{
     const horizontal=transform?.horizontal(s.raDeg,s.decDeg);
-    return {...s,bodyKind:'catalog-star',type:'Stella · '+figure.name,measured:true,color:colorFor(s.colorIndex).getStyle(),size:.12,
-      distance:s.distanceLy===null?'Distanza sconosciuta':s.distanceLy.toLocaleString('it-IT',{maximumFractionDigits:1})+' anni luce',
+    return {...s,bodyKind:'catalog-star',type:t('Star · ','Stella · ')+figure.name,measured:true,color:colorFor(s.colorIndex).getStyle(),size:.12,
+      distance:s.distanceLy===null?t('Unknown distance','Distanza sconosciuta'):formatNumber(s.distanceLy,{maximumFractionDigits:1})+t(' light-years',' anni luce'),
       position:position(s),altitudeDeg:horizontal?.altitudeDeg,azimuthDeg:horizontal?.azimuthDeg,
       source:catalog.metadata.source,positionKind:mode==='earth'?'sky-projection':'measured',
-      detail:`Stella del catalogo HYG v4.1 nella figura di ${figure.name}. Magnitudine apparente ${s.mag.toLocaleString('it-IT')}.${horizontal?' Altezza sull’orizzonte: '+horizontal.altitudeDeg.toFixed(1)+'°.':''}`,
-      positionNote:mode==='earth'?'Proiezione del cielo da coordinate J2000, con precessione alla data scelta. Orizzonte geometrico; senza rifrazione, moto proprio o parallasse.':'Coordinate J2000 e distanza HYG. Scala lineare in tutte le direzioni; dimensioni stellari amplificate.'
+      detail:t(`HYG v4.1 star in ${figure.name}. Apparent magnitude ${formatNumber(s.mag)}.`,`Stella del catalogo HYG v4.1 in ${figure.name}. Magnitudine apparente ${formatNumber(s.mag)}.`)+(horizontal?t(` Altitude above the horizon: ${formatNumber(horizontal.altitudeDeg,{minimumFractionDigits:1,maximumFractionDigits:1})}°.`,` Altezza sull’orizzonte: ${formatNumber(horizontal.altitudeDeg,{minimumFractionDigits:1,maximumFractionDigits:1})}°.`):''),
+      positionNote:mode==='earth'
+        ?t('Sky projection from J2000 coordinates, precessed to the selected date. Geometric horizon; refraction, proper motion and parallax are not included.','Proiezione del cielo da coordinate J2000, con precessione alla data scelta. Orizzonte geometrico; senza rifrazione, moto proprio o parallasse.')
+        :t('J2000 coordinates and HYG distances. Linear scale in all directions; stellar sizes are enlarged.','Coordinate J2000 e distanze HYG. Scala lineare in tutte le direzioni; dimensioni stellari amplificate.')
     };
   }).sort((a,b)=>(mode==='earth'?Number(b.altitudeDeg>=0)-Number(a.altitudeDeg>=0):0)||a.mag-b.mag);
   const centroid=new THREE.Vector3();
@@ -155,11 +158,15 @@ export function createConstellationView({catalog,figure,mode,observer,renderer})
   const lookDirection=centroid.clone().normalize();
   const center=mode==='earth'?new THREE.Vector3():new THREE.Box3().setFromPoints([new THREE.Vector3(),...objects.map(o=>new THREE.Vector3(...o.position))]).getCenter(new THREE.Vector3());
   const radius=mode==='earth'?RADIUS:Math.max(8,...objects.map(o=>new THREE.Vector3(...o.position).distanceTo(center)),center.length());
+  const observationDate=new Date(observer.dateIso).toLocaleString(locale(),{timeZone:'UTC'})+' UTC';
+  const coordinates=`${formatNumber(observer.latitude,{minimumFractionDigits:2,maximumFractionDigits:2})}°, ${formatNumber(observer.longitude,{minimumFractionDigits:2,maximumFractionDigits:2})}°`;
   const positionNote=mode==='earth'
-    ? `Cielo per ${observer.latitude.toFixed(2)}°, ${observer.longitude.toFixed(2)}° · ${new Date(observer.dateIso).toLocaleString('it-IT',{timeZone:'UTC'})+' UTC'}. ${visibleStarCount}/${members.length} stelle della figura sopra l’orizzonte. Luminosità amplificata; cielo diurno non simulato.`
-    : `Distanze lineari HYG · volume di ${Math.round(reach*1.55).toLocaleString('it-IT')} anni luce dal Sole. ${unknownDistanceCount?unknownDistanceCount+' stelle senza distanza e relativi segmenti visibili solo dalla Terra.':'Tutte le stelle della figura hanno una distanza di catalogo.'}`;
-  const context={id:'constellations',constellationId:figure.id,mode,observer,name:figure.name,short:figure.abbr,extent:mode==='earth'?'Cielo dalla superficie terrestre':Math.round(reach).toLocaleString('it-IT')+' anni luce',metric:'STELLE DELLA FIGURA',count:String(members.length),starCount:members.length,visibleStarCount,unknownDistanceCount,
-    source:catalog.metadata.source,description:'Figure convenzionali delle 88 costellazioni. Le linee non rappresentano legami fisici.',positionNote,overview:'Costellazioni',renderedStarCount:visibleCatalog.length,catalogStarCount:catalog.stars.length};
+    ? t(`Sky at ${coordinates} · ${observationDate}. ${visibleStarCount}/${members.length} figure stars above the horizon. Brightness is amplified; daylight is not simulated.`,`Cielo per ${coordinates} · ${observationDate}. ${visibleStarCount}/${members.length} stelle della figura sopra l’orizzonte. Luminosità amplificata; cielo diurno non simulato.`)
+    : t(`Linear HYG distances · radius ${formatNumber(Math.round(reach*1.55))} light-years from the Sun.`,`Distanze lineari HYG · raggio di ${formatNumber(Math.round(reach*1.55))} anni luce dal Sole.`)+' '+(unknownDistanceCount
+      ? t(`${unknownDistanceCount} stars without distance measurements and their segments are available only in the Earth sky view.`,`${unknownDistanceCount} stelle senza distanza e relativi segmenti visibili solo dalla Terra.`)
+      : t('All figure stars have catalog distances.','Tutte le stelle della figura hanno una distanza di catalogo.'));
+  const context={id:'constellations',constellationId:figure.id,mode,observer,name:figure.name,short:figure.abbr,extent:mode==='earth'?t('Sky from Earth’s surface','Cielo dalla superficie terrestre'):formatNumber(Math.round(reach))+t(' light-years',' anni luce'),metric:t('FIGURE STARS','STELLE DELLA FIGURA'),count:String(members.length),starCount:members.length,visibleStarCount,unknownDistanceCount,
+    source:catalog.metadata.source,description:t('88 constellations with HYG v4.1 stellar coordinates.','88 costellazioni con coordinate stellari HYG v4.1.'),positionNote,overview:t('Constellations','Costellazioni'),renderedStarCount:visibleCatalog.length,catalogStarCount:catalog.stars.length};
   return {group,objects,context,center,radius,lookDirection,mode,figure,observer};
 }
 

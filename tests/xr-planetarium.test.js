@@ -1,3 +1,4 @@
+import { getLanguage, setLanguage } from '../src/i18n.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -87,7 +88,7 @@ test('Earth VR surrounds the tracked viewer at full size and refuses object resc
   assert.ok(h.mapRoot.quaternion.equals(identity()));
   assert.equal(h.xr.focusObject(h.object, 0.5), false);
   assert.deepEqual(h.mapRoot.scale.toArray(), [1, 1, 1]);
-  assert.match(h.messages.at(-1), /cielo intorno a te/);
+  assert.match(h.messages.at(-1), /Look around the sky/);
   h.viewer.position.set(3, 1.8, -1);
   h.xr.recenter();
   h.xr.update();
@@ -183,10 +184,10 @@ test('constellation world panel exposes figure cycling and perspective switching
   h.connect();
   await h.xr.enter();
   h.xr.update();
-  assert.ok(h.text.includes('\u2190 FIGURA'));
-  assert.ok(h.text.includes('FIGURA \u2192'));
-  assert.ok(h.text.includes('SPAZIO 3D'));
-  assert.ok(h.text.includes('Cambia figura o prospettiva dal pannello.'));
+  assert.ok(h.text.includes('\u2190 FIGURE'));
+  assert.ok(h.text.includes('FIGURE \u2192'));
+  assert.ok(h.text.includes('3D SPACE'));
+  assert.ok(h.text.includes('Change the constellation or perspective using the panel.'));
   const panel = h.mapRoot.parent.getObjectByName('XR navigation panel');
   const clickPanel = (x, y) => {
     const target = panel.localToWorld(new THREE.Vector3((x / 1160 - 0.5) * 1.45, (0.5 - y / 420) * (1.45 * 420 / 1160), 0));
@@ -203,5 +204,21 @@ test('constellation world panel exposes figure cycling and perspective switching
   assert.equal(h.focusActions.length, 1);
   h.setMode('atlas');
   h.xr.update();
-  assert.ok(h.text.includes('DALLA TERRA'));
+  assert.ok(h.text.includes('FROM EARTH'));
+});
+
+
+test('VR uses English by default and renders Italian only after an explicit language selection', async t => {
+  assert.equal(getLanguage(), 'en');
+  setLanguage('it');
+  t.after(() => setLanguage('en'));
+  const h = createHarness(t);
+  await h.xr.enter();
+  h.xr.update();
+  assert.ok(h.text.includes('← FIGURA'));
+  assert.ok(h.text.includes('SPAZIO 3D'));
+  assert.ok(h.text.includes('RICENTRA'));
+  assert.ok(h.text.includes('ESCI VR'));
+  assert.match(h.messages.at(-1), /VR attiva/);
+  assert.ok(!h.text.includes('3D SPACE'));
 });

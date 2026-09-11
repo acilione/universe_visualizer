@@ -12,7 +12,9 @@
     "test:engine": "node tests/engine-browser.mjs",
     "test:constellations": "node tests/constellation-engine.mjs",
     "test:constellation-ui": "node tests/constellation-ui.mjs",
-    "test:earth-reference": "node tests/earth-reference-engine.mjs"
+    "test:earth-reference": "node tests/earth-reference-engine.mjs",
+    "test:language": "node tests/language.mjs",
+    "test:layout": "node tests/layout.mjs"
   },
   "dependencies": {
     "three": "^0.180.0",

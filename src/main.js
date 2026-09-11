@@ -1,3 +1,4 @@
+import { getLanguage, setLanguage, t, locale } from './i18n.js';
 import './style.css';
 import { createIcons, Orbit, Search, Glasses, Maximize2, Minimize2, Plus, Minus, RotateCcw, Move, MousePointer2, Hand, Play, Pause, Volume2, VolumeX, Settings2, CircleHelp, X, ArrowUpRight, ArrowRight, Focus, Sparkles, Grid3X3, Tags, Compass, Layers, Info, Globe2, Star, Telescope, Check, ExternalLink } from 'lucide';
 import { catalog, scales } from './data.js';
@@ -5,6 +6,10 @@ import { Universe } from './universe.js';
 import { exoplanets, planetCatalogMetadata, findPlanet } from './planets.js';
 import { loadConstellations } from './constellation-catalog.js';
 import { parseCoordinate, dateInputInZone, zonedDateInputToIso } from './observer-input.js';
+
+document.documentElement.lang = getLanguage();
+document.title = t('\u00c6THER \u2014 Scientific cosmic atlas', '\u00c6THER \u2014 Atlante cosmico scientifico');
+document.querySelector('meta[name="description"]').content = t('Interactive astronomical catalogues: planets, stars, galaxies, 3D constellations and Earth sky views with WebXR.', 'Cataloghi astronomici interattivi: pianeti, stelle, galassie, costellazioni 3D e cielo terrestre con WebXR.');
 
 const icons = { Orbit, Search, Glasses, Maximize2, Minimize2, Plus, Minus, RotateCcw, Move, MousePointer2, Hand, Play, Pause, Volume2, VolumeX, Settings2, CircleHelp, X, ArrowUpRight, ArrowRight, Focus, Sparkles, Grid3X3, Tags, Compass, Layers, Info, Globe2, Star, Telescope, Check, ExternalLink };
 const icon = name => `<i data-lucide="${name}" aria-hidden="true"></i>`;
@@ -40,82 +45,82 @@ let audioSuspendTimer = null;
 
 $('#app').innerHTML = `
   <main class="app-shell">
-    <canvas id="universe" aria-label="Atlante cosmico tridimensionale. Trascina per orbitare e usa la rotellina per avvicinarti." tabindex="0"></canvas>
+    <canvas id="universe" aria-label="${t("Three-dimensional cosmic atlas. Drag to orbit and scroll to zoom.","Atlante cosmico tridimensionale. Trascina per orbitare e usa la rotellina per avvicinarti.")}" tabindex="0"></canvas>
     <div class="vignette" aria-hidden="true"></div>
-    <div class="labels" id="map-labels" aria-label="Oggetti celesti sulla mappa"></div>
+    <div class="labels" id="map-labels" aria-label="${t("Celestial objects on the map","Oggetti celesti sulla mappa")}"></div>
     <header class="topbar">
-      <a class="brand" href="#esplora" aria-label="Æther, atlante cosmico"><img src="/favicon.svg" alt=""/><div><div class="brand-word">ÆTHER</div><div class="brand-sub">ATLANTE COSMICO</div></div></a>
-      <nav class="topnav" aria-label="Navigazione principale">
-        <button class="active" data-action="explore" aria-current="page">Esplora</button>
-        <button data-action="collections">Collezioni</button>
-        <button data-action="about">Il progetto ${icon('arrow-up-right')}</button>
+      <a class="brand" href="#esplora" aria-label="${t("Æther, cosmic atlas","Æther, atlante cosmico")}"><img src="/favicon.svg" alt=""/><div><div class="brand-word">ÆTHER</div><div class="brand-sub">${t("COSMIC ATLAS","ATLANTE COSMICO")}</div></div></a>
+      <nav class="topnav" aria-label="${t("Main navigation","Navigazione principale")}">
+        <button class="active" data-action="explore" aria-current="page">${t("Explore","Esplora")}</button>
+        <button data-action="collections">${t("Catalogue sections","Sezioni del catalogo")}</button>
+        <button data-action="about">${t("The project","Il progetto")} ${icon('arrow-up-right')}</button>
       </nav>
-      <div class="top-actions"><button class="constellation-browser-button" data-action="constellations" aria-label="Esplora le costellazioni" title="Costellazioni">${icon('sparkles')}<span>Costellazioni</span></button><button class="planet-browser-button" data-action="planets" aria-label="Esplora i pianeti" title="Pianeti">${icon('globe-2')}<span>Pianeti</span></button><span class="live"><span class="status-dot"></span><span id="renderer-status">UNIVERSO IN MOVIMENTO</span></span><button class="vr-button" data-action="vr">${icon('glasses')} Entra in VR</button></div>
+      <div class="top-actions"><button class="constellation-browser-button" data-action="constellations" aria-label="${t("Browse constellations","Esplora le costellazioni")}" title="${t("Constellations","Costellazioni")}">${icon('sparkles')}<span>${t("Constellations","Costellazioni")}</span></button><button class="planet-browser-button" data-action="planets" aria-label="${t("Browse planets","Esplora i pianeti")}" title="${t("Planets","Pianeti")}">${icon('globe-2')}<span>${t("Planets","Pianeti")}</span></button><span class="live"><span class="status-dot"></span><span id="renderer-status">${t("3D RENDERER ACTIVE","RENDERER 3D ATTIVO")}</span></span><button class="vr-button" data-action="vr">${icon('glasses')} ${t("Enter VR","Entra in VR")}</button></div>
     </header>
-    <section class="intro" aria-label="Regione esplorata">
-      <div class="eyebrow">UN VIAGGIO ATTRAVERSO L’INFINITO</div>
+    <section class="intro" aria-label="${t("Selected region","Regione esplorata")}">
+      <div class="eyebrow">${t("ASTRONOMICAL CATALOGUES","CATALOGHI ASTRONOMICI")}</div>
       <h1 id="scale-title">${scales[0].title}</h1>
       <div class="subtitle" id="scale-subtitle">${scales[0].subtitle}</div>
     </section>
-    <aside class="left-panel" aria-label="Scala e livelli della mappa">
-      <div class="section-heading">LA TUA PROSPETTIVA ${icon('layers')}</div>
-      <section class="constellation-controls" id="constellation-controls" aria-label="Prospettiva della costellazione" hidden>
-        <button class="constellation-change" data-action="constellations"><span id="constellation-current">Costellazioni</span>${icon('search')}</button>
-        <div class="constellation-mode" role="group" aria-label="Punto di osservazione">
-          <button data-constellation-mode="space">${icon('orbit')}Nello spazio 3D</button>
-          <button data-constellation-mode="earth">${icon('globe-2')}Dalla Terra</button>
+    <aside class="left-panel" aria-label="${t("Map scale and layers","Scala e livelli della mappa")}">
+      <div class="section-heading">${t("REFERENCE FRAME","SISTEMA DI RIFERIMENTO")} ${icon('layers')}</div>
+      <section class="constellation-controls" id="constellation-controls" aria-label="${t("Constellation perspective","Prospettiva della costellazione")}" hidden>
+        <button class="constellation-change" data-action="constellations"><span id="constellation-current">${t("Constellations","Costellazioni")}</span>${icon('search')}</button>
+        <div class="constellation-mode" role="group" aria-label="${t("Observer position","Punto di osservazione")}">
+          <button data-constellation-mode="space">${icon('orbit')}${t("3D space","Nello spazio 3D")}</button>
+          <button data-constellation-mode="earth">${icon('globe-2')}${t("Earth view","Dalla Terra")}</button>
         </div>
         <div id="earth-space-controls" class="earth-space-controls" hidden>
-          <div class="layer-row"><span>${icon('globe-2')}Mostra la Terra</span><button class="toggle" role="switch" aria-label="Mostra la Terra" aria-checked="true" data-action="earth-visible"></button></div>
-          <button class="earth-perspective-button" data-action="earth-perspective">${icon('focus')}Guarda dalla Terra</button>
-          <button class="earth-perspective-button" data-action="earth-orbit" hidden>${icon('orbit')}Torna a orbitare</button>
-          <small>Terra ingrandita all'origine della mappa.</small>
+          <div class="layer-row"><span>${icon('globe-2')}${t("Show Earth","Mostra la Terra")}</span><button class="toggle" role="switch" aria-label="${t("Show Earth","Mostra la Terra")}" aria-checked="true" data-action="earth-visible"></button></div>
+          <button class="earth-perspective-button" data-action="earth-perspective">${icon('focus')}${t("View from Earth","Guarda dalla Terra")}</button>
+          <button class="earth-perspective-button" data-action="earth-orbit" hidden>${icon('orbit')}${t("Return to orbit","Torna a orbitare")}</button>
+          <small>${t("Earth shown at enlarged size at the map origin.","Terra ingrandita all'origine della mappa.")}</small>
         </div>
         <p id="constellation-status" class="constellation-status" aria-live="polite"></p>
-        <button class="observer-adjust" data-action="constellation-observer">${icon('settings-2')}Luogo e orario</button>
+        <button class="observer-adjust" data-action="constellation-observer">${icon('settings-2')}${t("Location and time","Luogo e orario")}</button>
       </section>
-      <div class="scale-list" role="group" aria-label="Seleziona la scala cosmica">
+      <div class="scale-list" role="group" aria-label="${t("Select reference scale","Seleziona scala di riferimento")}">
         ${scales.map((scale, i) => `<button class="scale-button${i === 0 ? ' active' : ''}" data-scale="${i}" aria-pressed="${i === 0}"><span class="node" aria-hidden="true"></span><span>${scale.short}<small>${scale.extent}</small></span><span class="number">0${i + 1}</span></button>`).join('')}
       </div>
-      <div class="layers"><div class="section-heading">LIVELLI DELLA MAPPA</div>
-        ${[['labels','Etichette','tags'],['grid','Griglia orbitale','grid-3x3'],['particles','Polvere stellare','sparkles']].map(([name,label,glyph]) => `<div class="layer-row"><span>${icon(glyph)}${label}</span><button class="toggle" role="switch" aria-label="${label}" aria-checked="${state[name]}" data-layer="${name}"></button></div>`).join('')}
+      <div class="layers"><div class="section-heading">${t("MAP LAYERS","LIVELLI DELLA MAPPA")}</div>
+        ${[['labels',t("Labels","Etichette"),'tags'],['grid',t("Reference grid","Griglia di riferimento"),'grid-3x3'],['particles',t("Particle effects","Effetti particellari"),'sparkles']].map(([name,label,glyph]) => `<div class="layer-row"><span>${icon(glyph)}${label}</span><button class="toggle" role="switch" aria-label="${label}" aria-checked="${state[name]}" data-layer="${name}"></button></div>`).join('')}
       </div>
     </aside>
-    <aside class="right-panel" aria-label="Informazioni sull’oggetto selezionato">
-      <button class="search-button" data-action="search">${icon('search')}<span>Cerca nell’universo</span><kbd>/</kbd></button>
+    <aside class="right-panel" aria-label="${t("Selected object information","Informazioni sull’oggetto selezionato")}">
+      <button class="search-button" data-action="search">${icon('search')}<span>${t("Search catalogue","Cerca nel catalogo")}</span><kbd>/</kbd></button>
       <article class="object-card" id="object-card"></article>
-      <div class="coordinates"><span>J2000 · RIFERIMENTO</span><span>MAPPA ILLUSTRATIVA</span></div>
+      <div class="coordinates"><span>${t("J2000 · REFERENCE","J2000 · RIFERIMENTO")}</span><span>${t("ILLUSTRATIVE MAP","MAPPA ILLUSTRATIVA")}</span></div>
     </aside>
-    <div class="center-caption" aria-hidden="true"><div class="galaxy-name" id="region-name">SISTEMA SOLARE</div><div class="galaxy-type" id="region-type">OTTO MONDI DA ESPLORARE</div></div>
+    <div class="center-caption" aria-hidden="true"><div class="galaxy-name" id="region-name">${t("SOLAR SYSTEM","SISTEMA SOLARE")}</div><div class="galaxy-type" id="region-type">${t("SUN AND EIGHT PLANETS","SOLE E OTTO PIANETI")}</div></div>
     <div class="compass" aria-hidden="true"><small>N</small><span>✧</span></div>
-    <div class="view-controls" role="group" aria-label="Controlli di visualizzazione">
-      <button class="icon-button mobile-info" data-action="object" title="Informazioni sull’oggetto" aria-label="Informazioni sull’oggetto">${icon('info')}</button>
-      <button class="icon-button" data-action="zoom-in" title="Avvicina" aria-label="Avvicina">${icon('plus')}</button>
-      <button class="icon-button" data-action="zoom-out" title="Allontana" aria-label="Allontana">${icon('minus')}</button>
+    <div class="view-controls" role="group" aria-label="${t("View controls","Controlli di visualizzazione")}">
+      <button class="icon-button mobile-info" data-action="object" title="${t("Object information","Informazioni sull’oggetto")}" aria-label="${t("Object information","Informazioni sull’oggetto")}">${icon('info')}</button>
+      <button class="icon-button" data-action="zoom-in" title="${t("Zoom in","Avvicina")}" aria-label="${t("Zoom in","Avvicina")}">${icon('plus')}</button>
+      <button class="icon-button" data-action="zoom-out" title="${t("Zoom out","Allontana")}" aria-label="${t("Zoom out","Allontana")}">${icon('minus')}</button>
       <div class="separator"></div>
-      <button class="icon-button" data-action="reset" title="Ripristina vista · R" aria-label="Ripristina vista">${icon('rotate-ccw')}</button>
-      <button class="icon-button${state.autoRotate ? ' active' : ''}" data-action="rotate" aria-pressed="${state.autoRotate}" title="Rotazione automatica · Spazio" aria-label="Rotazione automatica">${icon('orbit')}</button>
-      <button class="immersion-button" data-action="cinema" title="Nasconde tutte le scritte · Esc per tornare" aria-label="Spazio libero, nascondi tutte le scritte" aria-pressed="false">${icon('maximize-2')}<span>Spazio libero</span></button>
+      <button class="icon-button" data-action="reset" title="${t("Reset view · R","Ripristina vista · R")}" aria-label="${t("Reset view","Ripristina vista")}">${icon('rotate-ccw')}</button>
+      <button class="icon-button${state.autoRotate ? ' active' : ''}" data-action="rotate" aria-pressed="${state.autoRotate}" title="${t("Auto-rotate · Space","Rotazione automatica · Spazio")}" aria-label="${t("Auto-rotate","Rotazione automatica")}">${icon('orbit')}</button>
+      <button class="immersion-button" data-action="cinema" title="${t("Hide all text · Esc to restore","Nasconde tutte le scritte · Esc per tornare")}" aria-label="${t("Immersive view, hide all text","Vista immersiva, nascondi tutte le scritte")}" aria-pressed="false">${icon('maximize-2')}<span>${t("Immersive view","Vista immersiva")}</span></button>
     </div>
-    <section class="bottom-panel" aria-label="Viaggio e scala">
-      <div class="scale-readout"><div class="readout-title">SCALA DI RIFERIMENTO</div><div class="readout-value" id="scale-readout">${scales[0].extent}</div></div>
+    <section class="bottom-panel" aria-label="${t("Reference scale navigation","Navigazione delle scale")}">
+      <div class="scale-readout"><div class="readout-title">${t("REFERENCE SCALE","SCALA DI RIFERIMENTO")}</div><div class="readout-value" id="scale-readout">${scales[0].extent}</div></div>
       <div class="journey">
-        <div class="journey-top"><span>Ogni viaggio inizia con la curiosità.</span><small id="scale-step">01 / 05</small></div>
-        <input id="scale-slider" type="range" min="0" max="4" step="1" value="0" aria-label="Scala cosmica" aria-valuetext="Sistema Solare"/>
-        <div class="journey-labels"><span>IL NOSTRO SISTEMA</span><span>L’UNIVERSO OSSERVABILE</span></div>
-        <button class="cosmic-return" data-action="cosmic-scales" hidden>${icon('arrow-right')}Torna alle scale cosmiche</button>
+        <div class="journey-top"><span>${t("Reference scale navigation","Navigazione fra scale di riferimento")}</span><small id="scale-step">01 / 05</small></div>
+        <input id="scale-slider" type="range" min="0" max="4" step="1" value="0" aria-label="${t("Reference scale","Scala di riferimento")}" aria-valuetext="${t("Solar System","Sistema Solare")}"/>
+        <div class="journey-labels"><span>${t("SOLAR SYSTEM","SISTEMA SOLARE")}</span><span>${t("OBSERVABLE UNIVERSE","UNIVERSO OSSERVABILE")}</span></div>
+        <button class="cosmic-return" data-action="cosmic-scales" hidden>${icon('arrow-right')}${t("Return to reference scales","Torna alle scale di riferimento")}</button>
       </div>
-      <div class="play-area"><button class="play-button" data-action="tour" aria-label="Avvia viaggio guidato" aria-pressed="false">${icon('play')}</button><div><strong id="tour-title">Lasciati trasportare</strong><small id="tour-caption">Inizia un viaggio guidato</small></div></div>
+      <div class="play-area"><button class="play-button" data-action="tour" aria-label="${t("Start scale sequence","Avvia sequenza delle scale")}" aria-pressed="false">${icon('play')}</button><div><strong id="tour-title">${t("Automatic sequence","Sequenza automatica")}</strong><small id="tour-caption">${t("Cycle through five reference scales","Scorri le cinque scale di riferimento")}</small></div></div>
     </section>
     <footer class="footer">
-      <div class="footer-controls"><span>${icon('mouse-pointer-2')} Trascina per orbitare</span><span>${icon('move')} Scroll per esplorare</span><span>${icon('hand')} Mani libere, in VR</span></div>
-      <div class="footer-right"><span>ISPIRATO ALLA MERAVIGLIA. RADICATO NELLA SCIENZA.</span><button data-action="sound" aria-pressed="false" aria-label="Attiva suono ambiente">${icon('volume-x')}<span id="sound-label">Suono off</span></button><button data-action="settings" title="Impostazioni" aria-label="Impostazioni">${icon('settings-2')}</button><button data-action="help" title="Guida ai comandi" aria-label="Guida ai comandi">${icon('circle-help')}</button></div>
+      <div class="footer-controls"><span>${icon('mouse-pointer-2')} ${t("Drag to orbit","Trascina per orbitare")}</span><span>${icon('move')} ${t("Scroll to zoom","Scorri per ingrandire")}</span><span>${icon('hand')} ${t("Hand tracking in VR","Tracciamento mani in VR")}</span></div>
+      <div class="footer-right"><span>${t("J2000 · CATALOGUE COORDINATES","J2000 · COORDINATE DI CATALOGO")}</span><button data-action="sound" aria-pressed="false" aria-label="${t("Enable ambient audio","Attiva suono ambiente")}">${icon('volume-x')}<span id="sound-label">${t("Audio off","Suono off")}</span></button><button data-action="settings" title="${t("Settings","Impostazioni")}" aria-label="${t("Settings","Impostazioni")}">${icon('settings-2')}</button><button data-action="help" title="${t("Controls guide","Guida ai comandi")}" aria-label="${t("Controls guide","Guida ai comandi")}">${icon('circle-help')}</button></div>
     </footer>
-    <button class="exit-cinema" data-action="cinema" aria-label="Mostra interfaccia">${icon('minimize-2')}</button>
+    <button class="exit-cinema" data-action="cinema" aria-label="${t("Show interface","Mostra interfaccia")}">${icon('minimize-2')}</button>
     <div class="toast" role="status" aria-live="polite"></div>
-    <div class="loading" role="status"><img src="/favicon.svg" alt=""/><span>TRACCIANDO LE STELLE</span></div>
+    <div class="loading" role="status"><img src="/favicon.svg" alt=""/><span>${t("LOADING CATALOGUES","CARICAMENTO CATALOGHI")}</span></div>
   </main>
-  <dialog id="modal" aria-labelledby="modal-title"><div class="dialog-head"><h2 id="modal-title"></h2><button data-action="close" aria-label="Chiudi finestra">${icon('x')}</button></div><div id="modal-body"></div></dialog>
+  <dialog id="modal" aria-labelledby="modal-title"><div class="dialog-head"><h2 id="modal-title"></h2><button data-action="close" aria-label="${t("Close dialog","Chiudi finestra")}">${icon('x')}</button></div><div id="modal-body"></div></dialog>
 `;
 
 function savePreferences() {
@@ -133,12 +138,12 @@ function notify(message) {
 }
 
 const isPlanet = object => object?.isPlanet || object?.bodyKind === 'exoplanet' || catalog.solar.slice(1).some(planet => planet.id === object?.id);
-const number = (value, unit = '') => Number.isFinite(value) ? `${value.toLocaleString('it-IT', { maximumFractionDigits: 2 })}${unit ? ' ' + unit : ''}` : 'Non disponibile';
+const number = (value, unit = '') => Number.isFinite(value) ? `${value.toLocaleString(locale(), { maximumFractionDigits: 2 })}${unit ? ' ' + unit : ''}` : t("Not available","Non disponibile");
 const currentScale = () => scales[state.scale] || {
   id: state.scale >= 6 ? 'constellations' : 'exoplanets',
-  name: state.context?.name || state.object?.host || 'Sistema esoplanetario',
+  name: state.context?.name || state.object?.host || t("Exoplanet system","Sistema esoplanetario"),
   source: state.scale >= 6 ? 'https://github.com/astronexus/HYG-Database' : 'https://exoplanetarchive.ipac.caltech.edu/',
-  extent: state.scale >= 6 ? 'Catalogo stellare HYG' : 'Sistema esoplanetario',
+  extent: state.scale >= 6 ? t("HYG star catalogue","Catalogo stellare HYG") : t("Exoplanet system","Sistema esoplanetario"),
   ...state.context
 };
 
@@ -153,26 +158,26 @@ function objectMarkup(object, isModal = false) {
     ? `<div class="planet-art${object.id === 'saturn' ? ' planet-art-saturn' : ''}" style="--planet-color:${escape(object.color || '#a6c7d4')};${solarTextures[object.id] ? `--planet-texture:url('/textures/${solarTextures[object.id]}')` : ''}" aria-hidden="true"><span></span></div>`
     : `<div class="galaxy-art" data-scene="${escape(scale.id)}" aria-hidden="true"></div>`;
   const measurements = exoplanet ? `<div class="planet-measurements">
-    <div><span>RAGGIO</span><strong>${number(object.radiusEarth, 'R⊕')}</strong></div>
-    <div><span>PERIODO ORBITALE</span><strong>${number(object.periodDays, 'giorni')}</strong></div>
-    ${isModal ? `<div><span>MASSA DA CATALOGO${object.massProvenance ? ' · ' + escape(object.massProvenance) : ''}</span><strong>${number(object.massEarth, 'M⊕')}</strong></div><div><span>TEMPERATURA DI EQUILIBRIO</span><strong>${number(object.temperatureK, 'K')}</strong></div><div><span>SEMIASSE MAGGIORE</span><strong>${number(object.semiMajorAxisAu, 'UA')}</strong></div><div><span>ANNO DI SCOPERTA</span><strong>${Number.isFinite(object.discoveryYear) ? object.discoveryYear : 'Non disponibile'}</strong></div>` : ''}
+    <div><span>${t("RADIUS","RAGGIO")}</span><strong>${number(object.radiusEarth, 'R⊕')}</strong></div>
+    <div><span>${t("ORBITAL PERIOD","PERIODO ORBITALE")}</span><strong>${number(object.periodDays, t("days","giorni"))}</strong></div>
+    ${isModal ? `<div><span>${t("CATALOGUE MASS","MASSA DA CATALOGO")}${object.massProvenance ? ' · ' + escape(object.massProvenance) : ''}</span><strong>${number(object.massEarth, 'M⊕')}</strong></div><div><span>${t("EQUILIBRIUM TEMPERATURE","TEMPERATURA DI EQUILIBRIO")}</span><strong>${number(object.temperatureK, 'K')}</strong></div><div><span>${t("SEMI-MAJOR AXIS","SEMIASSE MAGGIORE")}</span><strong>${number(object.semiMajorAxisAu, t("AU","UA"))}</strong></div><div><span>${t("DISCOVERY YEAR","ANNO DI SCOPERTA")}</span><strong>${Number.isFinite(object.discoveryYear) ? object.discoveryYear : t("Not available","Non disponibile")}</strong></div>` : ''}
     </div>` : catalogStar ? `<div class="planet-measurements star-measurements">
-      <div><span>ASCENSIONE RETTA · J2000</span><strong>${number(object.raDeg, '°')}</strong></div>
-      <div><span>DECLINAZIONE · J2000</span><strong>${number(object.decDeg, '°')}</strong></div>
-      ${isModal ? `<div><span>MAGNITUDINE APPARENTE</span><strong>${number(object.mag)}</strong></div><div><span>IDENTIFICATORE HIPPARCOS</span><strong>${object.hip ? 'HIP ' + escape(object.hip) : 'Non disponibile'}</strong></div>${state.scale === 7 ? `<div><span>ALTEZZA SULL'ORIZZONTE</span><strong>${number(object.altitudeDeg, '°')}</strong></div>` : ''}` : ''}
+      <div><span>${t("RIGHT ASCENSION · J2000","ASCENSIONE RETTA · J2000")}</span><strong>${number(object.raDeg, '°')}</strong></div>
+      <div><span>${t("DECLINATION · J2000","DECLINAZIONE · J2000")}</span><strong>${number(object.decDeg, '°')}</strong></div>
+      ${isModal ? `<div><span>${t("APPARENT MAGNITUDE","MAGNITUDINE APPARENTE")}</span><strong>${number(object.mag)}</strong></div><div><span>${t("HIPPARCOS IDENTIFIER","IDENTIFICATORE HIPPARCOS")}</span><strong>${object.hip ? 'HIP ' + escape(object.hip) : t("Not available","Non disponibile")}</strong></div>${state.scale === 7 ? `<div><span>${t("ALTITUDE ABOVE HORIZON","ALTEZZA SULL'ORIZZONTE")}</span><strong>${number(object.altitudeDeg, '°')}</strong></div>` : ''}` : ''}
     </div>` : '';
-  return `<div class="card-top"><span>${planet ? 'UN MONDO DA ESPLORARE' : isOverview ? 'TACCUINO DI ESPLORAZIONE' : 'OGGETTO CELESTE'}</span>${icon(planet ? 'globe-2' : 'sparkles')}</div>${art}
-    <div class="card-content${planet ? ' planet-card-content' : ''}"><h2>${escape(object.name)}</h2><div class="object-type">${escape(object.type || 'Stella da catalogo')}${exoplanet ? ' · ' + escape(object.host) : ''}</div>
+  return `<div class="card-top"><span>${planet ? t("PLANET DATA","DATI DEL PIANETA") : isOverview ? t("CATALOGUE OVERVIEW","PANORAMICA DEL CATALOGO") : t("CELESTIAL OBJECT","OGGETTO CELESTE")}</span>${icon(planet ? 'globe-2' : 'sparkles')}</div>${art}
+    <div class="card-content${planet ? ' planet-card-content' : ''}"><h2>${escape(object.name)}</h2><div class="object-type">${escape(object.type || t("Catalogue star","Stella da catalogo"))}${exoplanet ? ' · ' + escape(object.host) : ''}</div>
       <p class="card-description">${escape(object.detail || state.context?.description || '')}</p>
-      <div class="card-stats"><span>${isOverview ? escape(scale.metric) : exoplanet ? 'DISTANZA DALLA TERRA' : 'DISTANZA / ESTENSIONE'}</span><strong>${escape(isOverview ? scale.count : object.distance || 'Non disponibile')}</strong></div>
-      ${isOverview ? `<div class="card-stats"><span>ESTENSIONE</span><strong>${escape(scale.extent)}</strong></div>` : ''}
+      <div class="card-stats"><span>${isOverview ? escape(scale.metric) : exoplanet ? t("DISTANCE FROM EARTH","DISTANZA DALLA TERRA") : t("DISTANCE / EXTENT","DISTANZA / ESTENSIONE")}</span><strong>${escape(isOverview ? scale.count : object.distance || t("Not available","Non disponibile"))}</strong></div>
+      ${isOverview ? `<div class="card-stats"><span>${t("EXTENT","ESTENSIONE")}</span><strong>${escape(scale.extent)}</strong></div>` : ''}
       ${measurements}
-      ${catalogStar ? `<p class="illustration-note">${state.scale === 7 ? (object.altitudeDeg < 0 ? 'Sotto l’orizzonte nel luogo e all’orario scelti.' : 'Direzione nel cielo dal luogo e all’orario scelti.') : Number.isFinite(object.distanceLy) ? 'Posizione 3D da coordinate e distanza di catalogo.' : 'Distanza non disponibile: visibile nella vista dalla Terra.'}</p>${!isModal ? `<button class="planet-details-button" data-action="object">Dati della stella ${icon('arrow-up-right')}</button>` : ''}` : ''}
+      ${catalogStar ? `<p class="illustration-note">${state.scale === 7 ? (object.altitudeDeg < 0 ? t("Below the horizon at the selected location and time.","Sotto l’orizzonte nel luogo e all’orario scelti.") : t("Sky direction at the selected location and time.","Direzione nel cielo dal luogo e all’orario scelti.")) : Number.isFinite(object.distanceLy) ? t("3D position from catalogue coordinates and distance.","Posizione 3D da coordinate e distanza di catalogo.") : t("Distance unavailable; included in the Earth sky view.","Distanza non disponibile: visibile nella vista dalla Terra.")}</p>${!isModal ? `<button class="planet-details-button" data-action="object">${t("Star data","Dati della stella")} ${icon('arrow-up-right')}</button>` : ''}` : ''}
       ${isModal && object.positionNote ? `<p class="illustration-note">${escape(object.positionNote)}</p>` : ''}
-      ${exoplanet ? '<p class="illustration-note">Aspetto illustrativo. Misure e stime dal catalogo NASA.</p>' : ''}
-      ${planet && !isModal ? `<button class="planet-details-button" data-action="object">Dati del pianeta ${icon('arrow-up-right')}</button>` : ''}
-      <button class="focus-button" data-action="focus">${icon(canDive ? 'arrow-right' : 'focus')}${planet ? 'Avvicinati al pianeta' : canDive ? 'Esplora ' + escape(scales[object.targetScale].name) : 'Metti a fuoco'}</button>
-      <a class="object-source" href="${escape(object.source || scale.source)}" target="_blank" rel="noopener noreferrer">Fonte scientifica ↗</a>
+      ${exoplanet ? `<p class="illustration-note">${t("Illustrative appearance. Measurements and estimates from the NASA catalogue.","Aspetto illustrativo. Misure e stime dal catalogo NASA.")}</p>` : ''}
+      ${planet && !isModal ? `<button class="planet-details-button" data-action="object">${t("Planet data","Dati del pianeta")} ${icon('arrow-up-right')}</button>` : ''}
+      <button class="focus-button" data-action="focus">${icon(canDive ? 'arrow-right' : 'focus')}${planet ? t("Inspect planet","Osserva il pianeta") : canDive ? t("Open ","Apri ") + escape(scales[object.targetScale].name) : t("Focus","Metti a fuoco")}</button>
+      <a class="object-source" href="${escape(object.source || scale.source)}" target="_blank" rel="noopener noreferrer">${t("Scientific source ↗","Fonte scientifica ↗")}</a>
     </div>`;
 }
 
@@ -180,7 +185,7 @@ function renderObject(object) {
   if (!object || !object.name) return;
   state.object = object;
   $('#object-card').innerHTML = objectMarkup(object);
-  $('.coordinates').innerHTML = `<span>${state.scale === 7 ? 'ORIZZONTE LOCALE' : state.scale === 6 ? 'J2000 · DISTANZE HYG' : ['stars','local'].includes(currentScale().id) ? 'J2000 · APPROSSIMATA' : 'VISTA SCHEMATICA'}</span><span>${state.scale >= 6 ? 'CATALOGO HYG 4.1' : 'ATLANTE COSMICO'}</span>`;
+  $('.coordinates').innerHTML = `<span>${state.scale === 7 ? t("LOCAL HORIZON","ORIZZONTE LOCALE") : state.scale === 6 ? t("J2000 · HYG DISTANCES","J2000 · DISTANZE HYG") : ['stars','local'].includes(currentScale().id) ? t("J2000 · APPROXIMATE","J2000 · APPROSSIMATA") : t("SCHEMATIC VIEW","VISTA SCHEMATICA")}</span><span>${state.scale >= 6 ? t("HYG 4.1 CATALOGUE","CATALOGO HYG 4.1") : t("COSMIC ATLAS","ATLANTE COSMICO")}</span>`;
   if ($('#modal').open && $('#modal').dataset.kind === 'object') $('#modal-body').innerHTML = objectMarkup(object, true);
   refreshIcons();
 }
@@ -201,21 +206,21 @@ function updateScale(index, context = null) {
     if (typeof context?.earthVisible === 'boolean') constellationBrowser.earthVisible = context.earthVisible;
     if (context?.observer) constellationBrowser.observer = { ...constellationBrowser.observer, ...context.observer };
   }
-  $('#scale-title').textContent = constellationView ? `${scale.name}.` : hostView ? `Intorno a ${scale.name}.` : scale.title;
-  $('#scale-subtitle').textContent = constellationView ? index === 7 ? 'Il cielo sopra di te. Una prospettiva terrestre.' : 'Le stelle di una figura. La profondità dello spazio.' : hostView ? 'Un altro sole. Nuovi mondi da avvicinare.' : scale.subtitle;
+  $('#scale-title').textContent = constellationView ? `${scale.name}.` : hostView ? `${t("Host star: ","Stella ospite: ")}${scale.name}.` : scale.title;
+  $('#scale-subtitle').textContent = constellationView ? index === 7 ? t("Local sky coordinates for the selected observer and time.","Coordinate del cielo per l’osservatore e l’istante selezionati.") : t("J2000 stellar positions and catalogue distances.","Posizioni stellari J2000 e distanze di catalogo.") : hostView ? t("Confirmed planets around the selected host star.","Pianeti confermati intorno alla stella selezionata.") : scale.subtitle;
   $('#scale-readout').textContent = scale.extent;
-  $('#scale-step').textContent = constellationView ? index === 7 ? 'DALLA TERRA' : 'COSTELLAZIONI' : hostView ? 'ESOPIANETI' : `0${index + 1} / 05`;
-  $('#region-name').textContent = scale.name.toLocaleUpperCase('it-IT');
-  $('#region-type').textContent = constellationView ? index === 7 ? 'CIELO LOCALE · ORIZZONTE GEOMETRICO' : 'STELLE REALI · FIGURE CONVENZIONALI' : hostView ? 'SISTEMA ESOPLANETARIO · ORBITE ILLUSTRATIVE' : index === 4 ? 'RICOSTRUZIONE CONCETTUALE' : catalog[scale.id][0].type.toLocaleUpperCase('it-IT');
+  $('#scale-step').textContent = constellationView ? index === 7 ? t("EARTH VIEW","DALLA TERRA") : t("CONSTELLATIONS","COSTELLAZIONI") : hostView ? t("EXOPLANETS","ESOPIANETI") : `0${index + 1} / 05`;
+  $('#region-name').textContent = scale.name.toLocaleUpperCase(locale());
+  $('#region-type').textContent = constellationView ? index === 7 ? t("LOCAL SKY · GEOMETRIC HORIZON","CIELO LOCALE · ORIZZONTE GEOMETRICO") : t("HYG STELLAR COORDINATES","COORDINATE STELLARI HYG") : hostView ? t("EXOPLANET SYSTEM · SCHEMATIC ORBITS","SISTEMA ESOPLANETARIO · ORBITE ILLUSTRATIVE") : index === 4 ? t("CONCEPTUAL MODEL","RICOSTRUZIONE CONCETTUALE") : catalog[scale.id][0].type.toLocaleUpperCase(locale());
   const slider = $('#scale-slider');
   slider.disabled = detached;
   slider.hidden = detached;
   if (!detached) slider.value = index;
-  slider.setAttribute('aria-valuetext', detached ? 'Seleziona una scala cosmica per riprendere il viaggio.' : scale.name);
+  slider.setAttribute('aria-valuetext', detached ? t("Select a reference scale.","Seleziona una scala di riferimento.") : scale.name);
   slider.style.background = `linear-gradient(90deg,#ac8c5d ${detached ? 0 : index * 25}%,#37434a ${detached ? 0 : index * 25}%)`;
   $('.journey-labels').hidden = detached;
   $('.cosmic-return').hidden = !detached;
-  $('.journey-top > span').textContent = detached ? 'Continua a esplorare l’atlante.' : 'Ogni viaggio inizia con la curiosità.';
+  $('.journey-top > span').textContent = detached ? t("Reference scale navigation","Navigazione fra scale di riferimento") : t("Reference scale navigation","Navigazione fra scale di riferimento");
   $('.app-shell').classList.toggle('constellation-view', constellationView);
   $('.app-shell').classList.toggle('earth-sky-view', index === 7);
   $('.app-shell').classList.toggle('earth-perspective-view', index === 6 && Boolean(context?.earthPerspective));
@@ -234,15 +239,15 @@ function updateScale(index, context = null) {
   if (constellationView) {
     const observer = constellationBrowser.observer;
     const date = new Date(observer.dateIso);
-    const when = Number.isFinite(date.getTime()) ? date.toLocaleString('it-IT', { timeZone: constellationBrowser.timeZone, day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }) : '';
-    const visible = Number.isFinite(context?.visibleStarCount) ? `${context.visibleStarCount} stelle della figura sopra l’orizzonte. ` : '';
+    const when = Number.isFinite(date.getTime()) ? date.toLocaleString(locale(), { timeZone: constellationBrowser.timeZone, day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZoneName: 'short' }) : '';
+    const visible = Number.isFinite(context?.visibleStarCount) ? `${context.visibleStarCount}${t(context.visibleStarCount === 1 ? " figure star above the horizon. " : " figure stars above the horizon. ", context.visibleStarCount === 1 ? " stella della figura sopra l’orizzonte. " : " stelle della figura sopra l’orizzonte. ")}` : '';
     $('#constellation-status').textContent = index === 7
       ? `${visible}${number(observer.latitude, '°')}, ${number(observer.longitude, '°')} · ${when}`
-      : `${Number.isFinite(context?.starCount) ? context.starCount + ' stelle nella figura. ' : ''}${context?.earthPerspective ? 'Sei alla Terra: vista 3D senza orizzonte. Trascina per guardarti intorno. ' : ''}Le linee collegano stelle a distanze differenti.${context?.unknownDistanceCount ? ' Alcune distanze non sono disponibili.' : ''}`;
+      : `${Number.isFinite(context?.starCount) ? context.starCount + t(" stars in the figure. "," stelle nella figura. ") : ''}${context?.earthPerspective ? t("Earth origin · 3D view without horizon clipping. Drag to look around. ","Origine terrestre · vista 3D senza orizzonte. Trascina per orientarti. ") : ''}${t("Stellar distances use a common linear scale.","Le distanze stellari usano una scala lineare comune.")}${context?.unknownDistanceCount ? t(" Some distances are unavailable."," Alcune distanze non sono disponibili.") : ''}`;
     if (index === 7) $('#constellation-status').innerHTML = `${escape(visible)}${escape(number(observer.latitude, '°'))}, ${escape(number(observer.longitude, '°'))} · <time datetime="${escape(observer.dateIso)}">${escape(when)}</time>`;
   }
-  $('.footer-controls span:first-child').innerHTML = `${icon('mouse-pointer-2')} ${index === 7 || context?.earthPerspective ? 'Trascina per guardarti intorno' : 'Trascina per orbitare'}`;
-  $('#universe').setAttribute('aria-label', index === 6 && context?.earthPerspective ? 'Stelle nello spazio 3D viste dalla posizione della Terra. Trascina per guardarti intorno e usa la rotellina per ingrandire.' : index === 7 ? 'Cielo dalla superficie terrestre. Trascina per guardarti intorno e usa la rotellina per ingrandire.' : 'Atlante cosmico tridimensionale. Trascina per orbitare e usa la rotellina per avvicinarti.');
+  $('.footer-controls span:first-child').innerHTML = `${icon('mouse-pointer-2')} ${index === 7 || context?.earthPerspective ? t("Drag to look around","Trascina per guardarti intorno") : t("Drag to orbit","Trascina per orbitare")}`;
+  $('#universe').setAttribute('aria-label', index === 6 && context?.earthPerspective ? t("3D stars viewed from Earth’s position. Drag to look around and scroll to zoom.","Stelle nello spazio 3D viste dalla posizione della Terra. Trascina per guardarti intorno e usa la rotellina per ingrandire.") : index === 7 ? t("Sky from Earth’s surface. Drag to look around and scroll to zoom.","Cielo dalla superficie terrestre. Trascina per guardarti intorno e usa la rotellina per ingrandire.") : t("Three-dimensional cosmic atlas. Drag to orbit and scroll to zoom.","Atlante cosmico tridimensionale. Trascina per orbitare e usa la rotellina per avvicinarti."));
   document.querySelectorAll('[data-scale]').forEach(button => {
     const selected = Number(button.dataset.scale) === index;
     button.classList.toggle('active', selected);
@@ -327,7 +332,7 @@ function setCinematic(enabled) {
 function toggleCinematic() {
   if (state.cinematic) return setCinematic(false);
   if (immersionTimer) { clearTimeout(immersionTimer); immersionTimer = null; $('.toast').classList.remove('visible'); return; }
-  notify('Spazio libero: tutte le scritte scompaiono. Esc o l’icona in alto a destra per tornare.');
+  notify(t("Immersive view hides all text. Press Esc or use the top-right icon to restore controls.","La vista immersiva nasconde il testo. Premi Esc o usa l’icona in alto a destra per ripristinare i comandi."));
   immersionTimer = setTimeout(() => setCinematic(true), reducedMotion ? 1200 : 1800);
 }
 
@@ -335,9 +340,9 @@ function renderTour() {
   const button = $('[data-action="tour"]');
   button.innerHTML = icon(state.tour ? 'pause' : 'play');
   button.setAttribute('aria-pressed', state.tour);
-  button.setAttribute('aria-label', state.tour ? 'Ferma viaggio guidato' : 'Avvia viaggio guidato');
-  $('#tour-title').textContent = state.tour ? 'Il tuo viaggio è iniziato' : 'Lasciati trasportare';
-  $('#tour-caption').textContent = state.tour ? 'Una nuova prospettiva ogni 12 s' : 'Inizia un viaggio guidato';
+  button.setAttribute('aria-label', state.tour ? t("Stop scale sequence","Ferma sequenza delle scale") : t("Start scale sequence","Avvia sequenza delle scale"));
+  $('#tour-title').textContent = state.tour ? t("Scale sequence active","Sequenza delle scale attiva") : t("Automatic sequence","Sequenza automatica");
+  $('#tour-caption').textContent = state.tour ? t("Next scale every 12 s","Scala successiva ogni 12 s") : t("Cycle through five reference scales","Scorri le cinque scale di riferimento");
   refreshIcons();
 }
 
@@ -354,11 +359,11 @@ function toggleTour() {
   state.tour = true;
   changeScale(0, false);
   renderTour();
-  notify('Dal Sole all’universo osservabile. Il viaggio comincia.');
+  notify(t("Scale sequence started: Solar System to observable universe.","Sequenza avviata: dal Sistema Solare all’universo osservabile."));
   tourTimer = setInterval(() => {
     if (state.scale >= 4) {
       stopTour();
-      notify('Hai raggiunto l’universo osservabile. Continua a esplorare.');
+      notify(t("Scale sequence complete.","Sequenza delle scale completata."));
       return;
     }
     changeScale(state.scale + 1, false);
@@ -369,7 +374,7 @@ async function toggleSound() {
   try {
     if (!audioContext) {
       const Audio = window.AudioContext || window.webkitAudioContext;
-      if (!Audio) return notify('Il suono non è supportato da questo browser.');
+      if (!Audio) return notify(t("Audio is not supported by this browser.","Il suono non è supportato da questo browser."));
       audioContext = new Audio();
       audioGain = audioContext.createGain();
       audioGain.gain.value = 0;
@@ -407,12 +412,12 @@ async function toggleSound() {
     audioGain.gain.setTargetAtTime(enabled ? 0.12 : 0, audioContext.currentTime, 0.25);
     if (!enabled) audioSuspendTimer = setTimeout(() => { if (!state.sound) audioContext.suspend().catch(() => {}); }, 1200);
     const button = $('[data-action="sound"]');
-    button.innerHTML = `${icon(enabled ? 'volume-2' : 'volume-x')}<span id="sound-label">Suono ${enabled ? 'on' : 'off'}</span>`;
+    button.innerHTML = `${icon(enabled ? 'volume-2' : 'volume-x')}<span id="sound-label">${t("Audio ","Suono ")}${enabled ? 'on' : 'off'}</span>`;
     button.setAttribute('aria-pressed', enabled);
-    button.setAttribute('aria-label', `${enabled ? 'Disattiva' : 'Attiva'} suono ambiente`);
+    button.setAttribute('aria-label', `${enabled ? t("Disable","Disattiva") : t("Enable","Attiva")}${t(" ambient audio"," suono ambiente")}`);
     refreshIcons();
   } catch {
-    notify('Impossibile avviare il suono. Verifica le impostazioni audio del browser.');
+    notify(t("Unable to start audio. Check your browser audio settings.","Impossibile avviare il suono. Verifica le impostazioni audio del browser."));
   }
 }
 
@@ -434,20 +439,20 @@ function closeModal() {
   if ($('#modal').open) $('#modal').close();
 }
 
-function normalized(value) { return String(value).toLocaleLowerCase('it-IT').normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+function normalized(value) { return String(value).toLocaleLowerCase(locale()).normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
 const solarPlanets = catalog.solar.filter(isPlanet);
 const solarTextures = { mercury:'2k_mercury.jpg', venus:'2k_venus_atmosphere.jpg', earth:'2k_earth_daymap.jpg', mars:'2k_mars.jpg', jupiter:'2k_jupiter.jpg', saturn:'2k_saturn.jpg', uranus:'2k_uranus.jpg', neptune:'2k_neptune.jpg' };
 const searchEntries = [
   ...scales.flatMap((scale, index) => catalog[scale.id].map(object => ({ index, object, scaleName: scale.name }))),
   ...exoplanets.map(object => ({ index: 5, object, scaleName: object.host }))
-].map(entry => ({ ...entry, searchText: normalized(`${entry.object.name} ${entry.object.type} ${entry.scaleName} ${entry.object.host || ''}`) }));
+].map(entry => ({ ...entry, searchText: normalized(`${entry.object.name} ${entry.object.englishName || ''} ${entry.object.italianName || ''} ${entry.object.type} ${entry.scaleName} ${entry.object.host || ''}`) }));
 const planetEntries = [
   ...solarPlanets.map(object => ({ index: 0, object, category: 'solar' })),
   ...exoplanets.map(object => ({ index: 5, object, category: 'exoplanet' }))
-].map(entry => ({ ...entry, searchText: normalized(`${entry.object.name} ${entry.object.host || 'Sistema Solare Sole'} ${entry.object.type}`) }));
+].map(entry => ({ ...entry, searchText: normalized(`${entry.object.name} ${entry.object.englishName || ''} ${entry.object.italianName || ''} ${entry.object.host || t("Solar System Sun","Sistema Solare Sole")} ${entry.object.type}`) }));
 const catalogDate = (() => {
   const date = new Date(planetCatalogMetadata.retrievedAt);
-  return Number.isFinite(date.getTime()) ? date.toLocaleDateString('it-IT', { timeZone:'Europe/Rome', day:'numeric', month:'long', year:'numeric' }) : 'data non disponibile';
+  return Number.isFinite(date.getTime()) ? date.toLocaleDateString(locale(), { timeZone:'Europe/Rome', day:'numeric', month:'long', year:'numeric' }) : t("date unavailable","data non disponibile");
 })();
 const planetColor = object => escape(object.color || '#a8c7d8');
 
@@ -455,13 +460,13 @@ function renderSearch(query = '') {
   const needle = normalized(query.trim());
   const matches = searchEntries.filter(entry => entry.searchText.includes(needle));
   const entries = matches.slice(0, 80);
-  $('#search-results').innerHTML = entries.length ? entries.map(({ object, index, scaleName }) => `<button class="search-result" data-object="${escape(object.id)}" data-object-scale="${index}"><span><strong>${escape(object.name)}</strong><small>${escape(scaleName)} · ${escape(object.type)}</small></span>${icon('arrow-up-right')}</button>`).join('') : '<p>Nessun oggetto trovato. Prova “Terra”, “TRAPPIST-1” o “Andromeda”.</p>';
-  $('#search-count').textContent = matches.length > 80 ? `${matches.length.toLocaleString('it-IT')} oggetti trovati · primi 80 risultati. Affina la ricerca per vedere gli altri.` : `${matches.length.toLocaleString('it-IT')} oggetti trovati`;
+  $('#search-results').innerHTML = entries.length ? entries.map(({ object, index, scaleName }) => `<button class="search-result" data-object="${escape(object.id)}" data-object-scale="${index}"><span><strong>${escape(object.name)}</strong><small>${escape(scaleName)} · ${escape(object.type)}</small></span>${icon('arrow-up-right')}</button>`).join('') : `<p>${t("No objects found. Try “Earth”, “TRAPPIST-1” or “Andromeda”.","Nessun oggetto trovato. Prova “Terra”, “TRAPPIST-1” o “Andromeda”.")}</p>`;
+  $('#search-count').textContent = matches.length > 80 ? `${matches.length.toLocaleString(locale())}${t(" objects found · first 80 results. Refine your search to see others."," oggetti trovati · primi 80 risultati. Affina la ricerca per vedere gli altri.")}` : `${matches.length.toLocaleString(locale())}${t(matches.length === 1 ? " object found" : " objects found", matches.length === 1 ? " oggetto trovato" : " oggetti trovati")}`;
   refreshIcons();
 }
 
 function openSearch() {
-  openModal('search', 'Cerca nell’universo', '<label for="search-input" class="readout-title">STELLE, PIANETI E GALASSIE</label><input id="search-input" class="search-input" type="search" placeholder="Dove vuoi andare?" autocomplete="off" spellcheck="false" aria-controls="search-results"/><div id="search-count" class="result-count" role="status"></div><div id="search-results" class="search-results"></div>');
+  openModal('search', t("Search catalogue","Cerca nel catalogo"), `<label for="search-input" class="readout-title">${t("STARS, PLANETS AND GALAXIES","STELLE, PIANETI E GALASSIE")}</label><input id="search-input" class="search-input" type="search" placeholder="${t("Search by name","Cerca per nome")}" autocomplete="off" spellcheck="false" aria-controls="search-results"/><div id="search-count" class="result-count" role="status"></div><div id="search-results" class="search-results"></div>`);
   renderSearch();
   $('#search-input').addEventListener('input', event => renderSearch(event.target.value));
   $('#search-input').focus();
@@ -481,9 +486,9 @@ function renderPlanets() {
   const start = planetBrowser.page * pageSize;
   const entries = matches.slice(start, start + pageSize);
   $('#planet-results').innerHTML = entries.length ? entries.map(({ object, index }) => `<button class="planet-result" data-object="${escape(object.id)}" data-object-scale="${index}">
-    ${planetPreview(object)}<span class="planet-result-copy"><strong>${escape(object.name)}</strong><small>${escape(object.host || 'Sistema Solare')}</small><span>${escape(object.type)}</span></span>${icon('arrow-up-right')}</button>`).join('') : '<p class="planet-empty">Nessun pianeta trovato. Cerca il nome di un pianeta o della sua stella.</p>';
-  $('#planet-count').textContent = matches.length ? `${matches.length.toLocaleString('it-IT')} pianeti · ${start + 1}–${Math.min(start + pageSize, matches.length)}` : '0 pianeti';
-  $('#planet-page').textContent = `Pagina ${planetBrowser.page + 1} di ${pageCount}`;
+    ${planetPreview(object)}<span class="planet-result-copy"><strong>${escape(object.name)}</strong><small>${escape(object.host || t("Solar System","Sistema Solare"))}</small><span>${escape(object.type)}</span></span>${icon('arrow-up-right')}</button>`).join('') : `<p class="planet-empty">${t("No planets found. Search for a planet or its host star.","Nessun pianeta trovato. Cerca il nome di un pianeta o della sua stella.")}</p>`;
+  $('#planet-count').textContent = matches.length ? `${matches.length.toLocaleString(locale())}${t(matches.length === 1 ? " planet · " : " planets · ", matches.length === 1 ? " pianeta · " : " pianeti · ")}${start + 1}–${Math.min(start + pageSize, matches.length)}` : t("0 planets","0 pianeti");
+  $('#planet-page').textContent = `${t("Page ","Pagina ")}${planetBrowser.page + 1}${t(" of "," di ")}${pageCount}`;
   $('[data-catalog-page="previous"]').disabled = planetBrowser.page === 0;
   $('[data-catalog-page="next"]').disabled = planetBrowser.page >= pageCount - 1;
   document.querySelectorAll('[data-catalog-filter]').forEach(button => {
@@ -495,16 +500,16 @@ function renderPlanets() {
 }
 
 function openPlanets() {
-  openModal('planets', 'Mondi da esplorare', `
-    <p class="catalog-introduction"><strong>8 pianeti del Sistema Solare + ${exoplanets.length.toLocaleString('it-IT')} esopianeti confermati.</strong> Scegli un mondo per avvicinarti.</p>
-    <div class="solar-shortcuts" role="group" aria-label="Gli otto pianeti del Sistema Solare">${solarPlanets.map(object => `<button data-object="${escape(object.id)}" data-object-scale="0">${planetPreview(object)}<span>${escape(object.name)}</span></button>`).join('')}</div>
-    <label for="planet-search" class="readout-title">CERCA UN PIANETA O LA SUA STELLA</label>
-    <input id="planet-search" class="search-input" type="search" placeholder="Terra, TRAPPIST-1, Kepler…" autocomplete="off" spellcheck="false" value="${escape(planetBrowser.query)}" aria-controls="planet-results"/>
-    <div class="catalog-filter" role="group" aria-label="Tipo di pianeta"><button data-catalog-filter="all">Tutti</button><button data-catalog-filter="solar">Sistema Solare</button><button data-catalog-filter="exoplanet">Esopianeti</button></div>
+  openModal('planets', t("Planet catalogue","Catalogo planetario"), `
+    <p class="catalog-introduction"><strong>${t("8 Solar System planets + ","8 pianeti del Sistema Solare + ")}${exoplanets.length.toLocaleString(locale())}${t(" confirmed exoplanets."," esopianeti confermati.")}</strong>${t(" Select a planet to inspect."," Seleziona un pianeta per osservarlo.")}</p>
+    <div class="solar-shortcuts" role="group" aria-label="${t("The eight Solar System planets","Gli otto pianeti del Sistema Solare")}">${solarPlanets.map(object => `<button data-object="${escape(object.id)}" data-object-scale="0">${planetPreview(object)}<span>${escape(object.name)}</span></button>`).join('')}</div>
+    <label for="planet-search" class="readout-title">${t("SEARCH FOR A PLANET OR HOST STAR","CERCA UN PIANETA O LA SUA STELLA")}</label>
+    <input id="planet-search" class="search-input" type="search" placeholder="${t("Earth, TRAPPIST-1, Kepler…","Terra, TRAPPIST-1, Kepler…")}" autocomplete="off" spellcheck="false" value="${escape(planetBrowser.query)}" aria-controls="planet-results"/>
+    <div class="catalog-filter" role="group" aria-label="${t("Planet type","Tipo di pianeta")}"><button data-catalog-filter="all">${t("All","Tutti")}</button><button data-catalog-filter="solar">${t("Solar System","Sistema Solare")}</button><button data-catalog-filter="exoplanet">${t("Exoplanets","Esopianeti")}</button></div>
     <div id="planet-count" class="result-count" role="status"></div>
     <div id="planet-results" class="planet-results"></div>
-    <div class="catalog-pagination"><button data-catalog-page="previous" aria-label="Pagina precedente">← Precedenti</button><span id="planet-page"></span><button data-catalog-page="next" aria-label="Pagina successiva">Successivi →</button></div>
-    <p class="catalog-provenance"><a href="https://exoplanetarchive.ipac.caltech.edu/" target="_blank" rel="noopener noreferrer">NASA Exoplanet Archive</a> · Catalogo del ${escape(catalogDate)}. Tutti gli esopianeti confermati nella tabella PSCompPars alla data di acquisizione. I candidati non confermati non sono inclusi. Gli esopianeti hanno un aspetto illustrativo.</p>`);
+    <div class="catalog-pagination"><button data-catalog-page="previous" aria-label="${t("Previous page","Pagina precedente")}">${t("← Previous","← Precedenti")}</button><span id="planet-page"></span><button data-catalog-page="next" aria-label="${t("Next page","Pagina successiva")}">${t("Next →","Successivi →")}</button></div>
+    <p class="catalog-provenance"><a href="https://exoplanetarchive.ipac.caltech.edu/" target="_blank" rel="noopener noreferrer">NASA Exoplanet Archive</a>${t(" · Catalogue retrieved "," · Catalogo del ")}${escape(catalogDate)}${t(". All confirmed exoplanets in PSCompPars at retrieval. Unconfirmed candidates are excluded. Exoplanet surfaces are illustrative.",". Tutti gli esopianeti confermati nella tabella PSCompPars alla data di acquisizione. I candidati non confermati non sono inclusi. Gli esopianeti hanno un aspetto illustrativo.")}</p>`);
   renderPlanets();
   $('#planet-search').addEventListener('input', event => { planetBrowser.query = event.target.value; planetBrowser.page = 0; renderPlanets(); });
 }
@@ -514,9 +519,9 @@ function localDateInput(iso) {
 }
 
 function constellationModeButtons() {
-  return `<div class="constellation-mode modal-constellation-mode" role="group" aria-label="Prospettiva della costellazione">
-    <button data-constellation-mode="space" aria-pressed="${constellationBrowser.mode === 'space'}" class="${constellationBrowser.mode === 'space' ? 'active' : ''}">${icon('orbit')}Nello spazio 3D<small>Scopri le distanze reali</small></button>
-    <button data-constellation-mode="earth" aria-pressed="${constellationBrowser.mode === 'earth'}" class="${constellationBrowser.mode === 'earth' ? 'active' : ''}">${icon('globe-2')}Dalla superficie terrestre<small>Ritrova la figura nel cielo</small></button>
+  return `<div class="constellation-mode modal-constellation-mode" role="group" aria-label="${t("Constellation perspective","Prospettiva della costellazione")}">
+    <button data-constellation-mode="space" aria-pressed="${constellationBrowser.mode === 'space'}" class="${constellationBrowser.mode === 'space' ? 'active' : ''}">${icon('orbit')}<span>${t("3D space","Nello spazio 3D")}</span><small>${t("Measured stellar distances","Distanze stellari misurate")}</small></button>
+    <button data-constellation-mode="earth" aria-pressed="${constellationBrowser.mode === 'earth'}" class="${constellationBrowser.mode === 'earth' ? 'active' : ''}">${icon('globe-2')}<span>${t("Earth surface","Dalla superficie terrestre")}</span><small>${t("Local sky coordinates","Coordinate del cielo locale")}</small></button>
   </div>`;
 }
 
@@ -525,15 +530,15 @@ function observerFormMarkup() {
   const deviceZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   const zones = [...new Set(['Europe/Rome', 'UTC', deviceZone])];
   return `<fieldset id="observer-fields" class="observer-fields" ${constellationBrowser.mode === 'earth' ? '' : 'hidden'}>
-    <legend>Il tuo punto di osservazione</legend>
-    <label for="observer-latitude">Latitudine <small>Nord + / Sud \u2212</small><input id="observer-latitude" type="text" inputmode="text" required autocomplete="off" spellcheck="false" aria-describedby="observer-coordinate-help" value="${observer.latitude}"/></label>
-    <label for="observer-longitude">Longitudine <small>Est + / Ovest \u2212</small><input id="observer-longitude" type="text" inputmode="text" required autocomplete="off" spellcheck="false" aria-describedby="observer-coordinate-help" value="${observer.longitude}"/></label>
-    <label for="observer-datetime" class="observer-date">Data e ora <small>Nel fuso scelto \u00b7 1900\u20132100</small><input id="observer-datetime" type="datetime-local" min="1900-01-02T00:00" max="2100-12-30T23:59" required value="${localDateInput(observer.dateIso)}"/></label>
-    <p id="observer-coordinate-help">Accetta decimali (38,1144) o gradi, primi e secondi (38\u00b006\u203251.98\u2033N).</p>
-    <label for="observer-timezone" class="observer-zone">Fuso orario<select id="observer-timezone">${zones.map(zone => `<option value="${escape(zone)}" ${zone === constellationBrowser.timeZone ? 'selected' : ''}>${zone === 'Europe/Rome' ? 'Italia \u00b7 Europe/Rome (CET / CEST)' : zone === 'UTC' ? 'UTC' : escape(zone) + ' \u00b7 dispositivo'}</option>`).join('')}</select></label>
-    <div class="observer-actions"><button data-action="observer-now">${icon('rotate-ccw')}Adesso</button><button id="constellation-apply" data-action="apply-observer">Aggiorna ${escape(constellationBrowser.data?.constellations.find(item => item.id === constellationBrowser.id)?.name || 'il cielo')}${icon('arrow-right')}</button></div>
-    <button class="observer-preset" data-action="observer-orion-winter">${icon('sparkles')}Prova Orione \u00b7 11 dic 2026, 20:00 in Italia<small>38\u00b006\u203251.98\u2033N \u00b7 15\u00b039\u203200\u2033E</small></button>
-    <p>Il fuso scelto determina l'istante: in Italia, 20:00 in inverno corrisponde a 19:00 UTC. Il cielo resta fermo all'istante scelto; le stelle sotto l'orizzonte non sono visibili. La luminosit\u00e0 diurna, la rifrazione e l'inquinamento luminoso non sono simulati.</p>
+    <legend>${t("Observer coordinates","Coordinate dell’osservatore")}</legend>
+    <label for="observer-latitude">${t("Latitude","Latitudine")} <small>${t("North + / South −","Nord + / Sud −")}</small><input id="observer-latitude" type="text" inputmode="text" required autocomplete="off" spellcheck="false" aria-describedby="observer-coordinate-help" value="${observer.latitude}"/></label>
+    <label for="observer-longitude">${t("Longitude","Longitudine")} <small>${t("East + / West −","Est + / Ovest −")}</small><input id="observer-longitude" type="text" inputmode="text" required autocomplete="off" spellcheck="false" aria-describedby="observer-coordinate-help" value="${observer.longitude}"/></label>
+    <label for="observer-datetime" class="observer-date">${t("Date and time","Data e ora")} <small>${t("Selected timezone · 1900–2100","Nel fuso scelto · 1900–2100")}</small><input id="observer-datetime" type="datetime-local" min="1900-01-02T00:00" max="2100-12-30T23:59" required value="${localDateInput(observer.dateIso)}"/></label>
+    <p id="observer-coordinate-help">${t("Decimal degrees (38.1144) or degrees, minutes and seconds (38°06′51.98″N).","Accetta decimali (38,1144) o gradi, primi e secondi (38°06′51.98″N).")}</p>
+    <label for="observer-timezone" class="observer-zone">${t("Timezone","Fuso orario")}<select id="observer-timezone">${zones.map(zone => `<option value="${escape(zone)}" ${zone === constellationBrowser.timeZone ? 'selected' : ''}>${zone === 'Europe/Rome' ? t("Italy · Europe/Rome (CET / CEST)","Italia · Europe/Rome (CET / CEST)") : zone === 'UTC' ? 'UTC' : escape(zone) + t(" · device"," · dispositivo")}</option>`).join('')}</select></label>
+    <div class="observer-actions"><button data-action="observer-now">${icon('rotate-ccw')}${t("Now","Adesso")}</button><button id="constellation-apply" data-action="apply-observer">${t("Update ","Aggiorna ")}${escape(constellationBrowser.data?.constellations.find(item => item.id === constellationBrowser.id)?.name || t("sky","il cielo"))}${icon('arrow-right')}</button></div>
+    <button class="observer-preset" data-action="observer-orion-winter">${icon('sparkles')}${t("Orion example · 11 Dec 2026, 20:00 Italy","Esempio Orione · 11 dic 2026, 20:00 Italia")}<small>38°06′51.98″N · 15°39′00″E</small></button>
+    <p>${t("The timezone determines the instant: 20:00 in winter in Italy is 19:00 UTC. The sky remains fixed at the selected time. Stars below the horizon are hidden. Daylight, refraction and light pollution are not simulated.","Il fuso scelto determina l'istante: in Italia, 20:00 in inverno corrisponde a 19:00 UTC. Il cielo resta fermo all'istante scelto; le stelle sotto l'orizzonte non sono visibili. La luminosità diurna, la rifrazione e l'inquinamento luminoso non sono simulati.")}</p>
   </fieldset>`;
 }
 
@@ -541,28 +546,28 @@ function renderConstellationResults() {
   const results = $('#constellation-results');
   if (!results || !constellationBrowser.data) return;
   const query = normalized(constellationBrowser.query.trim());
-  const matches = constellationBrowser.data.constellations.filter(item => normalized(`${item.name} ${item.latinName} ${item.abbr} ${item.id}`).includes(query)).sort((a, b) => a.name.localeCompare(b.name, 'it-IT'));
+  const matches = constellationBrowser.data.constellations.filter(item => normalized(`${item.name} ${item.englishName || ''} ${item.italianName || ''} ${item.latinName} ${item.abbr} ${item.id}`).includes(query)).sort((a, b) => a.name.localeCompare(b.name, locale()));
   results.innerHTML = matches.map(item => {
     const starCount = new Set(item.segments.flat()).size;
     return `<button class="constellation-result${item.id === constellationBrowser.id ? ' selected' : ''}" data-constellation="${escape(item.id)}" ${constellationBrowser.busy ? 'disabled' : ''}>
-      <span class="constellation-monogram" aria-hidden="true">${icon('sparkles')}<small>${escape(item.abbr)}</small></span><span><strong>${escape(item.name)}</strong><small>${escape(item.latinName)} \u00b7 ${starCount} stelle nella figura</small></span>${icon('arrow-up-right')}</button>`;
-  }).join('') || '<p class="constellation-empty">Nessuna costellazione trovata. Prova \u201cOrione\u201d, \u201cOrsa\u201d o \u201cCassiopea\u201d.</p>';
-  $('#constellation-count').textContent = `${matches.length} costellazioni${matches.length !== constellationBrowser.data.constellations.length ? ' trovate' : ' \u00b7 scegli una figura da esplorare'}`;
+      <span class="constellation-monogram" aria-hidden="true">${icon('sparkles')}<small>${escape(item.abbr)}</small></span><span><strong>${escape(item.name)}</strong><small>${escape(item.latinName)} · ${starCount}${t(" stars in the figure"," stelle nella figura")}</small></span>${icon('arrow-up-right')}</button>`;
+  }).join('') || `<p class="constellation-empty">${t("No constellations found. Try “Orion”, “Ursa” or “Cassiopeia”.","Nessuna costellazione trovata. Prova “Orione”, “Orsa” o “Cassiopea”.")}</p>`;
+  $('#constellation-count').textContent = `${matches.length}${t(matches.length === 1 ? " constellation" : " constellations", matches.length === 1 ? " costellazione" : " costellazioni")}${matches.length !== constellationBrowser.data.constellations.length ? t(" found", matches.length === 1 ? " trovata" : " trovate") : t(" · select a constellation"," · seleziona una costellazione")}`;
   refreshIcons();
 }
 
 function renderConstellationModal() {
   const stars = constellationBrowser.data.metadata?.starCount || constellationBrowser.data.metadata?.catalogStarCount;
   $('#modal-body').innerHTML = `
-    <p class="catalog-introduction"><strong>Le 88 costellazioni. Due modi di guardarle.</strong> ${stars ? number(stars) : 'Oltre 119.000'} stelle del catalogo HYG, dalle figure familiari alla loro profondit\u00e0 nello spazio.</p>
+    <p class="catalog-introduction"><strong>${t("88 constellations · 3D and local sky views.","88 costellazioni · viste 3D e cielo locale.")}</strong> ${stars ? number(stars) : t("Over 119,000","Oltre 119.000")}${t(" HYG catalogue stars with equatorial coordinates and measured distances where available."," stelle HYG con coordinate equatoriali e distanze misurate quando disponibili.")}</p>
     ${constellationModeButtons()}
     ${observerFormMarkup()}
-    <label for="constellation-search" class="readout-title">CERCA UNA COSTELLAZIONE</label>
-    <input id="constellation-search" class="search-input" type="search" value="${escape(constellationBrowser.query)}" placeholder="Orione, Cassiopea, Orsa Maggiore\u2026" autocomplete="off" spellcheck="false" aria-controls="constellation-results"/>
+    <label for="constellation-search" class="readout-title">${t("SEARCH CONSTELLATIONS","CERCA UNA COSTELLAZIONE")}</label>
+    <input id="constellation-search" class="search-input" type="search" value="${escape(constellationBrowser.query)}" placeholder="${t("Orion, Cassiopeia, Ursa Major…","Orione, Cassiopea, Orsa Maggiore…")}" autocomplete="off" spellcheck="false" aria-controls="constellation-results"/>
     <div id="constellation-count" class="result-count" role="status"></div>
     <div id="constellation-results" class="constellation-results"></div>
     <div id="constellation-progress" class="constellation-progress" role="status" aria-live="polite"></div>
-    <p class="catalog-provenance">Le linee sono figure convenzionali della tradizione occidentale. Uniscono stelle spesso molto lontane tra loro. Le distanze mancanti restano escluse dalla vista 3D. Il catalogo HYG \u00e8 una selezione osservativa: non comprende tutte le stelle conosciute. <a href="https://github.com/astronexus/HYG-Database" target="_blank" rel="noopener noreferrer">HYG 4.1 \u00b7 fonte e licenza</a></p>`;
+    <p class="catalog-provenance">${t("Stars without a measured distance appear in the Earth sky view. HYG is an observational catalogue with limited coverage. ","Le stelle prive di distanza misurata sono presenti nella vista del cielo terrestre. HYG è un catalogo osservativo con copertura limitata. ")}<a href="https://github.com/astronexus/HYG-Database" target="_blank" rel="noopener noreferrer">${t("HYG 4.1 · source and licence","HYG 4.1 · fonte e licenza")}</a></p>`;
   renderConstellationResults();
   $('#constellation-search').addEventListener('input', event => { constellationBrowser.query = event.target.value; renderConstellationResults(); });
   $('#observer-fields').addEventListener('input', event => event.target.setCustomValidity?.(''));
@@ -576,7 +581,7 @@ function renderConstellationModal() {
 async function openConstellations({ observer = false } = {}) {
   if (observer) constellationBrowser.mode = 'earth';
   const request = ++constellationModalRequest;
-  openModal('constellations', 'Figure tra le stelle', '<p class="constellation-loading" role="status">Caricamento delle 88 costellazioni\u2026</p>');
+  openModal('constellations', t("Constellations","Costellazioni"), `<p class="constellation-loading" role="status">${t("Loading 88 constellations…","Caricamento delle 88 costellazioni…")}</p>`);
   try {
     constellationBrowser.data ||= await loadConstellations();
     if (request !== constellationModalRequest || !$('#modal').open || $('#modal').dataset.kind !== 'constellations') return;
@@ -584,7 +589,7 @@ async function openConstellations({ observer = false } = {}) {
     $(observer ? '#observer-latitude' : '#constellation-search').focus();
   } catch (error) {
     if (request !== constellationModalRequest || !$('#modal').open || $('#modal').dataset.kind !== 'constellations') return;
-    $('#modal-body').innerHTML = '<p role="alert">Il catalogo delle costellazioni non \u00e8 stato caricato. Riprova tra un momento.</p><button class="focus-button" data-action="constellations">Riprova</button>';
+    $('#modal-body').innerHTML = `<p role="alert">${t("Unable to load the constellation catalogue. Try again.","Il catalogo delle costellazioni non è stato caricato. Riprova tra un momento.")}</p><button class="focus-button" data-action="constellations">${t("Retry","Riprova")}</button>`;
   }
 }
 
@@ -611,15 +616,15 @@ function readObserverForm() {
 async function selectConstellation(id, mode = constellationBrowser.mode) {
   if (constellationBrowser.busy) return;
   if (!readObserverForm()) return;
-  if (!universe) return notify('La vista delle costellazioni richiede il motore grafico WebGL. Attiva l\u2019accelerazione grafica e ricarica.');
+  if (!universe) return notify(t("Constellation views require WebGL. Enable hardware acceleration and reload.","La vista delle costellazioni richiede il motore grafico WebGL. Attiva l’accelerazione grafica e ricarica."));
   stopTour();
   constellationBrowser.busy = true;
   const lastMode = state.scale === 7 ? 'earth' : 'space';
   constellationBrowser.mode = mode;
   const pending = document.querySelectorAll('[data-constellation], [data-constellation-mode], #constellation-apply');
   pending.forEach(button => { button.disabled = true; });
-  if ($('#constellation-progress')) $('#constellation-progress').textContent = 'Tracciando le stelle e le loro connessioni\u2026';
-  else notify('Tracciando le stelle\u2026');
+  if ($('#constellation-progress')) $('#constellation-progress').textContent = t("Loading stars and constellation geometry…","Caricamento di stelle e geometria delle costellazioni…");
+  else notify(t("Loading stars…","Caricamento delle stelle…"));
   $('#constellation-controls').setAttribute('aria-busy', 'true');
   try {
     const shown = await universe.showConstellation(id, { mode, observer: { ...constellationBrowser.observer } });
@@ -628,7 +633,7 @@ async function selectConstellation(id, mode = constellationBrowser.mode) {
     if ($('#modal').dataset.kind === 'constellations') closeModal();
   } catch (error) {
     constellationBrowser.mode = lastMode;
-    const message = error?.message || 'Impossibile aprire questa costellazione. Riprova tra un momento.';
+    const message = error?.message || t("Unable to open this constellation. Try again.","Impossibile aprire questa costellazione. Riprova tra un momento.");
     if ($('#constellation-progress')) $('#constellation-progress').textContent = message;
     else notify(message);
   } finally {
@@ -655,56 +660,63 @@ async function chooseConstellationMode(mode, button) {
 
 function openCollections() {
   const featured = [
-    { scale:0, id:'earth', icon:'globe-2', name:'Il nostro angolo di cosmo', subtitle:'Dal Sole agli otto pianeti' },
-    { scale:1, id:'proxima', icon:'star', name:'Le luci più vicine', subtitle:'Incontra le stelle del vicinato' },
-    { scale:3, id:'andromeda', icon:'orbit', name:'Isole nell’oscurità', subtitle:'Un viaggio tra le galassie' },
-    { scale:4, id:'laniakea', icon:'sparkles', name:'La grande trama', subtitle:'Alla scoperta della rete cosmica' }
+    { scale:0, id:'earth', icon:'globe-2', name:t("Solar System","Sistema Solare"), subtitle:t("Sun and eight planets","Sole e otto pianeti") },
+    { scale:1, id:'proxima', icon:'star', name:t("Nearby stars","Stelle vicine"), subtitle:t("Local stellar distances and coordinates","Distanze e coordinate delle stelle vicine") },
+    { scale:3, id:'andromeda', icon:'orbit', name:t("Local Group","Gruppo Locale"), subtitle:t("Milky Way, Andromeda and satellite galaxies","Via Lattea, Andromeda e galassie satelliti") },
+    { scale:4, id:'laniakea', icon:'sparkles', name:t("Large-scale structure","Struttura a grande scala"), subtitle:t("Galaxy clusters and cosmic web","Ammassi galattici e rete cosmica") }
   ];
-  openModal('collections', 'Sentieri tra le stelle', `<p>Quattro punti di partenza. Infinite ragioni per guardare più lontano.</p><div class="collection-grid">${featured.map(item => `<button class="collection-item" data-object="${item.id}" data-object-scale="${item.scale}">${icon(item.icon)}<strong>${item.name}</strong><small>${item.subtitle}</small></button>`).join('')}</div>`);
+  openModal('collections', t("Catalogue sections","Sezioni del catalogo"), `<p>${t("Browse objects by astronomical scale.","Consulta gli oggetti per scala astronomica.")}</p><div class="collection-grid">${featured.map(item => `<button class="collection-item" data-object="${item.id}" data-object-scale="${item.scale}">${icon(item.icon)}<strong>${item.name}</strong><small>${item.subtitle}</small></button>`).join('')}</div>`);
 }
 
 function openAbout() {
-  openModal('about', 'Un atlante per la meraviglia', `
-    <p>Æther trasforma l’esplorazione del cosmo in un gesto. Una mappa luminosa, ispirata agli strumenti degli antichi navigatori e ai mondi della fantascienza.</p>
-    <h3>IL CIELO REALE, UNA MAPPA INTERPRETATA</h3>
-    <p>Gli oggetti selezionabili sono reali. Il catalogo planetario include gli otto pianeti del Sistema Solare e tutti i ${exoplanets.length.toLocaleString('it-IT')} esopianeti confermati nella tabella PSCompPars del NASA Exoplanet Archive, acquisita il ${escape(catalogDate)}. Gli altri oggetti sono una selezione dell’universo conosciuto.</p><p>I sistemi esoplanetari mostrano orbite schematiche; gli aspetti dei pianeti sono illustrativi. Misure e stime provengono dall’archivio; i dati mancanti restano indicati come non disponibili.</p><p>Texture planetarie: <a href="https://www.solarsystemscope.com/textures/" target="_blank" rel="noopener noreferrer">Solar System Scope</a>, licenza <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>. Basate su immagini NASA con integrazioni artistiche.</p>
-    <p>Le distanze orbitali sono compresse e le dimensioni planetarie amplificate. Le stelle vicine usano coordinate equatoriali J2000 approssimate. La Via Lattea è una ricostruzione illustrativa; nel Gruppo Locale le dimensioni galattiche sono amplificate.</p>
-    <p>La rete cosmica e le particelle decorative sono generate proceduralmente. Le posizioni dei suoi ammassi sono schematiche: non sono un catalogo osservativo. La navigazione collega cinque rappresentazioni con scale differenti.</p>
-    <h3>STELLE DA CATALOGO</h3>
-    <p>La vista stellare include 156 stelle entro 25 anni luce estratte da <a href="https://github.com/astronexus/HYG-Database" target="_blank" rel="noopener noreferrer">HYG 4.1 · David Nash</a>, oltre ai riferimenti principali. Il sottoinsieme conserva coordinate, distanze e identificatori: selezione, conversione in anni luce e nomi di visualizzazione sono adattamenti dell’atlante. Dati distribuiti con licenza <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener noreferrer">CC BY-SA 4.0</a>.</p>
-    <p>La sezione Costellazioni amplia il cielo a oltre 119.000 stelle HYG e alle 88 figure occidentali. Nello spazio 3D, le stelle con distanza misurata mantengono la profondità relativa; la vista dalla Terra ricostruisce le direzioni nel cielo per luogo e orario, con un orizzonte geometrico. Le linee sono convenzioni visive, non legami fisici tra le stelle. I dati HYG sono distribuiti con licenza CC BY-SA 4.0.</p>
-    <h3>FONTI E APPROFONDIMENTI</h3>
-    <ul><li><a href="${scales[0].source}" target="_blank" rel="noopener noreferrer">NASA · Dimensioni e distanze del Sistema Solare</a></li>
+  openModal('about', t("About the project","Il progetto"), `
+    <p>${t("Æther is an interactive astronomical atlas with 3D, Earth sky and WebXR views.","Æther è un atlante astronomico interattivo con viste 3D, cielo terrestre e WebXR.")}</p>
+    <h3>${t("DATA AND REPRESENTATION","DATI E RAPPRESENTAZIONE")}</h3>
+    <p>${t("The planetary catalogue includes the eight Solar System planets and all ","Il catalogo planetario comprende gli otto pianeti del Sistema Solare e tutti i ")}${exoplanets.length.toLocaleString(locale())}${t(" confirmed exoplanets in the NASA Exoplanet Archive PSCompPars table, retrieved "," esopianeti confermati nella tabella PSCompPars del NASA Exoplanet Archive, acquisita il ")}${escape(catalogDate)}${t(". Other objects form a selected astronomical catalogue.",". Gli altri oggetti costituiscono una selezione di catalogo.")}</p><p>${t("Exoplanetary orbits are schematic and surfaces are illustrative. Measurements and estimates come from the archive; missing data remain unavailable.","I sistemi esoplanetari mostrano orbite schematiche; gli aspetti dei pianeti sono illustrativi. Misure e stime provengono dall’archivio; i dati mancanti restano indicati come non disponibili.")}</p><p>${t("Planetary textures: ","Texture planetarie: ")}<a href="https://www.solarsystemscope.com/textures/" target="_blank" rel="noopener noreferrer">Solar System Scope</a>${t(", licence ",", licenza ")}<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>${t(". Based on NASA imagery with artistic additions.",". Basate su immagini NASA con integrazioni artistiche.")}</p>
+    <p>${t("Orbital distances are compressed and planet sizes enlarged. Nearby stars use approximate J2000 equatorial coordinates. The Milky Way is an illustrative model; galaxy sizes in the Local Group are enlarged.","Le distanze orbitali sono compresse e le dimensioni planetarie amplificate. Le stelle vicine usano coordinate equatoriali J2000 approssimate. La Via Lattea è una ricostruzione illustrativa; nel Gruppo Locale le dimensioni galattiche sono amplificate.")}</p>
+    <p>${t("Cosmic web geometry and particle effects are generated procedurally. Cluster positions are schematic. Five reference scales are available.","La rete cosmica e le particelle decorative sono generate proceduralmente. Le posizioni dei suoi ammassi sono schematiche: non sono un catalogo osservativo. La navigazione collega cinque rappresentazioni con scale differenti.")}</p>
+    <h3>${t("STELLAR CATALOGUES","CATALOGHI STELLARI")}</h3>
+    <p>${t("The nearby-star view includes 156 stars within 25 light-years from ","La vista stellare include 156 stelle entro 25 anni luce estratte da ")}<a href="https://github.com/astronexus/HYG-Database" target="_blank" rel="noopener noreferrer">HYG 4.1 · David Nash</a>${t(", in addition to the principal reference stars. The subset retains coordinates, distances and identifiers; selection, unit conversion and display names are atlas adaptations. Data licence: ",", oltre ai riferimenti principali. Il sottoinsieme conserva coordinate, distanze e identificatori: selezione, conversione in anni luce e nomi di visualizzazione sono adattamenti dell’atlante. Dati distribuiti con licenza ")}<a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener noreferrer">CC BY-SA 4.0</a>.</p>
+    <p>${t("Constellation views contain 119,625 HYG stars and all 88 constellations. The 3D view preserves measured stellar depth. The Earth view calculates sky directions and the geometric horizon for the selected location and time. HYG data: CC BY-SA 4.0.","Le viste delle costellazioni contengono 119.625 stelle HYG e tutte le 88 costellazioni. La vista 3D conserva la profondità stellare misurata. La vista terrestre calcola direzioni e orizzonte geometrico per luogo e istante selezionati. Dati HYG: CC BY-SA 4.0.")}</p>
+    <p>${t('Constellation geometry: ', 'Geometria delle costellazioni: ')}<a href="https://github.com/Stellarium/stellarium/tree/master/skycultures/modern" target="_blank" rel="noopener noreferrer">Stellarium modern skyculture</a> ${t('by the Stellarium team, CC BY-SA 4.0.', 'del team Stellarium, CC BY-SA 4.0.')}</p>
+    <h3>${t("DATA SOURCES","FONTI DEI DATI")}</h3>
+    <ul><li><a href="${scales[0].source}" target="_blank" rel="noopener noreferrer">${t("NASA · Solar System sizes and distances","NASA · Dimensioni e distanze del Sistema Solare")}</a></li>
     <li><a href="${scales[1].source}" target="_blank" rel="noopener noreferrer">NASA / Hubble · Proxima Centauri</a></li>
-    <li><a href="${scales[2].source}" target="_blank" rel="noopener noreferrer">NASA · Galassie e Via Lattea</a></li>
-    <li><a href="${scales[4].source}" target="_blank" rel="noopener noreferrer">NASA · L’universo osservabile</a></li></ul>`);
+    <li><a href="${scales[2].source}" target="_blank" rel="noopener noreferrer">${t("NASA · Galaxies and the Milky Way","NASA · Galassie e Via Lattea")}</a></li>
+    <li><a href="${scales[4].source}" target="_blank" rel="noopener noreferrer">${t("NASA · Observable universe","NASA · L’universo osservabile")}</a></li></ul>`);
 }
 
 function openHelp() {
-  openModal('help', 'Impara a navigare', `
-    <div class="help-keys"><div><strong>Trascina</strong>Orbita intorno alla mappa</div><div><strong>Rotellina / due dita</strong>Avvicina e allontana</div><div><strong>Clic / tocco su un pianeta</strong>Vola vicino alla sua superficie</div><div><strong>Pianeti</strong>Sfoglia tutti gli otto pianeti e gli esopianeti confermati</div><div><strong>Costellazioni</strong>Scegli una figura, osserva la sua profondità in 3D o il cielo dalla Terra. Luogo e orario sono modificabili</div><div><strong>Spazio libero</strong>Nasconde tutte le scritte. Esc o l’icona in alto a destra per tornare</div><div><strong>1 — 5</strong>Cambia scala cosmica</div><div><strong>/</strong>Cerca stelle e pianeti</div><div><strong>Spazio</strong>Ferma o riprendi la rotazione</div><div><strong>R</strong>Ripristina l’inquadratura</div><div><strong>Esc</strong>Chiudi finestre e vista immersiva</div></div>
-    <h3>NELLA REALTÀ VIRTUALE</h3><p>Con un visore WebXR compatibile puoi osservare la mappa davanti a te. Il tracciamento delle mani richiede un visore e un browser che lo supportino. Anche i controller sono utilizzabili.</p><button class="focus-button" data-action="vr">${icon('glasses')}Scopri i comandi VR</button>`);
+  openModal('help', t("Controls and navigation","Comandi e navigazione"), `
+    <div class="help-keys"><div><strong>${t("Drag","Trascina")}</strong>${t("Orbit the map","Orbita intorno alla mappa")}</div><div><strong>${t("Scroll / two fingers","Rotellina / due dita")}</strong>${t("Zoom in and out","Avvicina e allontana")}</div><div><strong>${t("Click / tap a planet","Clic / tocco su un pianeta")}</strong>${t("Inspect the planet’s surface","Osserva la superficie del pianeta")}</div><div><strong>${t("Planets","Pianeti")}</strong>${t("Browse all eight planets and confirmed exoplanets","Sfoglia tutti gli otto pianeti e gli esopianeti confermati")}</div><div><strong>${t("Constellations","Costellazioni")}</strong>${t("Select a constellation in 3D or Earth sky view. Location and time are configurable","Seleziona una costellazione in 3D o nel cielo terrestre. Luogo e orario sono configurabili")}</div><div><strong>${t("Immersive view","Vista immersiva")}</strong>${t("Hide all text. Press Esc or use the top-right icon to restore controls","Nasconde tutte le scritte. Esc o l’icona in alto a destra per tornare")}</div><div><strong>1 — 5</strong>${t("Change reference scale","Cambia scala di riferimento")}</div><div><strong>/</strong>${t("Search stars and planets","Cerca stelle e pianeti")}</div><div><strong>${t("Space","Spazio")}</strong>${t("Pause or resume rotation","Ferma o riprendi la rotazione")}</div><div><strong>R</strong>${t("Reset the camera","Ripristina l’inquadratura")}</div><div><strong>Esc</strong>${t("Close dialogs and immersive view","Chiudi finestre e vista immersiva")}</div></div>
+    <h3>${t("VIRTUAL REALITY","NELLA REALTÀ VIRTUALE")}</h3><p>${t("WebXR supports spatial map inspection with a compatible headset. Hand tracking requires device and browser support; controllers are also supported.","Con un visore WebXR compatibile puoi osservare la mappa davanti a te. Il tracciamento delle mani richiede un visore e un browser che lo supportino. Anche i controller sono utilizzabili.")}</p><button class="focus-button" data-action="vr">${icon('glasses')}${t("VR controls","Comandi VR")}</button>`);
 }
 
 function openSettings() {
-  openModal('settings', 'La tua esperienza', `
-    <h3>DETTAGLIO DELLA MAPPA</h3><div class="quality" role="group" aria-label="Qualità grafica"><button data-quality="low" class="${state.quality === 'low' ? 'active' : ''}" aria-pressed="${state.quality === 'low'}">Essenziale</button><button data-quality="high" class="${state.quality === 'high' ? 'active' : ''}" aria-pressed="${state.quality === 'high'}">Ricco di stelle</button></div><p>Il dettaglio essenziale riduce il numero di particelle e il carico grafico.</p>
-    <h3>MOVIMENTO E LIVELLI</h3>
-    <div class="layer-row"><span>Rotazione automatica</span><button class="toggle" role="switch" data-action="settings-rotate" aria-label="Rotazione automatica" aria-checked="${state.autoRotate}"></button></div>
-    ${[['labels','Etichette'],['grid','Griglia orbitale'],['particles','Polvere stellare']].map(([name,label]) => `<div class="layer-row"><span>${label}</span><button class="toggle" role="switch" aria-label="${label}" aria-checked="${state[name]}" data-layer="${name}"></button></div>`).join('')}
-    <p>${reducedMotion ? 'Riduzione del movimento rilevata: la rotazione parte disattivata, salvo una tua preferenza salvata.' : 'Le preferenze vengono salvate su questo dispositivo.'}</p>`);
+  openModal('settings', t("Settings","Impostazioni"), `
+    <h3>${t('LANGUAGE', 'LINGUA')}</h3>
+    <label class="readout-title" for="language-setting">${t('Interface language', 'Lingua dell\u2019interfaccia')}</label>
+    <select id="language-setting" class="search-input" aria-label="${t('Interface language', 'Lingua dell\u2019interfaccia')}">
+      <option value="en" ${getLanguage() === 'en' ? 'selected' : ''}>English</option>
+      <option value="it" ${getLanguage() === 'it' ? 'selected' : ''}>Italiano</option>
+    </select>
+    <h3>${t("GRAPHICS QUALITY","QUALITÀ GRAFICA")}</h3><div class="quality" role="group" aria-label="${t("Graphics quality","Qualità grafica")}"><button data-quality="low" class="${state.quality === 'low' ? 'active' : ''}" aria-pressed="${state.quality === 'low'}">${t("Low","Bassa")}</button><button data-quality="high" class="${state.quality === 'high' ? 'active' : ''}" aria-pressed="${state.quality === 'high'}">${t("High","Alta")}</button></div><p>${t("Low detail reduces particle count and rendering load.","Il dettaglio basso riduce particelle e carico grafico.")}</p>
+    <h3>${t("MOTION AND LAYERS","MOVIMENTO E LIVELLI")}</h3>
+    <div class="layer-row"><span>${t("Auto-rotate","Rotazione automatica")}</span><button class="toggle" role="switch" data-action="settings-rotate" aria-label="${t("Auto-rotate","Rotazione automatica")}" aria-checked="${state.autoRotate}"></button></div>
+    ${[['labels',t("Labels","Etichette")],['grid',t("Reference grid","Griglia di riferimento")],['particles',t("Particle effects","Effetti particellari")]].map(([name,label]) => `<div class="layer-row"><span>${label}</span><button class="toggle" role="switch" aria-label="${label}" aria-checked="${state[name]}" data-layer="${name}"></button></div>`).join('')}
+    <p>${reducedMotion ? t("Reduced motion detected: rotation is off by default unless you have saved another preference.","Riduzione del movimento rilevata: la rotazione parte disattivata, salvo una tua preferenza salvata.") : t("Preferences are saved on this device.","Le preferenze vengono salvate su questo dispositivo.")}</p>`);
 }
 
 function vrContent() {
   const supported = xrSupported && universe;
-  const status = !window.isSecureContext ? 'Per attivare WebXR apri questa pagina via HTTPS o su localhost.' : !navigator.xr ? 'Questo browser non espone WebXR. Apri l’atlante nel browser di un visore compatibile.' : !xrChecked ? 'Verifica della compatibilità del visore in corso…' : !xrSupported ? 'Nessun visore VR disponibile in questo browser. Apri l’atlante dal visore oppure collega un dispositivo compatibile.' : !universe ? 'La realtà virtuale richiede una sessione grafica WebGL funzionante.' : 'Visore disponibile. Sei pronto a entrare.';
-  return `<p>Il cosmo diventa un ologramma davanti a te. Muoviti intorno alla mappa, avvicinati e segui le sue stelle.</p>
-    <div class="help-keys"><div><strong>Pizzico breve</strong>Seleziona un oggetto sulla mappa</div><div><strong>Pizzico mantenuto</strong>Sposta e ruota; con due mani cambia anche dimensione</div><div><strong>Controller · grilletto</strong>Seleziona un oggetto puntandolo</div><div><strong>Pannello nell’ologramma</strong>Cambia scala, ripristina la vista o esci</div><div><strong>LIBERA</strong>Nasconde scritte e pannelli; tocca la piccola sfera luminosa per ripristinarli</div></div>
-    <p>Attiva il tracciamento delle mani nelle impostazioni del visore. La disponibilità dipende dal dispositivo e dal browser. Con i controller, usa il tasto di presa per afferrare la mappa. Puoi uscire anche dal menu di sistema del visore.</p>
-    <p id="xr-status" role="status">${status}</p><button class="focus-button" data-action="start-vr" ${supported ? '' : 'disabled'}>${icon('glasses')}Entra nell’atlante VR</button>`;
+  const status = !window.isSecureContext ? t("WebXR requires HTTPS or localhost.","Per attivare WebXR apri questa pagina via HTTPS o su localhost.") : !navigator.xr ? t("This browser does not provide WebXR. Open the atlas in a compatible headset browser.","Questo browser non espone WebXR. Apri l’atlante nel browser di un visore compatibile.") : !xrChecked ? t("Checking headset compatibility…","Verifica della compatibilità del visore in corso…") : !xrSupported ? t("No VR headset is available in this browser. Use a headset browser or connect a compatible device.","Nessun visore VR disponibile in questo browser. Apri l’atlante dal visore oppure collega un dispositivo compatibile.") : !universe ? t("VR requires a working WebGL renderer.","La realtà virtuale richiede una sessione grafica WebGL funzionante.") : t("Compatible headset available.","Visore compatibile disponibile.");
+  return `<p>${t("Use hand tracking or controllers to select objects and adjust the 3D map.","Usa mani o controller per selezionare oggetti e regolare la mappa 3D.")}</p>
+    <div class="help-keys"><div><strong>${t("Brief pinch","Pizzico breve")}</strong>${t("Select a map object","Seleziona un oggetto sulla mappa")}</div><div><strong>${t("Pinch and hold","Pizzico mantenuto")}</strong>${t("Move and rotate; use two hands to change scale","Sposta e ruota; con due mani cambia anche dimensione")}</div><div><strong>${t("Controller · trigger","Controller · grilletto")}</strong>${t("Point to select an object","Seleziona un oggetto puntandolo")}</div><div><strong>${t("VR panel","Pannello VR")}</strong>${t("Change scale, reset the view or exit","Cambia scala, ripristina la vista o esci")}</div><div><strong>${t("IMMERSIVE","IMMERSIVA")}</strong>${t("Hide text and panels; select the small luminous sphere to restore them","Nasconde scritte e pannelli; tocca la piccola sfera luminosa per ripristinarli")}</div></div>
+    <p>${t("Enable hand tracking in the headset settings. Availability depends on the device and browser. With controllers, use grip to hold the map. The headset system menu can also end the session.","Attiva il tracciamento delle mani nelle impostazioni del visore. La disponibilità dipende dal dispositivo e dal browser. Con i controller, usa il tasto di presa per afferrare la mappa. Puoi uscire anche dal menu di sistema del visore.")}</p>
+    <p id="xr-status" role="status">${status}</p><button class="focus-button" data-action="start-vr" ${supported ? '' : 'disabled'}>${icon('glasses')}${t("Enter VR atlas","Entra nell’atlante VR")}</button>`;
 }
 
-function openVR() { openModal('vr', 'L’universo, tra le tue mani', vrContent()); }
+function openVR() { openModal('vr', t("Virtual reality","Realtà virtuale"), vrContent()); }
 
 async function checkVR() {
   try { xrSupported = Boolean(window.isSecureContext && navigator.xr && await navigator.xr.isSessionSupported('immersive-vr')); } catch { xrSupported = false; }
@@ -721,13 +733,27 @@ async function startVR(button) {
   try {
     const started = await universe.enterVR();
     if (started) closeModal();
-    else notify('La sessione VR non è stata avviata. Controlla il visore.');
+    else notify(t("VR session did not start. Check the headset.","La sessione VR non è stata avviata. Controlla il visore."));
   } catch (error) {
-    notify(error?.message || 'Impossibile avviare la sessione VR.');
+    notify(error?.message || t("Unable to start the VR session.","Impossibile avviare la sessione VR."));
   } finally {
     button.disabled = false;
   }
 }
+
+document.addEventListener('change', event => {
+  if (event.target.id !== 'language-setting' || event.target.value === getLanguage()) return;
+  try {
+    sessionStorage.setItem('aether.languageView', JSON.stringify({
+      scale: state.scale, objectId: state.object.id, host: state.object.host,
+      constellationId: constellationBrowser.id, mode: constellationBrowser.mode,
+      observer: constellationBrowser.observer, timeZone: constellationBrowser.timeZone,
+      earthVisible: constellationBrowser.earthVisible, earthPerspective: state.context?.earthPerspective
+    }));
+  } catch { /* Language selection remains available without session storage. */ }
+  setLanguage(event.target.value);
+  location.reload();
+});
 
 document.addEventListener('click', async event => {
   const button = event.target.closest('button, a.brand');
@@ -799,16 +825,16 @@ document.addEventListener('click', async event => {
     case 'close': closeModal(); break;
     case 'zoom-in': universe?.zoom(0.8); break;
     case 'zoom-out': universe?.zoom(1.25); break;
-    case 'reset': universe?.resetView(); notify('La rotta è di nuovo al centro.'); break;
+    case 'reset': universe?.resetView(); notify(t("View reset.","Vista ripristinata.")); break;
     case 'rotate': setRotation(!state.autoRotate); break;
     case 'settings-rotate': setRotation(!state.autoRotate); button.setAttribute('aria-checked', state.autoRotate); break;
     case 'cinema': toggleCinematic(); break;
     case 'sound': await toggleSound(); break;
     case 'tour': toggleTour(); break;
-    case 'object': openModal('object', 'Nel tuo campo visivo', objectMarkup(state.object, true)); break;
+    case 'object': openModal('object', t("Object data","Dati dell’oggetto"), objectMarkup(state.object, true)); break;
     case 'focus':
       if (Number.isInteger(state.object.targetScale)) changeScale(state.object.targetScale);
-      else { universe?.focusObject(state.object); notify(`Rotta verso ${state.object.name}.`); }
+      else { universe?.focusObject(state.object); notify(`${t("Focus: ","Messa a fuoco: ")}${state.object.name}.`); }
       closeModal();
       break;
   }
@@ -863,11 +889,11 @@ try {
   universe.setQuality(state.quality);
 } catch (error) {
   console.error('Aether renderer:', error);
-  $('#renderer-status').textContent = 'CATALOGO DISPONIBILE';
+  $('#renderer-status').textContent = t("CATALOGUE AVAILABLE","CATALOGO DISPONIBILE");
   const fallback = document.createElement('div');
   fallback.className = 'webgl-error';
   fallback.setAttribute('role','alert');
-  fallback.innerHTML = '<strong>Il cielo 3D non è disponibile.</strong><p>Attiva l’accelerazione grafica del browser e ricarica la pagina. Puoi già esplorare gli oggetti e le fonti dal catalogo.</p><button class="focus-button" data-action="search">Apri il catalogo</button>';
+  fallback.innerHTML = `<strong>${t("3D rendering is unavailable.","Il cielo 3D non è disponibile.")}</strong><p>${t("Enable browser hardware acceleration and reload. Catalogue objects and sources remain available.","Attiva l’accelerazione grafica del browser e ricarica la pagina. Puoi già esplorare gli oggetti e le fonti dal catalogo.")}</p><button class="focus-button" data-action="search">${t("Open catalogue","Apri il catalogo")}</button>`;
   $('.app-shell').append(fallback);
   document.querySelectorAll('[data-action="zoom-in"],[data-action="zoom-out"],[data-action="reset"],[data-action="rotate"]').forEach(button => { button.disabled = true; });
 }
@@ -876,3 +902,29 @@ requestAnimationFrame(() => requestAnimationFrame(() => {
   setTimeout(() => $('.loading')?.remove(), 650);
 }));
 checkVR();
+
+async function restoreLanguageView() {
+  let saved;
+  try {
+    const value = sessionStorage.getItem('aether.languageView');
+    sessionStorage.removeItem('aether.languageView');
+    saved = value ? JSON.parse(value) : null;
+  } catch { return; }
+  if (!saved || !universe) return;
+  try {
+    if (saved.scale >= 6) {
+      constellationBrowser.timeZone = saved.timeZone || 'Europe/Rome';
+      universe.setEarthVisible(saved.earthVisible !== false);
+      await universe.showConstellation(saved.constellationId, { mode: saved.mode, observer: saved.observer });
+      if (saved.earthPerspective) universe.viewFromEarth();
+    } else if (saved.scale === 5) {
+      const planet = findPlanet(saved.objectId) || exoplanets.find(item => item.host === saved.host);
+      if (planet) universe.focusObject(planet);
+    } else if (scales[saved.scale]) {
+      changeScale(saved.scale);
+      const object = catalog[scales[saved.scale].id].find(item => item.id === saved.objectId);
+      if (object) universe.selectObject(object);
+    }
+  } catch (error) { notify(error.message); }
+}
+restoreLanguageView();

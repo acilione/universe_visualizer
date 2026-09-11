@@ -1,3 +1,5 @@
+import { t } from './i18n.js';
+
 /**
  * Geometric sky coordinates for a visual planetarium, not an observing ephemeris.
  * Catalogue directions are J2000; precession uses the IAU 1976 polynomials in
@@ -16,21 +18,21 @@ const wrap = (degrees) => ((degrees % 360) + 360) % 360;
 
 function finite(value, label) {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
-    throw new RangeError(`${label}: valore numerico non valido.`);
+    throw new RangeError(t(`${label}: invalid numeric value.`,`${label}: valore numerico non valido.`));
   }
   return value;
 }
 
 function latitudeValue(value) {
-  finite(value, 'Latitudine');
-  if (value < -90 || value > 90) throw new RangeError('Latitudine fuori intervallo (-90 / 90).');
+  finite(value, t("Latitude","Latitudine"));
+  if (value < -90 || value > 90) throw new RangeError(t("Latitude out of range (-90 / 90).","Latitudine fuori intervallo (-90 / 90)."));
   return value;
 }
 
 function dateValue(value) {
   // A timezone is mandatory so an observation cannot silently depend on the browser locale.
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/.test(value)) {
-    throw new RangeError('Data non valida: usa una data ISO con fuso orario.');
+    throw new RangeError(t("Invalid date: use an ISO date with a timezone.","Data non valida: usa una data ISO con fuso orario."));
   }
   const milliseconds = Date.parse(value);
   const date = new Date(milliseconds);
@@ -39,29 +41,29 @@ function dateValue(value) {
   const [inputYear, month, day] = value.slice(0, 10).split('-').map(Number);
   const monthLength = new Date(Date.UTC(inputYear, month, 0)).getUTCDate();
   if (!Number.isFinite(milliseconds) || month < 1 || month > 12 || day < 1 || day > monthLength || year < 1900 || year > 2100) {
-    throw new RangeError('Data non valida: scegli una data fra il 1900 e il 2100.');
+    throw new RangeError(t("Invalid date: choose a date between 1900 and 2100.","Data non valida: scegli una data fra il 1900 e il 2100."));
   }
   return { milliseconds, dateIso: date.toISOString() };
 }
 
 export function validateObserver(input = {}) {
   const latitude = latitudeValue(input.latitude);
-  const longitude = finite(input.longitude, 'Longitudine');
-  if (longitude < -180 || longitude > 180) throw new RangeError('Longitudine fuori intervallo (-180 / 180).');
+  const longitude = finite(input.longitude, t("Longitude","Longitudine"));
+  if (longitude < -180 || longitude > 180) throw new RangeError(t("Longitude out of range (-180 / 180).","Longitudine fuori intervallo (-180 / 180)."));
   return { latitude, longitude, dateIso: dateValue(input.dateIso).dateIso };
 }
 
 function validateEquatorial(raDeg, decDeg) {
-  finite(raDeg, 'Ascensione retta');
-  finite(decDeg, 'Declinazione');
-  if (decDeg < -90 || decDeg > 90) throw new RangeError('Declinazione fuori intervallo (-90 / 90).');
+  finite(raDeg, t("Right ascension","Ascensione retta"));
+  finite(decDeg, t("Declination","Declinazione"));
+  if (decDeg < -90 || decDeg > 90) throw new RangeError(t("Declination out of range (-90 / 90).","Declinazione fuori intervallo (-90 / 90)."));
 }
 
 /** App frame: +Y celestial north, RA 0 along +X, RA 90 along -Z. */
 export function equatorialVector(raDeg, decDeg, distance = 1) {
   validateEquatorial(raDeg, decDeg);
-  finite(distance, 'Distanza');
-  if (distance < 0) throw new RangeError('La distanza non puo essere negativa.');
+  finite(distance, t("Distance","Distanza"));
+  if (distance < 0) throw new RangeError(t("Distance cannot be negative.","La distanza non può essere negativa."));
   const ra = wrap(raDeg) * RAD;
   const dec = decDeg * RAD;
   const horizontal = Math.cos(dec) * distance;
@@ -139,7 +141,7 @@ function horizontalResult(vector) {
 export function equatorialToHorizontalAtSiderealTime(raDeg, decDeg, { latitude, siderealDeg }) {
   validateEquatorial(raDeg, decDeg);
   latitudeValue(latitude);
-  finite(siderealDeg, 'Tempo siderale');
+  finite(siderealDeg, t("Sidereal time","Tempo siderale"));
   return horizontalResult(matrixVector(horizonMatrix(latitude, siderealDeg), raDeg, decDeg));
 }
 
@@ -159,8 +161,8 @@ export function createSkyTransform(input) {
   }
   const vector = (raDeg, decDeg, distance = 1) => {
     validateEquatorial(raDeg, decDeg);
-    finite(distance, 'Distanza');
-    if (distance < 0) throw new RangeError('La distanza non puo essere negativa.');
+    finite(distance, t("Distance","Distanza"));
+    if (distance < 0) throw new RangeError(t("Distance cannot be negative.","La distanza non può essere negativa."));
     return matrixVector(combined, raDeg, decDeg, distance);
   };
   return { observer, siderealDeg, vector, horizontal: (raDeg, decDeg) => horizontalResult(vector(raDeg, decDeg)) };

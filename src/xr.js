@@ -1,17 +1,18 @@
+import { t } from './i18n.js';
 import * as THREE from 'three';
 import { singleGripTransform, dualGripTransform, isSelectionGesture } from './xr-math.js';
 
 const WIDTH = 1160;
 const HEIGHT = 420;
 const BUTTONS = [
-  { label: '← SCALA', action: 'previous', x: 28, y: 220, w: 174, h: 74 },
-  { label: 'SCALA →', action: 'next', x: 214, y: 220, w: 174, h: 74 },
-  { label: 'AVVICINA', action: 'focus', x: 400, y: 220, w: 174, h: 74 },
-  { label: 'RICENTRA', action: 'reset', x: 586, y: 220, w: 174, h: 74 },
-  { label: 'LIBERA', action: 'immersive', x: 772, y: 220, w: 174, h: 74 },
-  { label: 'ESCI VR', action: 'exit', x: 958, y: 220, w: 174, h: 74 },
+  { label: ["← SCALE", "← SCALA"], action: 'previous', x: 28, y: 220, w: 174, h: 74 },
+  { label: ["SCALE →", "SCALA →"], action: 'next', x: 214, y: 220, w: 174, h: 74 },
+  { label: ["FOCUS", "AVVICINA"], action: 'focus', x: 400, y: 220, w: 174, h: 74 },
+  { label: ["RECENTER", "RICENTRA"], action: 'reset', x: 586, y: 220, w: 174, h: 74 },
+  { label: ["IMMERSIVE", "LIBERA"], action: 'immersive', x: 772, y: 220, w: 174, h: 74 },
+  { label: ["EXIT VR", "ESCI VR"], action: 'exit', x: 958, y: 220, w: 174, h: 74 },
 ];
-const SCALE_NAMES = ['Sistema Solare', 'Stelle vicine', 'Via Lattea', 'Gruppo Locale', 'Universo osservabile'];
+const SCALE_NAMES = [['Solar System','Sistema Solare'],['Nearby stars','Stelle vicine'],['Milky Way','Via Lattea'],['Local Group','Gruppo Locale'],['Observable universe','Universo osservabile']];
 
 /**
  * WebXR interaction layer. Call update() inside renderer.setAnimationLoop().
@@ -49,7 +50,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   const jointGeometry = new THREE.SphereGeometry(1, 8, 6);
   const jointMaterials = [0xa5efe7, 0xf0cf91].map(color => new THREE.MeshBasicMaterial({ color, toneMapped: false }));
   const lineGeometry = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, -1)]);
-  let info = { name: 'Afferra l’universo', distance: 'Punta e pizzica brevemente per selezionare.' };
+  let info = { name: t("Select an object","Seleziona un oggetto"), distance: t("Point and briefly pinch to select.","Punta e pizzica brevemente per selezionare.") };
   let active = false;
   let disposed = false;
   let entering = false;
@@ -88,11 +89,11 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     context.fillStyle = '#ccb180';
     const value = getScale?.();
     const constellationView = value === 6 || value === 7;
-    const scaleName = info.scaleLabel || (typeof value === 'number' ? SCALE_NAMES[value] : value?.name || value) || 'Atlante cosmico';
+    const scaleName = info.scaleLabel || (typeof value === 'number' ? (SCALE_NAMES[value] && t(...SCALE_NAMES[value])) : value?.name || value) || t("Cosmic atlas","Atlante cosmico");
     context.fillText(`ÆTHER  /  ${String(scaleName).toUpperCase()}`, 30, 39, 1090);
     context.fillStyle = '#f1e6ce';
     context.font = '500 46px sans-serif';
-    context.fillText(String(info.name || 'Afferra l’universo'), 30, 103, 1090);
+    context.fillText(String(info.name || t("Select an object","Seleziona un oggetto")), 30, 103, 1090);
     context.fillStyle = '#aabdbc';
     context.font = '26px sans-serif';
     context.fillText(String(info.distance || ''), 30, 160, 1090);
@@ -109,22 +110,22 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       context.font = '600 23px sans-serif';
       context.textAlign = 'center';
       const label = constellationView
-        ? ({ previous: '← FIGURA', next: 'FIGURA →', focus: value === 6 ? 'DALLA TERRA' : 'SPAZIO 3D' }[b.action] || b.label)
-        : b.label;
+        ? ({ previous: t("← FIGURE","← FIGURA"), next: t("FIGURE →","FIGURA →"), focus: value === 6 ? t("FROM EARTH","DALLA TERRA") : t("3D SPACE","SPAZIO 3D") }[b.action] || t(...b.label))
+        : t(...b.label);
       context.fillText(label, b.x + b.w / 2, b.y + b.h / 2);
       context.textAlign = 'left';
     }
     context.fillStyle = '#afbfbd';
     context.font = '21px sans-serif';
     context.fillText(isPlanetarium()
-      ? 'MANI  ·  Guarda il cielo intorno a te   /   Punta e pizzica per selezionare'
-      : 'MANI  ·  Pizzico breve: seleziona   /   Tieni: sposta e ruota   /   Due mani: zoom', 30, 333, 1090);
+      ? t("HANDS  ·  Look around the sky   /   Point and pinch to select","MANI  ·  Guarda il cielo intorno a te   /   Punta e pizzica per selezionare")
+      : t("HANDS  ·  Brief pinch: select   /   Hold: move and rotate   /   Two hands: zoom","MANI  ·  Pizzico breve: seleziona   /   Tieni: sposta e ruota   /   Due mani: zoom"), 30, 333, 1090);
     context.fillStyle = '#788f92';
     context.fillText(constellationView
-      ? 'Cambia figura o prospettiva dal pannello.'
+      ? t("Change the constellation or perspective using the panel.","Cambia figura o prospettiva dal pannello.")
       : isPlanetarium()
-      ? 'CONTROLLER  ·  Grilletto: seleziona   /   Ricentra: riposiziona l’orizzonte'
-      : 'CONTROLLER  ·  Grilletto: seleziona   /   Impugnatura: afferra', 30, 375, 1090);
+      ? t("CONTROLLERS  ·  Trigger: select   /   Recenter: reposition the horizon","CONTROLLER  ·  Grilletto: seleziona   /   Ricentra: riposiziona l’orizzonte")
+      : t("CONTROLLERS  ·  Trigger: select   /   Grip: grab","CONTROLLER  ·  Grilletto: seleziona   /   Impugnatura: afferra"), 30, 375, 1090);
     texture.needsUpdate = true;
     panelDirty = false;
   }
@@ -187,7 +188,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       } else if (action === 'immersive' || action === 'restore') {
         setImmersive(action === 'immersive');
       } else if (action === 'exit') {
-        renderer.xr.getSession()?.end().catch(() => onMessage('Usa il menu del visore per uscire dalla VR.'));
+        renderer.xr.getSession()?.end().catch(() => onMessage(t('Use the headset menu to exit VR.','Usa il menu del visore per uscire dalla VR.')));
       }
     } else if (hit.item) {
       setInfo(hit.item);
@@ -454,7 +455,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       snapshot = null;
     }
     onSessionEnd?.({ presentationMode: currentMode, previousPresentationMode, viewChanged, modeChanged: currentMode !== previousPresentationMode });
-    onMessage('Sessione VR terminata. Sei tornato all’atlante.');
+    onMessage(t("VR session ended. The desktop atlas is restored.","Sessione VR terminata. Sei tornato all’atlante."));
   }
 
   async function enter() {
@@ -465,11 +466,11 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     }
     if (entering) return false;
     if (!window.isSecureContext) {
-      onMessage('Per entrare in VR apri l’atlante tramite HTTPS o localhost sul browser del visore.');
+      onMessage(t("To enter VR, open the atlas via HTTPS or localhost in the headset browser.","Per entrare in VR apri l’atlante tramite HTTPS o localhost sul browser del visore."));
       return false;
     }
     if (!navigator.xr) {
-      onMessage('WebXR non è disponibile in questo browser. Apri l’atlante nel browser di un visore compatibile.');
+      onMessage(t("WebXR is unavailable in this browser. Open the atlas in a compatible headset browser.","WebXR non è disponibile in questo browser. Apri l’atlante nel browser di un visore compatibile."));
       return false;
     }
     entering = true;
@@ -508,8 +509,8 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       recenterPending = true;
       panelDirty = true;
       onMessage(isPlanetarium()
-        ? 'VR attiva. Osserva il cielo intorno a te; punta e pizzica per selezionare una stella.'
-        : 'VR attiva. Pizzica e tieni per afferrare; usa due mani per ingrandire.');
+        ? t("VR active. Look around the sky; point and pinch to select a star.","VR attiva. Osserva il cielo intorno a te; punta e pizzica per selezionare una stella.")
+        : t("VR active. Pinch and hold to grab; use two hands to zoom.","VR attiva. Pizzica e tieni per afferrare; usa due mani per ingrandire."));
       return true;
     } catch (error) {
       if (session) {
@@ -518,10 +519,10 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       }
       entering = false;
       const message = error?.name === 'NotAllowedError' || error?.name === 'SecurityError'
-        ? 'Accesso VR non consentito. Puoi riprovare dal pulsante VR e consentire l’accesso al visore.'
+        ? t("VR access was denied. Retry using the VR button and allow headset access.","Accesso VR non consentito. Puoi riprovare dal pulsante VR e consentire l’accesso al visore.")
         : error?.name === 'NotSupportedError'
-          ? 'Nessun visore WebXR disponibile. Collega un visore o apri la pagina nel suo browser.'
-          : 'Impossibile avviare la VR. Verifica che il visore sia collegato e riprova.';
+          ? t("No WebXR headset is available. Connect a headset or open the page in its browser.","Nessun visore WebXR disponibile. Collega un visore o apri la pagina nel suo browser.")
+          : t("Unable to start VR. Check the headset connection and retry.","Impossibile avviare la VR. Verifica che il visore sia collegato e riprova.");
       onMessage(message);
       return false;
     }

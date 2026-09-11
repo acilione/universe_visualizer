@@ -67,7 +67,7 @@ try {
     window.originalObjectPositions = atlas.objects.map(object => object.position.slice());
   });
   // Exercise the user-facing Earth label itself, even if label collision rules temporarily hide it.
-  await page.getByRole('button', { name: 'Guarda la costellazione dalla posizione della Terra, nello spazio 3D', exact: true, includeHidden: true }).evaluate(button => button.click());
+  await page.getByRole('button', { name: 'View the constellation from Earth’s position in 3D space', exact: true, includeHidden: true }).evaluate(button => button.click());
   await page.waitForFunction(() => !atlas.skyEntry);
   assert.deepEqual(await snapshot(page), { index: 6, earthVisible: true, perspective: true,
     earthShown: false, linesShown: true, controlsEnabled: false, cameraRadius: 0, fov: 70 });
