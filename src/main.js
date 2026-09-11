@@ -154,7 +154,7 @@ function objectMarkup(object, isModal = false) {
   const isOverview = object.id === catalog[scale.id]?.[0]?.id || object.id === state.context?.overview?.id;
   const catalogStar = state.scale >= 6 && Number.isFinite(object.raDeg) && Number.isFinite(object.decDeg);
   const canDive = Number.isInteger(object.targetScale) && scales[object.targetScale];
-  const art = isModal ? '' : planet
+  const art = isModal || scale.id === 'constellations' ? '' : planet
     ? `<div class="planet-art${object.id === 'saturn' ? ' planet-art-saturn' : ''}" style="--planet-color:${escape(object.color || '#a6c7d4')};${solarTextures[object.id] ? `--planet-texture:url('/textures/${solarTextures[object.id]}')` : ''}" aria-hidden="true"><span></span></div>`
     : `<div class="galaxy-art" data-scene="${escape(scale.id)}" aria-hidden="true"></div>`;
   const measurements = exoplanet ? `<div class="planet-measurements">
