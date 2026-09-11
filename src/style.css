@@ -69,3 +69,68 @@ dialog .catalog-provenance a{font-size:10px;color:#9dafb8}
 @media(max-width:900px){.top-actions{gap:8px}.planet-browser-button{padding:9px 11px}.immersion-button{padding:9px;font-size:9px;gap:6px}.planet-browser-button svg{width:15px}.view-controls{gap:6px}}
 @media(max-width:560px){.topbar{margin:0 15px}.brand{gap:8px}.brand img{width:30px;height:30px}.brand-word{font-size:20px;letter-spacing:4px}.brand-sub{font-size:6px;letter-spacing:1.5px}.top-actions{gap:6px}.planet-browser-button{padding:9px 8px;font-size:10px;gap:5px}.vr-button{font-size:9px;gap:6px;padding:9px 8px}.vr-button svg{width:15px}.intro h1{max-width:270px}.planet-results{grid-template-columns:1fr;max-height:35dvh}.solar-shortcuts{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;padding:9px 0;margin-bottom:16px}.solar-shortcuts button{gap:6px;font-size:9px;padding:5px}.solar-shortcuts .planet-preview{width:29px;height:29px}.catalog-introduction{font-size:11px;margin-bottom:10px}.catalog-filter{gap:5px}.catalog-filter button{font-size:10px;padding:8px 10px}dialog[data-kind="planets"]{padding:20px;max-height:94dvh}dialog[data-kind="planets"] .dialog-head h2{font-size:22px}.planet-result{min-height:73px;padding:11px 14px}.planet-result-copy strong{font-size:13px}.exit-cinema{right:18px;top:18px}}
 @media(max-height:650px){dialog[data-kind="planets"] .solar-shortcuts{display:none}.catalog-provenance{max-height:40px;overflow:auto}}
+
+/* Constellation catalog, spatial perspective and an observer on Earth. */
+[hidden]{display:none!important}
+.constellation-browser-button{display:flex;align-items:center;gap:8px;border:1px solid #a5cdbc50;background:#96c9ba0a;padding:11px 13px;border-radius:5px;font-size:11px;color:#b4d9d0;white-space:nowrap}
+.constellation-browser-button:hover{border-color:#b8e6d68c;color:#e5fff5;background:#89cfb817}
+.constellation-view .scale-list{display:none}
+.constellation-view .left-panel>.section-heading{margin-bottom:14px}
+.constellation-controls{display:flex;flex-direction:column;gap:13px;pointer-events:auto}
+.constellation-change{display:flex;justify-content:space-between;align-items:center;text-align:left;gap:8px;padding:0 0 12px;border-bottom:1px solid #acd7ca26;color:#dcf1e6;font-family:'Space Grotesk',sans-serif;font-size:18px}
+.constellation-change svg{width:15px;height:15px;color:#89a9a1;flex-shrink:0}
+.constellation-mode{display:flex;flex-direction:column;gap:7px}
+.constellation-mode button{display:flex;align-items:center;gap:10px;text-align:left;padding:12px;border:1px solid #a9c9c922;border-radius:5px;background:#8cc9ba05;color:#8caaa6;font-size:11px}
+.constellation-mode button svg{width:16px;height:16px;flex-shrink:0}
+.constellation-mode button.active{border-color:#a2d9c65b;color:#d6f2e7;background:linear-gradient(100deg,#9bdbc51d,#9bdbc505)}
+.constellation-mode button:hover{background:#a5dece16;border-color:#b7dfd147;color:#def7ed}
+.constellation-status{font-size:10px;line-height:1.8;color:#869b98;margin:0}
+.observer-adjust{display:flex;align-items:center;justify-content:center;gap:8px;padding:9px 11px;border:1px solid var(--line);border-radius:4px;color:#cbbd9e;font-size:10px}
+.observer-adjust svg{width:13px;height:13px}
+.cosmic-return{font-size:11px;display:flex;align-items:center;gap:8px;color:#b7ccc7;padding:0}
+.cosmic-return svg{width:14px;height:14px}
+.constellation-view .readout-value{font-size:16px;line-height:1.4;max-width:200px}
+.earth-sky-view .compass{display:none}
+.earth-sky-view [data-action="rotate"]{display:none}
+.earth-sky-view .vignette{background:linear-gradient(90deg,#080c12a3,transparent 37%,transparent 73%,#080c1280),linear-gradient(0deg,#080c12a6,transparent 24%,transparent 75%,#080c1280)}
+.galaxy-art[data-scene="constellations"]:before{width:120px;height:76px;left:calc(50% - 60px);top:24px;border-radius:0;transform:none;background:linear-gradient(33deg,transparent 35%,#9fe3d244 36%,transparent 37%) 0 0/65% 100%,linear-gradient(-40deg,transparent 41%,#9fe3d238 42%,transparent 43%) 100% 0/60% 100%,radial-gradient(circle at 8% 26%,#d7fff1 1%,#9fe3d228 2%,transparent 10%),radial-gradient(circle at 51% 78%,#d7fff1 1%,#9fe3d22b 2%,transparent 11%),radial-gradient(circle at 93% 9%,#d7fff1 1%,#9fe3d225 2%,transparent 9%);background-repeat:no-repeat;box-shadow:none;filter:drop-shadow(0 0 8px #9fe3d242)}
+.galaxy-art[data-scene="constellations"]:after{color:#9ec9c0;text-shadow:139px 61px #9ec9c0,120px -2px #adcad7,17px 60px #7a969e,56px -11px #a7bdab}
+.constellation-view .object-card .card-description{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;line-height:1.7}
+.constellation-view .object-card .card-content h2{overflow-wrap:anywhere}
+.constellation-view .coordinates{font-size:8px;letter-spacing:.5px}
+dialog[data-kind="constellations"]{width:min(810px,calc(100% - 32px));max-height:94dvh;padding:27px}
+dialog[data-kind="constellations"] .dialog-head{margin-bottom:12px}
+.modal-constellation-mode{flex-direction:row;margin:17px 0 20px;gap:10px}
+.modal-constellation-mode button{flex:1;position:relative;display:block;padding:15px 16px 15px 47px;font-size:12px;line-height:1.6}
+.modal-constellation-mode button svg{position:absolute;left:16px;top:19px;width:19px;height:19px}
+.modal-constellation-mode small{display:block;font-size:10px;color:#829d97;margin-top:2px}
+.observer-fields{display:grid;grid-template-columns:1fr 1fr 1.6fr;gap:13px 12px;min-width:0;margin:0 0 20px;padding:16px;border:1px solid #9bc8c12c;border-radius:5px;background:#9bc8c104}
+.observer-fields legend{font-size:10px;color:#bddace;padding:0 7px;letter-spacing:.4px}
+.observer-fields label{font-size:11px;color:#c5d9d2;min-width:0;line-height:1.8}
+.observer-fields label small{display:block;font-size:9px;line-height:1.6;color:#87a099}
+.observer-fields input{display:block;color:#dbede6;border:1px solid #a4c9be38;border-radius:4px;background:#080f14;width:100%;padding:10px;font-size:11px;margin-top:7px;min-width:0;color-scheme:dark}
+.observer-actions{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.observer-actions button{display:flex;align-items:center;gap:7px;color:#b6d2c9;font-size:10px;padding:8px 10px;border:1px solid #a3cdbb2b;border-radius:4px}
+.observer-actions button:last-child{color:#dcdfc6;border-color:#c6b78c3d;background:#c6b78c0c}
+.observer-actions svg{width:13px;height:13px}
+dialog .observer-fields p{grid-column:1/-1;margin:0;font-size:10px;line-height:1.7;color:#829c94}
+.constellation-results{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px;max-height:35dvh;min-height:85px;overflow:auto;overscroll-behavior:contain;padding:4px 4px 4px 0;scrollbar-color:#48635e transparent;scrollbar-width:thin}
+.constellation-result{display:flex;align-items:center;gap:13px;text-align:left;padding:13px 14px;min-height:76px;min-width:0;border:1px solid #a5c9be14;border-radius:5px;background:#9ac7b803}
+.constellation-result:hover{background:#a5dcca10;border-color:#b5decb37}
+.constellation-result.selected{border-color:#afddcb38;background:#a4d9c80b}
+.constellation-monogram{display:flex;flex-direction:column;align-items:center;justify-content:center;width:34px;gap:4px;flex-shrink:0;color:#acd6c7}
+.constellation-monogram svg{width:21px;height:21px;filter:drop-shadow(0 0 7px #adf1d53d)}
+.constellation-monogram small{font-family:'Space Grotesk',sans-serif;font-size:8px;letter-spacing:1px;color:#8bb7aa}
+.constellation-result>span:nth-child(2){flex:1;min-width:0}
+.constellation-result strong{display:block;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:400;color:#dbeae3;overflow-wrap:anywhere}
+.constellation-result>span:nth-child(2)>small{display:block;font-size:10px;color:#869f98;line-height:1.6;margin-top:5px}
+.constellation-result>svg{flex-shrink:0;width:13px;height:13px;color:#8ebbae}
+.constellation-empty{grid-column:1/-1}
+.constellation-progress{font-size:11px;color:#bcdfd1;line-height:1.7}
+.constellation-progress:not(:empty){margin-top:12px;padding:11px 14px;border:1px solid #a5dcca2e;border-radius:4px;background:#a5dcca07}
+@media(max-width:1400px){.top-actions .live{display:none}}
+@media(min-width:901px) and (max-width:1150px){.topnav{gap:13px}.top-actions{gap:9px}.constellation-browser-button,.planet-browser-button{padding:10px}.brand-word{font-size:24px}.brand img{width:37px}.topbar{margin:0 25px}}
+@media(max-height:800px) and (min-width:901px){.constellation-controls{gap:9px}.constellation-change{padding-bottom:9px;font-size:16px}.constellation-mode button{padding:10px}.constellation-status{font-size:9px}.constellation-view .layers{margin-top:18px}.constellation-view .object-card .galaxy-art{height:80px}.constellation-view .object-card .galaxy-art:before{top:10px}.constellation-view .object-card .card-description{font-size:10px;margin:9px 0}.constellation-view .object-card .star-measurements{padding:9px 0}}
+@media(max-width:900px){.constellation-browser-button{padding:9px 11px}.constellation-browser-button svg{width:15px;height:15px}.constellation-view .left-panel{bottom:143px}.constellation-view .center-caption{display:none}.constellation-controls{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 13px;padding:11px 13px;background:#0b141bbd;border:1px solid #a1cbb32e;border-radius:5px;backdrop-filter:blur(8px)}.constellation-change{display:none}.constellation-controls>.constellation-mode{flex-direction:row;grid-column:1}.constellation-controls>.constellation-mode button{flex:1;justify-content:center;white-space:nowrap;padding:9px;font-size:10px}.constellation-status{grid-column:1;grid-row:2;font-size:9px;line-height:1.5}.constellation-controls .observer-adjust{grid-column:2;grid-row:1/3;align-self:stretch;flex-direction:column;gap:7px;padding:9px;font-size:9px}.constellation-view .readout-value{font-size:12px;max-width:116px}.constellation-view .view-controls{bottom:258px}.constellation-view .intro .subtitle{max-width:calc(100vw - 82px)}.earth-sky-view .vignette{background:linear-gradient(0deg,#080c1299,transparent 34%,transparent 72%,#080c1299)}}
+@media(max-width:650px){.constellation-browser-button span,.planet-browser-button span{display:none}.constellation-browser-button,.planet-browser-button{width:34px;height:34px;padding:0;justify-content:center}.top-actions{gap:6px}}
+@media(max-width:560px){dialog[data-kind="constellations"]{padding:20px}.modal-constellation-mode{gap:7px;margin:14px 0 18px}.modal-constellation-mode button{padding:13px 11px;display:flex;flex-direction:column;align-items:flex-start;gap:4px;font-size:11px;line-height:1.5}.modal-constellation-mode button svg{position:static;width:19px;height:19px;margin-bottom:3px}.modal-constellation-mode small{font-size:9px;margin:0}.observer-fields{grid-template-columns:1fr 1fr;padding:12px;gap:12px 9px}.observer-fields .observer-date{grid-column:1/-1}.observer-fields input{padding:9px;font-size:12px}.observer-actions{gap:7px}.observer-actions button{font-size:9px;padding:8px}.constellation-results{grid-template-columns:1fr;max-height:32dvh}.constellation-result{min-height:68px;padding:11px 13px}.constellation-result strong{font-size:13px}.constellation-controls{gap:7px;padding:9px}.constellation-controls>.constellation-mode{gap:6px}.constellation-controls>.constellation-mode button{font-size:9px;padding:8px;gap:5px}.constellation-controls>.constellation-mode button svg{width:14px;height:14px}.constellation-controls .observer-adjust{padding:8px;font-size:8px}.constellation-status{font-size:8px}.constellation-view .readout-value{font-size:11px;max-width:98px}.cosmic-return{font-size:9px;line-height:1.6}.cosmic-return svg{width:12px;height:12px}.constellation-view .view-controls{bottom:255px}.constellation-view .toast{bottom:240px}.constellation-view .intro h1{max-width:calc(100vw - 83px)}}

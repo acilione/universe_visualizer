@@ -6,6 +6,8 @@ import { createXR } from './xr.js';
 import { createPlanetVisual, disposePlanetTextures } from './planet-visuals.js';
 import { hostView } from './planets.js';
 import { planetCameraFraming, overviewDistance } from './planet-navigation.js';
+import { loadConstellation, loadConstellations } from './constellation-catalog.js';
+import { createConstellationView } from './constellation-visuals.js';
 
 const GOLD = 0x68cfbb;
 const vec = (a) => new THREE.Vector3(...a);
@@ -33,11 +35,20 @@ export class Universe {
     this.ambient=new THREE.AmbientLight(0xb7c7df,.85);this.scene.add(this.ambient);
     this.sunLight=new THREE.PointLight(0xffd7a1,60,80,1.1);this.mapRoot.add(this.sunLight);
     this.xr=createXR({renderer:this.renderer,scene:this.scene,camera:this.camera,controls:this.controls,mapRoot:this.mapRoot,
-      getTargets:()=>this.targets,onSelect:(o)=>this.selectObject(o),onFocus:(o)=>this.focusObject(o),onScale:(delta)=>this.setScale(THREE.MathUtils.clamp((this.index===5?0:this.index)+delta,0,4)),getScale:()=>this.index,onMessage,onImmersiveChange:(value)=>this.setImmersive(value)});
+      getPresentationMode:()=>this.index===7?'planetarium':'atlas',onSessionEnd:({viewChanged})=>{this.resize();if(viewChanged)this.resetView(true);},getTargets:()=>this.targets,onSelect:(o)=>this.selectObject(o),onFocus:(o)=>this.focusFromXR(o),onScale:(delta)=>this.navigateFromXR(delta),getScale:()=>this.index,onMessage,onImmersiveChange:(value)=>this.setImmersive(value)});
     this.resizeObserver=new ResizeObserver(()=>this.resize());this.resizeObserver.observe(canvas.parentElement);this.resize();
-    this.pointerStart=null;
-    canvas.addEventListener('pointerdown',this.onPointerDown=(e)=>{this.pointerStart={x:e.clientX,y:e.clientY,time:performance.now()};});
-    canvas.addEventListener('pointerup',this.onPointerUp=(e)=>{if(!this.pointerStart||Math.hypot(e.clientX-this.pointerStart.x,e.clientY-this.pointerStart.y)>6||performance.now()-this.pointerStart.time>450)return;this.pick(e,true);});
+    this.pointerStart=null;this.skyPointers=new Map();this.viewRequest=0;
+    canvas.addEventListener('pointerdown',this.onPointerDown=(e)=>{this.pointerStart={x:e.clientX,y:e.clientY,time:performance.now()};if(this.index===7){this.skyFlight=null;this.skyPointers.set(e.pointerId,{x:e.clientX,y:e.clientY});canvas.setPointerCapture(e.pointerId);}});
+    canvas.addEventListener('pointerup',this.onPointerUp=(e)=>{this.skyPointers.delete(e.pointerId);if(!this.pointerStart||Math.hypot(e.clientX-this.pointerStart.x,e.clientY-this.pointerStart.y)>6||performance.now()-this.pointerStart.time>450)return;this.pick(e,true);});
+    canvas.addEventListener('pointermove',this.onSkyMove=(event)=>{
+      if(this.index!==7||!this.skyPointers.has(event.pointerId)||this.renderer.xr.isPresenting)return;
+      const old=this.skyPointers.get(event.pointerId),other=[...this.skyPointers.entries()].find(([id])=>id!==event.pointerId)?.[1];
+      if(other){const before=Math.hypot(old.x-other.x,old.y-other.y),after=Math.hypot(event.clientX-other.x,event.clientY-other.y);if(after>2)this.zoom(before/after);}
+      else {this.skyYaw-=(event.clientX-old.x)*.003;this.skyPitch=THREE.MathUtils.clamp(this.skyPitch+(event.clientY-old.y)*.003,-.07,Math.PI/2-.01);this.applySkyLook();}
+      this.skyPointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
+    });
+    canvas.addEventListener('pointercancel',this.onSkyCancel=e=>this.skyPointers.delete(e.pointerId));
+    canvas.addEventListener('wheel',this.onSkyWheel=e=>{if(this.index===7){e.preventDefault();this.zoom(Math.exp(e.deltaY*.001));}},{passive:false});
     canvas.addEventListener('webglcontextlost',this.onContextLost=(e)=>{e.preventDefault();this.onMessage('Il contesto grafico Ã¨ stato interrotto. Ricarica la pagina per riprendere.');});
     this.setScale(0,true);
     this.lastTime=performance.now();this.renderer.setAnimationLoop((time)=>this.animate(time));this.ready=true;
@@ -101,27 +112,80 @@ export class Universe {
       g.add(new THREE.Mesh(new THREE.SphereGeometry(size,20,14),new THREE.MeshBasicMaterial({color:o.color})));
       const glow=new THREE.Sprite(new THREE.SpriteMaterial({map:this.glowTexture,color:o.color,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:.85}));glow.scale.setScalar(2.3);glow.material.userData.baseOpacity=.85;g.add(glow);
     }
-    const hit=new THREE.Mesh(new THREE.SphereGeometry(planetary?Math.max(size,.52):.5,12,8),new THREE.MeshBasicMaterial({visible:false}));hit.userData.object=o;g.add(hit);this.targets.push(hit);this.content.add(g);
+    const hit=new THREE.Mesh(new THREE.SphereGeometry(planetary?Math.max(size,.52):.5,12,8),new THREE.MeshBasicMaterial({visible:false}));hit.userData.object=o;g.add(hit);if(this.index!==7||o.altitudeDeg>=0)this.targets.push(hit);this.content.add(g);
     const label=document.createElement('button');label.className='map-label'+(o.id==='solar-system'||o.id==='earth'?' home':'');label.textContent=o.name;label.setAttribute('aria-label',`Seleziona ${o.name}`);label.addEventListener('click',()=>this.isPlanet(o)?this.focusObject(o):this.selectObject(o));this.labelContainer.append(label);this.labels.push({element:label,object:g,data:o});return g;
   }
   setScale(index,initial=false){
     index=Math.round(THREE.MathUtils.clamp(index,0,4));if(!initial&&index===this.index)return;
-    this.systemHost=null;this.buildView(index,catalog[scales[index].id],scales[index],initial);
+    this.viewRequest++;this.systemHost=null;this.buildView(index,catalog[scales[index].id],scales[index],initial);
   }
   showSystem(planet){
     if(this.index===5&&this.systemHost===planet.host)return;
-    const {objects,context}=hostView(planet);this.systemHost=planet.host;this.buildView(5,objects,context);
+    this.viewRequest++;const {objects,context}=hostView(planet);this.systemHost=planet.host;this.buildView(5,objects,context);
   }
-  buildView(index,objects,context,initial=false){
+  navigateFromXR(delta){
+    if(this.index<6){this.setScale(THREE.MathUtils.clamp((this.index===5?0:this.index)+delta,0,4));return;}
+    const current=this.constellationData;
+    loadConstellations().then(({constellations})=>{
+      if(this.constellationData!==current||this.index<6)return;
+      const ordered=[...constellations].sort((a,b)=>a.name.localeCompare(b.name,'it'));
+      const index=ordered.findIndex(item=>item.id===current.figure.id);
+      const figure=ordered[(index+delta+ordered.length)%ordered.length];
+      return this.showConstellation(figure.id,{mode:current.mode,observer:current.observer});
+    }).catch(error=>this.onMessage(error.message));
+  }
+  focusFromXR(object){
+    if(this.index<6){this.focusObject(object);return;}
+    this.showConstellation(this.constellationData.figure.id,{mode:this.index===6?'earth':'space',observer:this.constellationData.observer}).catch(error=>this.onMessage(error.message));
+  }
+  async showConstellation(id,options={}){
+    const request=++this.viewRequest;
+    const data=await loadConstellation(id,options);
+    if(request!==this.viewRequest||this.disposed)return false;
+    this.constellationData=data;
+    const view=createConstellationView({...data,renderer:this.renderer});
+    this.constellationView=view;this.systemHost=null;
+    this.buildView(data.mode==='earth'?7:6,view.objects,view.context,false,view.group);
+    if(data.mode==='earth'&&view.context.visibleStarCount===0)this.onMessage('Questa costellazione ? sotto l?orizzonte. Cambia luogo o ora per osservarla.');
+    return true;
+  }
+  applySkyLook(){
+    if(this.renderer.xr.isPresenting)return;
+    const direction=new THREE.Vector3(Math.cos(this.skyPitch)*Math.sin(this.skyYaw),Math.sin(this.skyPitch),-Math.cos(this.skyPitch)*Math.cos(this.skyYaw));
+    this.camera.position.set(0,0,0);this.camera.lookAt(direction);
+    this.controls.target.copy(direction.multiplyScalar(60));
+  }
+  lookAtSky(direction,immediate=false){
+    const pitch=THREE.MathUtils.clamp(Math.asin(direction.clone().normalize().y),-.07,Math.PI/2-.01);
+    let yaw=Math.atan2(direction.x,-direction.z);
+    if(!Number.isFinite(this.skyYaw)){this.skyYaw=yaw;this.skyPitch=pitch;}
+    while(yaw-this.skyYaw>Math.PI)yaw-=Math.PI*2;
+    while(yaw-this.skyYaw<-Math.PI)yaw+=Math.PI*2;
+    if(immediate||this.reducedMotion){this.skyYaw=yaw;this.skyPitch=pitch;this.skyFlight=null;this.applySkyLook();}
+    else this.skyFlight={start:this.elapsed,fromYaw:this.skyYaw,toYaw:yaw,fromPitch:this.skyPitch,toPitch:pitch};
+  }
+  buildView(index,objects,context,initial=false,customMap=null){
+    this.cameraFlight=null;this.skyFlight=null;this.skyPointers.clear();
+    const previousIndex=this.index;
+    if(previousIndex===7||index===7){for(const retiring of this.retiring)this.disposeGroup(retiring.group);this.retiring=[];if(this.content){this.disposeGroup(this.content);this.content=null;}}
     if(this.content)this.retiring.push({group:this.content,start:this.elapsed});
     this.index=index;this.objects=objects;this.viewContext=context;this.focusedPlanet=null;this.spinning=[];this.targets=[];this.labels.forEach(l=>l.element.remove());this.labels=[];
+    this.controls.enabled=index!==7&&!this.renderer.xr.isPresenting;
+    this.controls.autoRotate=index!==7&&this.autoRotate;
+    this.camera.fov=index===7?70:(this.canvas.clientWidth<700?59:44);this.camera.updateProjectionMatrix();
     this.content=new THREE.Group();this.mapRoot.add(this.content);this.content.userData.born=this.elapsed;
     this.boundsRadius=this.isPlanetaryView()?Math.max(20,...objects.map(o=>o.orbit||0))+2.6:23;
-    const grid=this.makeGrid();grid.scale.setScalar(this.boundsRadius/23);grid.visible=this.layers.grid&&!this.immersive;this.content.add(grid);
-    const map=this.isPlanetaryView()?this.makeSolar():[null,()=>this.makeStars(),()=>this.makeGalaxy(81,this.quality==='high'?38000:15000),()=>this.makeLocal(),()=>this.makeCosmic()][index]();map.name='map';this.content.add(map);
+    if(customMap){
+      this.boundsRadius=this.constellationView.radius;
+      const grid=customMap.getObjectByName('grid');if(grid)grid.visible=this.layers.grid&&!this.immersive;
+      this.content.add(customMap);
+    } else {
+      const grid=this.makeGrid();grid.scale.setScalar(this.boundsRadius/23);grid.visible=this.layers.grid&&!this.immersive;this.content.add(grid);
+      const map=this.isPlanetaryView()?this.makeSolar():[null,()=>this.makeStars(),()=>this.makeGalaxy(81,this.quality==='high'?38000:15000),()=>this.makeLocal(),()=>this.makeCosmic()][index]();map.name='map';this.content.add(map);
+    }
     for(const o of objects)this.makeMarker(o);
     this.selected=null;this.onScale(index,context);this.selectObject(objects[0]);this.setLayer('particles',this.layers.particles);
-    if(!this.renderer.xr.isPresenting)this.resetView(initial);
+    if(!this.renderer.xr.isPresenting)this.resetView(initial||previousIndex===7||index===7);else this.xr.recenter();
     if(initial)this.content.userData.born=-3;
   }
   setOpacity(group,opacity){group.traverse(o=>{if(!o.material)return;for(const m of Array.isArray(o.material)?o.material:[o.material]){if(m.uniforms?.uOpacity)m.uniforms.uOpacity.value=(m.userData.baseOpacity??1)*opacity;else if(m.visible!==false){if(m.userData.baseOpacity===undefined)m.userData.baseOpacity=m.opacity;m.transparent=true;m.opacity=m.userData.baseOpacity*opacity;}}});}
@@ -130,10 +194,12 @@ export class Universe {
     if(object.bodyKind==='exoplanet')this.showSystem(object);
     this.selected=object;for(const l of this.labels)l.element.classList.toggle('selected',l.data.id===object.id);this.onSelect(object);this.xr?.setInfo({...object,scaleLabel:this.viewContext.name});
     if(this.selectionRing){this.selectionRing.removeFromParent();this.selectionRing.geometry.dispose();this.selectionRing.material.dispose();}
-    this.selectionRing=this.ring(this.isPlanetaryView()?(object.size||.4)*1.8:.62,.75);this.selectionRing.position.copy(vec(object.position));this.selectionRing.position.y+=.06;this.selectionRing.visible=!this.immersive;this.content.add(this.selectionRing);
+    this.selectionRing=this.ring(this.isPlanetaryView()?(object.size||.4)*1.8:.62,.75);this.selectionRing.position.copy(vec(object.position));this.selectionRing.position.y+=.06;this.selectionRing.visible=!this.immersive&&(this.index!==7||object.altitudeDeg>=0);this.content.add(this.selectionRing);
   }
   focusObject(object){
     this.selectObject(object);const target=vec(object.position);
+    if(this.index===7){if(object.altitudeDeg<0){this.onMessage('Questa stella ? sotto l?orizzonte all?ora scelta.');return;}this.lookAtSky(target);return;}
+
     if(this.isPlanet(object)){
       this.focusedPlanet=object;
       const framing=planetCameraFraming(object.size||.5,{fov:this.camera.fov,width:this.canvas.clientWidth,height:this.canvas.clientHeight,rings:object.id==='saturn',immersive:this.immersive});
@@ -151,6 +217,17 @@ export class Universe {
   fly(position,target){this.cameraFlight={start:this.elapsed,from:this.camera.position.clone(),to:position,targetFrom:this.controls.target.clone(),targetTo:target,duration:this.reducedMotion?.05:1.65};}
   resetView(immediate=false){
     if(this.renderer.xr.isPresenting){this.xr.recenter?.();return;}
+    if(this.index===7){this.cameraFlight=null;this.camera.fov=70;this.camera.updateProjectionMatrix();this.lookAtSky(this.constellationView.lookDirection,immediate);return;}
+    if(this.index===6){
+      this.controls.minDistance=.3;
+      const {center,radius}=this.constellationView;
+      const distance=overviewDistance(radius,{fov:this.camera.fov,width:this.canvas.clientWidth,height:this.canvas.clientHeight,immersive:this.immersive});
+      // Begin near the Earth-facing side, offset enough to reveal depth.
+      const direction=center.clone().negate().normalize().add(new THREE.Vector3(.45,.24,.1)).normalize();
+      const position=center.clone().addScaledVector(direction,distance);
+      if(immediate){this.cameraFlight=null;this.camera.position.copy(position);this.controls.target.copy(center);this.controls.update();}
+      else this.fly(position,center);return;
+    }
     this.focusedPlanet=null;this.controls.minDistance=2;
     const distance=this.isPlanetaryView()?overviewDistance(this.boundsRadius,{fov:this.camera.fov,width:this.canvas.clientWidth,height:this.canvas.clientHeight,immersive:this.immersive}):49;
     const position=new THREE.Vector3(0,.57,.82).normalize().multiplyScalar(distance),target=new THREE.Vector3();
@@ -158,47 +235,49 @@ export class Universe {
   }
   zoom(factor){
     if(this.renderer.xr.isPresenting)return;
+    if(this.index===7){this.camera.fov=THREE.MathUtils.clamp(this.camera.fov*factor,20,100);this.camera.updateProjectionMatrix();return;}
     const offset=this.camera.position.clone().sub(this.controls.target);offset.setLength(THREE.MathUtils.clamp(offset.length()*factor,this.controls.minDistance,250));this.fly(this.controls.target.clone().add(offset),this.controls.target.clone());
   }
   setLayer(name,value){
     this.layers[name]=value;
     if(name==='labels')this.labelContainer.style.display=value&&!this.immersive?'':'none';
-    if(name==='grid')this.content.getObjectByName('grid').visible=value&&!this.immersive;
-    if(name==='particles'){this.sky.visible=value;this.content.traverse(o=>{if(o.userData.particles)o.visible=value;});}
+    if(name==='grid'){const grid=this.content.getObjectByName('grid');if(grid)grid.visible=value&&!this.immersive;}
+    if(name==='particles'){this.sky.visible=value&&this.index<6;this.content.traverse(o=>{if(o.userData.particles)o.visible=value;});}
   }
   setImmersive(value){
-    const changed=this.immersive!==value;this.immersive=value;this.setLayer('labels',this.layers.labels);this.setLayer('grid',this.layers.grid);if(this.selectionRing)this.selectionRing.visible=!value;
+    const changed=this.immersive!==value;this.immersive=value;this.setLayer('labels',this.layers.labels);this.setLayer('grid',this.layers.grid);if(this.selectionRing)this.selectionRing.visible=!value&&(this.index!==7||this.selected?.altitudeDeg>=0);
     const orbits=this.content.getObjectByName('orbits');if(orbits)orbits.visible=!value;
     this.xr.setImmersive?.(value);if(changed)this.onImmersiveChange(value);
     if(this.focusedPlanet&&!this.renderer.xr.isPresenting)this.focusObject(this.focusedPlanet);
   }
-  setAutoRotate(value){this.autoRotate=value;this.controls.autoRotate=value;}
+  setAutoRotate(value){this.autoRotate=value;this.controls.autoRotate=this.index!==7&&value;}
   setQuality(quality){
     if(this.quality===quality)return;const object=this.selected,host=this.systemHost;
     this.quality=quality;this.renderer.setPixelRatio(Math.min(devicePixelRatio,quality==='low'?1:1.75));
+    if(this.index>=6){this.showConstellation(this.constellationData.figure.id,{mode:this.constellationData.mode,observer:this.constellationData.observer}).catch(error=>this.onMessage(error.message));this.resize();return;}
     this.buildView(this.index,this.objects,this.viewContext);this.systemHost=host;if(object)this.selectObject(object);this.resize();
   }
   enterVR(){this.cameraFlight=null;return this.xr.enter();}
   pick(event,focus=false){const rect=this.canvas.getBoundingClientRect();const pointer=new THREE.Vector2((event.clientX-rect.left)/rect.width*2-1,-(event.clientY-rect.top)/rect.height*2+1);const ray=new THREE.Raycaster();ray.setFromCamera(pointer,this.camera);const hits=ray.intersectObjects(this.targets,false);if(hits[0]){const object=hits[0].object.userData.object;if(focus&&this.isPlanet(object))this.focusObject(object);else this.selectObject(object);}}
-  resize(){if(this.renderer.xr.isPresenting)return;const w=this.canvas.clientWidth,h=this.canvas.clientHeight;this.renderer.setSize(w,h,false);this.camera.aspect=w/h;this.camera.fov=w<700?59:44;this.camera.updateProjectionMatrix();}
+  resize(){if(this.renderer.xr.isPresenting)return;const w=this.canvas.clientWidth,h=this.canvas.clientHeight;this.renderer.setSize(w,h,false);this.camera.aspect=w/h;if(this.index!==7)this.camera.fov=w<700?59:44;this.camera.updateProjectionMatrix();this.content?.traverse(o=>{if(o.material?.isLineMaterial)o.material.resolution.set(w,h);});}
   updateLabels(){
     if(this.renderer.xr.isPresenting||this.immersive){this.labelContainer.style.visibility='hidden';return;}this.labelContainer.style.visibility='visible';if(!this.layers.labels)return;
     const w=this.canvas.clientWidth,h=this.canvas.clientHeight,used=[];const center=new THREE.Vector3();
     const ordered=[...this.labels].sort((a,b)=>(b.data.id===this.selected?.id)-(a.data.id===this.selected?.id));
     for(const l of ordered){l.object.getWorldPosition(center);center.project(this.camera);const x=(center.x*.5+.5)*w+10,y=(-center.y*.5+.5)*h-10;const width=l.data.name.length*6.1+25;
-      const inPanel=w>900&&(x<270||x+width>w-305);const visible=used.length<(w>900?12:6)&&center.z<1&&center.z>-1&&x>8&&x+width<w-10&&y>190&&y<h-180&&!inPanel&&!used.some(r=>x<r.x+r.w&&x+width>r.x&&Math.abs(y-r.y)<25);
+      const inPanel=w>900&&(x<270||x+width>w-305);const visible=(this.index!==7||l.data.altitudeDeg>=0)&&used.length<(w>900?12:6)&&center.z<1&&center.z>-1&&x>8&&x+width<w-10&&y>190&&y<h-180&&!inPanel&&!used.some(r=>x<r.x+r.w&&x+width>r.x&&Math.abs(y-r.y)<25);
       l.element.style.display=visible?'block':'none';if(visible){l.element.style.transform=`translate(${x}px,${y}px)`;used.push({x,y,w:width});}
     }
   }
   animate(time){
     const frameDelta=Math.max(0,(time-this.lastTime)/1000);const dt=Math.min(frameDelta,.06);this.lastTime=time;this.elapsed+=frameDelta;
-    if(!this.renderer.xr.isPresenting){if(this.cameraFlight){const f=this.cameraFlight,t=THREE.MathUtils.clamp((this.elapsed-f.start)/f.duration,0,1);this.camera.position.lerpVectors(f.from,f.to,ease(t));this.controls.target.lerpVectors(f.targetFrom,f.targetTo,ease(t));if(t===1)this.cameraFlight=null;}this.controls.update(dt);}
-    const born=this.content.userData.born;const progress=this.reducedMotion?1:THREE.MathUtils.clamp((this.elapsed-born)/1.5,0,1);this.setOpacity(this.content,ease(progress));this.content.scale.setScalar(.92+.08*ease(progress));
+    if(!this.renderer.xr.isPresenting){if(this.index===7){if(this.skyFlight){const f=this.skyFlight,t=THREE.MathUtils.clamp((this.elapsed-f.start)/1.2,0,1);this.skyYaw=THREE.MathUtils.lerp(f.fromYaw,f.toYaw,ease(t));this.skyPitch=THREE.MathUtils.lerp(f.fromPitch,f.toPitch,ease(t));if(t===1)this.skyFlight=null;}this.applySkyLook();}else{if(this.cameraFlight){const f=this.cameraFlight,t=THREE.MathUtils.clamp((this.elapsed-f.start)/f.duration,0,1);this.camera.position.lerpVectors(f.from,f.to,ease(t));this.controls.target.lerpVectors(f.targetFrom,f.targetTo,ease(t));if(t===1)this.cameraFlight=null;}this.controls.update(dt);}}
+    const born=this.content.userData.born;const progress=this.reducedMotion?1:THREE.MathUtils.clamp((this.elapsed-born)/1.5,0,1);this.setOpacity(this.content,ease(progress));this.content.scale.setScalar(this.index===7?1:.92+.08*ease(progress));
     for(let i=this.retiring.length-1;i>=0;i--){const r=this.retiring[i],t=(this.elapsed-r.start)/.85;if(t>=1||this.reducedMotion){this.disposeGroup(r.group);this.retiring.splice(i,1);}else{this.setOpacity(r.group,1-ease(t));r.group.scale.setScalar(1+t*.08);}}
-    this.scene.traverse(o=>{if(o.material?.uniforms?.uTime)o.material.uniforms.uTime.value=this.reducedMotion?0:this.elapsed;});
+    this.scene.traverse(o=>{if(o.userData.animate)o.userData.animate(this.reducedMotion?0:this.elapsed);if(o.material?.uniforms?.uTime)o.material.uniforms.uTime.value=this.reducedMotion?0:this.elapsed;});
     if(this.selectionRing&&!this.reducedMotion)this.selectionRing.material.opacity*=.7+Math.sin(this.elapsed*2)*.3;
     if(!this.reducedMotion)for(const surface of this.spinning)surface.rotation.y+=dt*.10;
     this.xr.update(dt);this.sunLight.intensity=25*Math.pow(this.mapRoot.scale.x,1.1);if(!this.lastLabelTime||this.elapsed-this.lastLabelTime>.05){this.updateLabels();this.lastLabelTime=this.elapsed;}this.renderer.render(this.scene,this.camera);
   }
-  dispose(){this.renderer.setAnimationLoop(null);this.resizeObserver.disconnect();this.controls.dispose();this.xr.dispose?.();this.disposeGroup(this.mapRoot);this.disposeGroup(this.sky);this.glowTexture.dispose();disposePlanetTextures();this.renderer.dispose();this.canvas.removeEventListener('pointerdown',this.onPointerDown);this.canvas.removeEventListener('pointerup',this.onPointerUp);this.canvas.removeEventListener('webglcontextlost',this.onContextLost);this.labels.forEach(l=>l.element.remove());}
+  dispose(){this.disposed=true;this.viewRequest++;this.canvas.removeEventListener('pointermove',this.onSkyMove);this.canvas.removeEventListener('pointercancel',this.onSkyCancel);this.canvas.removeEventListener('wheel',this.onSkyWheel);this.renderer.setAnimationLoop(null);this.resizeObserver.disconnect();this.controls.dispose();this.xr.dispose?.();this.disposeGroup(this.mapRoot);this.disposeGroup(this.sky);this.glowTexture.dispose();disposePlanetTextures();this.renderer.dispose();this.canvas.removeEventListener('pointerdown',this.onPointerDown);this.canvas.removeEventListener('pointerup',this.onPointerUp);this.canvas.removeEventListener('webglcontextlost',this.onContextLost);this.labels.forEach(l=>l.element.remove());}
 }

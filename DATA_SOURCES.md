@@ -38,3 +38,7 @@ Il comando usa soltanto la libreria standard Python, scarica il CSV pubblico del
 ## Schede astronomiche curate
 
 Le fonti delle schede del Sistema Solare, delle stelle curate, delle galassie e degli ammassi sono riportate nelle proprietà `source` di `src/data.js` e nelle schede dell'interfaccia: NASA Science, CDS/SIMBAD e lo studio originale su Laniakea. Le coordinate approssimate e le posizioni illustrative sono identificate da `positionKind` e `positionNote`. Le ricostruzioni della Via Lattea e della rete cosmica non provengono da una survey osservativa.
+
+## Catalogo completo e figure delle costellazioni
+
+La vista Costellazioni usa il catalogo HYG completo (119.625 stelle) e le 88 figure convenzionali Stellarium. ? distinta dal sottoinsieme vicino descritto sopra; dati, licenze e trasformazioni sono documentati in [DATA_CONSTELLATIONS.md](DATA_CONSTELLATIONS.md).

@@ -9,7 +9,9 @@
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --test tests/*.test.js",
     "test:browser": "node tests/browser.mjs",
-    "test:engine": "node tests/engine-browser.mjs"
+    "test:engine": "node tests/engine-browser.mjs",
+    "test:constellations": "node tests/constellation-engine.mjs",
+    "test:constellation-ui": "node tests/constellation-ui.mjs"
   },
   "dependencies": {
     "three": "^0.180.0",

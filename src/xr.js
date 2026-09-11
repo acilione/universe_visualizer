@@ -18,7 +18,7 @@ const SCALE_NAMES = ['Sistema Solare', 'Stelle vicine', 'Via Lattea', 'Gruppo Lo
  * onScale receives -1/+1; mapRoot transforms must be left to this module in VR.
  * XRInputSource.targetRaySpace works for both hands and handheld controllers.
  */
-export function createXR({ renderer, scene, camera, controls, mapRoot, getTargets, onSelect, onFocus, onScale, getScale, onImmersiveChange, onMessage = () => {} }) {
+export function createXR({ renderer, scene, camera, controls, mapRoot, getTargets, onSelect, onFocus, onScale, getScale, getPresentationMode = () => 'atlas', onSessionEnd, onImmersiveChange, onMessage = () => {} }) {
   renderer.xr.enabled = true;
   renderer.xr.setReferenceSpaceType('local');
   const raycaster = new THREE.Raycaster();
@@ -62,6 +62,9 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   let hoverButton = -1;
   let panelDirty = true;
   let lastScale = null;
+  let lastPresentationMode = presentationMode();
+  function presentationMode() { return getPresentationMode() === 'planetarium' ? 'planetarium' : 'atlas'; }
+  function isPlanetarium() { return presentationMode() === 'planetarium'; }
   const inputs = [];
   const listeners = [];
   const ownedGeometries = new Set([panel.geometry, restoreOrb.geometry, jointGeometry, lineGeometry]);
@@ -84,6 +87,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     context.font = '500 24px sans-serif';
     context.fillStyle = '#ccb180';
     const value = getScale?.();
+    const constellationView = value === 6 || value === 7;
     const scaleName = info.scaleLabel || (typeof value === 'number' ? SCALE_NAMES[value] : value?.name || value) || 'Atlante cosmico';
     context.fillText(`ÆTHER  /  ${String(scaleName).toUpperCase()}`, 30, 39, 1090);
     context.fillStyle = '#f1e6ce';
@@ -104,14 +108,23 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       context.fillStyle = hoverButton === i ? '#142026' : '#eadbbd';
       context.font = '600 23px sans-serif';
       context.textAlign = 'center';
-      context.fillText(b.label, b.x + b.w / 2, b.y + b.h / 2);
+      const label = constellationView
+        ? ({ previous: '← FIGURA', next: 'FIGURA →', focus: value === 6 ? 'DALLA TERRA' : 'SPAZIO 3D' }[b.action] || b.label)
+        : b.label;
+      context.fillText(label, b.x + b.w / 2, b.y + b.h / 2);
       context.textAlign = 'left';
     }
     context.fillStyle = '#afbfbd';
     context.font = '21px sans-serif';
-    context.fillText('MANI  ·  Pizzico breve: seleziona   /   Tieni: sposta e ruota   /   Due mani: zoom', 30, 333, 1090);
+    context.fillText(isPlanetarium()
+      ? 'MANI  ·  Guarda il cielo intorno a te   /   Punta e pizzica per selezionare'
+      : 'MANI  ·  Pizzico breve: seleziona   /   Tieni: sposta e ruota   /   Due mani: zoom', 30, 333, 1090);
     context.fillStyle = '#788f92';
-    context.fillText('CONTROLLER  ·  Grilletto: seleziona   /   Impugnatura: afferra', 30, 375, 1090);
+    context.fillText(constellationView
+      ? 'Cambia figura o prospettiva dal pannello.'
+      : isPlanetarium()
+      ? 'CONTROLLER  ·  Grilletto: seleziona   /   Ricentra: riposiziona l’orizzonte'
+      : 'CONTROLLER  ·  Grilletto: seleziona   /   Impugnatura: afferra', 30, 375, 1090);
     texture.needsUpdate = true;
     panelDirty = false;
   }
@@ -150,6 +163,8 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       const button = BUTTONS.findIndex(b => px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h);
       return { ...panelHit, button, panel: true };
     }
+    // The terrestrial sky is a 60 m dome, not a miniature held at arm's length.
+    raycaster.far = isPlanetarium() ? 120 : 20;
     const targets = (getTargets?.() || []).filter(visibleObject);
     const hits = raycaster.intersectObjects(targets, false);
     if (!hits.length) return null;
@@ -164,7 +179,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
         onScale?.(action === 'previous' ? -1 : 1);
         recenter();
         panelDirty = true;
-      } else if (action === 'focus' && info.id) {
+      } else if (action === 'focus' && (info.id || getScale?.() === 6 || getScale?.() === 7)) {
         if (onFocus) onFocus(info);
         else focusObject(info);
       } else if (action === 'reset') {
@@ -272,6 +287,15 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     mapRoot.quaternion.identity();
     mapRoot.scale.setScalar(1);
     mapRoot.updateMatrixWorld(true);
+    if (isPlanetarium()) {
+      baseScale = 1;
+      mapRoot.position.copy(eye);
+      if (mapRoot.parent) mapRoot.parent.worldToLocal(mapRoot.position);
+      mapRoot.updateMatrixWorld(true);
+      positionPanel();
+      recenterPending = false;
+      return;
+    }
     const bounds = new THREE.Box3().setFromObject(mapRoot);
     const size = bounds.getSize(new THREE.Vector3());
     const extent = Math.max(size.x, size.y, size.z, 1);
@@ -353,7 +377,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
 
   /** Bring a body to the viewer by transforming the map, never the XR camera. */
   function focusObject(object, extent) {
-    if (!active || !object) return false;
+    if (!active || !object || isPlanetarium()) return false;
     if (recenterPending) placeOverview();
     const anchor = objectAnchor(object, extent);
     if (!anchor) return false;
@@ -394,6 +418,9 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   }
 
   function restoreDesktop() {
+    const currentMode = presentationMode();
+    const previousPresentationMode = snapshot?.presentationMode ?? currentMode;
+    const viewChanged = snapshot ? snapshot.scale !== getScale?.() : false;
     active = false;
     entering = false;
     panel.visible = false;
@@ -420,11 +447,13 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       mapRoot.scale.copy(snapshot.rootScale);
       mapRoot.updateMatrixWorld(true);
       if (controls) {
-        controls.enabled = snapshot.controlsEnabled;
+        // A view can change inside VR; restore controls for the current view.
+        controls.enabled = currentMode !== 'planetarium';
         controls.target.copy(snapshot.target);
       }
       snapshot = null;
     }
+    onSessionEnd?.({ presentationMode: currentMode, previousPresentationMode, viewChanged, modeChanged: currentMode !== previousPresentationMode });
     onMessage('Sessione VR terminata. Sei tornato all’atlante.');
   }
 
@@ -458,7 +487,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
         cameraPosition: camera.position.clone(), cameraQuaternion: camera.quaternion.clone(),
         near: camera.near, far: camera.far, fov: camera.fov, aspect: camera.aspect, zoom: camera.zoom,
         rootPosition: mapRoot.position.clone(), rootQuaternion: mapRoot.quaternion.clone(), rootScale: mapRoot.scale.clone(),
-        controlsEnabled: controls?.enabled, target: controls?.target.clone(),
+        target: controls?.target.clone(), presentationMode: presentationMode(), scale: getScale?.(),
       };
       if (controls) controls.enabled = false;
       camera.position.set(0, 0, 0);
@@ -472,12 +501,15 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       });
       await renderer.xr.setSession(session);
       active = true;
+      lastPresentationMode = presentationMode();
       entering = false;
       panel.visible = !immersive;
       restoreOrb.visible = immersive;
       recenterPending = true;
       panelDirty = true;
-      onMessage('VR attiva. Pizzica e tieni per afferrare; usa due mani per ingrandire.');
+      onMessage(isPlanetarium()
+        ? 'VR attiva. Osserva il cielo intorno a te; punta e pizzica per selezionare una stella.'
+        : 'VR attiva. Pizzica e tieni per afferrare; usa due mani per ingrandire.');
       return true;
     } catch (error) {
       if (session) {
@@ -497,6 +529,12 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
 
   function update(delta = 1 / 60) {
     if (!active || !renderer.xr.isPresenting) return;
+    const currentMode = presentationMode();
+    if (currentMode !== lastPresentationMode) {
+      lastPresentationMode = currentMode;
+      recenter();
+      panelDirty = true;
+    }
     if (recenterPending) placeOverview();
     updateFocus(delta);
     if (immersive) positionRestoreOrb();
@@ -533,6 +571,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       input.cursor.visible = !!hit && !!input.source;
       if (hit) {
         input.cursor.position.copy(hit.point);
+        input.cursor.scale.setScalar(isPlanetarium() && !hit.panel ? Math.max(1, hit.distance / 2) : 1);
         input.ray.scale.z = hit.distance;
         if (hit.panel && hit.button >= 0) nextHover = hit.button;
       } else {
@@ -547,7 +586,9 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
         }
       }
     }
-    const grabbing = inputs.filter(input => input.press && !input.press.hit?.panel && inputPose(input));
+    // Keep the terrestrial horizon fixed: pinch/trigger still select, while
+    // a held hand or controller grip cannot rotate, drag or resize the sky.
+    const grabbing = isPlanetarium() ? [] : inputs.filter(input => input.press && !input.press.hit?.panel && inputPose(input));
     if (grabbing.length === 2) {
       const poses = grabbing.map(inputPose);
       for (const input of grabbing) input.press.manipulated = true;
