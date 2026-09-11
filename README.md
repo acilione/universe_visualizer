@@ -33,7 +33,8 @@ npm run preview -- --port 5174
 
 Il pulsante **Costellazioni** apre una selezione ricercabile delle **88 costellazioni**, con nomi italiani, latini e sigle. Il catalogo completo contiene **119.625 stelle reali HYG v4.1**; viene caricato localmente solo alla prima apertura di una figura. Non rappresenta tutte le stelle conosciute da ogni survey.
 
-- **Spazio 3D**: stelle e collegamenti occupano le loro posizioni J2000 con distanze HYG e una scala lineare comune. La figura cambia forma orbitandole attorno. Un punto dorato indica il Sole; il volume stellare mostrato si adatta alla distanza della costellazione.
+- **Spazio 3D**: stelle e collegamenti occupano le loro posizioni J2000 con distanze HYG e una scala lineare comune. La figura cambia forma orbitandole attorno. La Terra è visibile di default all’origine, con dimensioni amplificate; **Mostra la Terra** permette di nasconderla. Il volume stellare mostrato si adatta alla distanza della costellazione.
+- **Guarda dalla Terra**, nella vista 3D, porta la camera all’origine terrestre mantenendo posizioni e profondità delle stelle. Cliccare il globo o la sua etichetta produce lo stesso effetto. Trascina per orientarti, usa lo zoom per ingrandire e **Torna a orbitare** o **Ricentra** per riprendere la navigazione. Il globo non viene disegnato mentre la camera è al suo centro; la preferenza di visibilità si conserva tornando a orbitare. A questa scala la separazione Terra–Sole è trascurata; superficie e dimensioni del globo sono illustrative.
 - **Dalla Terra**: cielo sferico con orizzonte geometrico, calcolato per latitudine, longitudine, data e ora. Il pannello mostra quante stelle della figura sono sopra l?orizzonte. Trascina per guardarti intorno, usa rotellina o due dita per ingrandire.
 - **Luogo e ora**: posizione iniziale Roma, orario iniziale corrente; coordinate modificabili senza richiedere geolocalizzazione. L?orario inserito usa il fuso indicato dal browser ed ? convertito in UTC. Intervallo 1900?2100. Il cielo rimane alla data scelta finch? non la cambi.
 - Le linee sottili ciano hanno alone e impulsi luminosi; la preferenza di movimento ridotto ferma gli effetti. Le figure rimangono visibili in **Spazio libero**.
@@ -123,3 +124,5 @@ Il commit iniziale richiesto è `b09f3da`, con autore `acilione <antoninocilione
 La verifica del renderer e dello zoom usa anche `npm run test:engine` con il server di sviluppo attivo su porta 5173 (oppure `ENGINE_TEST_URL`).
 
 La verifica delle costellazioni nel renderer usa `npm run test:constellations` con il server di sviluppo su porta 5173. Include proiezione del cielo, stelle sotto l?orizzonte, trascinamento, zoom, distanze ignote e ritorno ai pianeti. `npm run test:constellation-ui` verifica la navigazione desktop/mobile sull?anteprima di produzione (porta 5174).
+
+La verifica del riferimento terrestre e della camera usa **npm run test:earth-reference** sul server di sviluppo. Comprende visibilità, persistenza fra figure, prospettiva dall’origine, transizione animata e ritorno all’orbita. I test astronomici includono il caso di Orione dell’11 dicembre 2026 alle 20:00 CET.

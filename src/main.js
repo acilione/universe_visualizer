@@ -4,6 +4,7 @@ import { catalog, scales } from './data.js';
 import { Universe } from './universe.js';
 import { exoplanets, planetCatalogMetadata, findPlanet } from './planets.js';
 import { loadConstellations } from './constellation-catalog.js';
+import { parseCoordinate, dateInputInZone, zonedDateInputToIso } from './observer-input.js';
 
 const icons = { Orbit, Search, Glasses, Maximize2, Minimize2, Plus, Minus, RotateCcw, Move, MousePointer2, Hand, Play, Pause, Volume2, VolumeX, Settings2, CircleHelp, X, ArrowUpRight, ArrowRight, Focus, Sparkles, Grid3X3, Tags, Compass, Layers, Info, Globe2, Star, Telescope, Check, ExternalLink };
 const icon = name => `<i data-lucide="${name}" aria-hidden="true"></i>`;
@@ -26,7 +27,7 @@ let immersionTimer = null;
 let immersionRevealTimer = null;
 const planetBrowser = { query: '', filter: 'all', page: 0 };
 const constellationBrowser = {
-  query: '', mode: 'space', id: 'Ori', data: null, busy: false,
+  query: '', mode: 'space', id: 'Ori', data: null, busy: false, earthVisible: true, timeZone: 'Europe/Rome',
   observer: { latitude: 41.9028, longitude: 12.4964, dateIso: new Date().toISOString() }
 };
 let constellationModalRequest = 0;
@@ -63,6 +64,12 @@ $('#app').innerHTML = `
         <div class="constellation-mode" role="group" aria-label="Punto di osservazione">
           <button data-constellation-mode="space">${icon('orbit')}Nello spazio 3D</button>
           <button data-constellation-mode="earth">${icon('globe-2')}Dalla Terra</button>
+        </div>
+        <div id="earth-space-controls" class="earth-space-controls" hidden>
+          <div class="layer-row"><span>${icon('globe-2')}Mostra la Terra</span><button class="toggle" role="switch" aria-label="Mostra la Terra" aria-checked="true" data-action="earth-visible"></button></div>
+          <button class="earth-perspective-button" data-action="earth-perspective">${icon('focus')}Guarda dalla Terra</button>
+          <button class="earth-perspective-button" data-action="earth-orbit" hidden>${icon('orbit')}Torna a orbitare</button>
+          <small>Terra ingrandita all'origine della mappa.</small>
         </div>
         <p id="constellation-status" class="constellation-status" aria-live="polite"></p>
         <button class="observer-adjust" data-action="constellation-observer">${icon('settings-2')}Luogo e orario</button>
@@ -181,6 +188,7 @@ function renderObject(object) {
 function updateScale(index, context = null) {
   index = Number(index);
   if (!Number.isInteger(index) || ![5, 6, 7].includes(index) && !scales[index]) return;
+  if (index !== state.scale) { clearTimeout(toastTimer); $('.toast').classList.remove('visible'); }
   state.scale = index;
   state.context = index >= 5 ? context || state.context : null;
   const scale = currentScale();
@@ -190,6 +198,7 @@ function updateScale(index, context = null) {
   if (constellationView) {
     constellationBrowser.id = context?.constellationId || constellationBrowser.id;
     constellationBrowser.mode = index === 7 ? 'earth' : 'space';
+    if (typeof context?.earthVisible === 'boolean') constellationBrowser.earthVisible = context.earthVisible;
     if (context?.observer) constellationBrowser.observer = { ...constellationBrowser.observer, ...context.observer };
   }
   $('#scale-title').textContent = constellationView ? `${scale.name}.` : hostView ? `Intorno a ${scale.name}.` : scale.title;
@@ -209,6 +218,7 @@ function updateScale(index, context = null) {
   $('.journey-top > span').textContent = detached ? 'Continua a esplorare l’atlante.' : 'Ogni viaggio inizia con la curiosità.';
   $('.app-shell').classList.toggle('constellation-view', constellationView);
   $('.app-shell').classList.toggle('earth-sky-view', index === 7);
+  $('.app-shell').classList.toggle('earth-perspective-view', index === 6 && Boolean(context?.earthPerspective));
   $('#constellation-controls').hidden = !constellationView;
   $('#constellation-current').textContent = scale.name;
   document.querySelectorAll('#constellation-controls [data-constellation-mode]').forEach(button => {
@@ -217,17 +227,22 @@ function updateScale(index, context = null) {
     button.setAttribute('aria-pressed', selected);
   });
   $('#constellation-controls .observer-adjust').hidden = index !== 7;
+  $('#earth-space-controls').hidden = index !== 6;
+  $('[data-action="earth-visible"]').setAttribute('aria-checked', constellationBrowser.earthVisible);
+  $('[data-action="earth-perspective"]').hidden = Boolean(context?.earthPerspective);
+  $('[data-action="earth-orbit"]').hidden = !context?.earthPerspective;
   if (constellationView) {
     const observer = constellationBrowser.observer;
     const date = new Date(observer.dateIso);
-    const when = Number.isFinite(date.getTime()) ? date.toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+    const when = Number.isFinite(date.getTime()) ? date.toLocaleString('it-IT', { timeZone: constellationBrowser.timeZone, day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }) : '';
     const visible = Number.isFinite(context?.visibleStarCount) ? `${context.visibleStarCount} stelle della figura sopra l’orizzonte. ` : '';
     $('#constellation-status').textContent = index === 7
       ? `${visible}${number(observer.latitude, '°')}, ${number(observer.longitude, '°')} · ${when}`
-      : `${Number.isFinite(context?.starCount) ? context.starCount + ' stelle nella figura. ' : ''}Le linee collegano stelle a distanze differenti.${context?.unknownDistanceCount ? ' Alcune distanze non sono disponibili.' : ''}`;
+      : `${Number.isFinite(context?.starCount) ? context.starCount + ' stelle nella figura. ' : ''}${context?.earthPerspective ? 'Sei alla Terra: vista 3D senza orizzonte. Trascina per guardarti intorno. ' : ''}Le linee collegano stelle a distanze differenti.${context?.unknownDistanceCount ? ' Alcune distanze non sono disponibili.' : ''}`;
+    if (index === 7) $('#constellation-status').innerHTML = `${escape(visible)}${escape(number(observer.latitude, '°'))}, ${escape(number(observer.longitude, '°'))} · <time datetime="${escape(observer.dateIso)}">${escape(when)}</time>`;
   }
-  $('.footer-controls span:first-child').innerHTML = `${icon('mouse-pointer-2')} ${index === 7 ? 'Trascina per guardarti intorno' : 'Trascina per orbitare'}`;
-  $('#universe').setAttribute('aria-label', index === 7 ? 'Cielo dalla superficie terrestre. Trascina per guardarti intorno e usa la rotellina per ingrandire.' : 'Atlante cosmico tridimensionale. Trascina per orbitare e usa la rotellina per avvicinarti.');
+  $('.footer-controls span:first-child').innerHTML = `${icon('mouse-pointer-2')} ${index === 7 || context?.earthPerspective ? 'Trascina per guardarti intorno' : 'Trascina per orbitare'}`;
+  $('#universe').setAttribute('aria-label', index === 6 && context?.earthPerspective ? 'Stelle nello spazio 3D viste dalla posizione della Terra. Trascina per guardarti intorno e usa la rotellina per ingrandire.' : index === 7 ? 'Cielo dalla superficie terrestre. Trascina per guardarti intorno e usa la rotellina per ingrandire.' : 'Atlante cosmico tridimensionale. Trascina per orbitare e usa la rotellina per avvicinarti.');
   document.querySelectorAll('[data-scale]').forEach(button => {
     const selected = Number(button.dataset.scale) === index;
     button.classList.toggle('active', selected);
@@ -495,8 +510,7 @@ function openPlanets() {
 }
 
 function localDateInput(iso) {
-  const date = new Date(iso);
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  return dateInputInZone(iso, constellationBrowser.timeZone);
 }
 
 function constellationModeButtons() {
@@ -508,14 +522,18 @@ function constellationModeButtons() {
 
 function observerFormMarkup() {
   const observer = constellationBrowser.observer;
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'locale';
+  const deviceZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  const zones = [...new Set(['Europe/Rome', 'UTC', deviceZone])];
   return `<fieldset id="observer-fields" class="observer-fields" ${constellationBrowser.mode === 'earth' ? '' : 'hidden'}>
     <legend>Il tuo punto di osservazione</legend>
-    <label for="observer-latitude">Latitudine <small>Nord + / Sud \u2212</small><input id="observer-latitude" type="number" min="-90" max="90" step="any" required value="${observer.latitude}"/></label>
-    <label for="observer-longitude">Longitudine <small>Est + / Ovest \u2212</small><input id="observer-longitude" type="number" min="-180" max="180" step="any" required value="${observer.longitude}"/></label>
-    <label for="observer-datetime" class="observer-date">Data e ora <small>${escape(timezone)} \u00b7 1900\u20132100</small><input id="observer-datetime" type="datetime-local" min="1900-01-02T00:00" max="2100-12-30T23:59" required value="${localDateInput(observer.dateIso)}"/></label>
+    <label for="observer-latitude">Latitudine <small>Nord + / Sud \u2212</small><input id="observer-latitude" type="text" inputmode="text" required autocomplete="off" spellcheck="false" aria-describedby="observer-coordinate-help" value="${observer.latitude}"/></label>
+    <label for="observer-longitude">Longitudine <small>Est + / Ovest \u2212</small><input id="observer-longitude" type="text" inputmode="text" required autocomplete="off" spellcheck="false" aria-describedby="observer-coordinate-help" value="${observer.longitude}"/></label>
+    <label for="observer-datetime" class="observer-date">Data e ora <small>Nel fuso scelto \u00b7 1900\u20132100</small><input id="observer-datetime" type="datetime-local" min="1900-01-02T00:00" max="2100-12-30T23:59" required value="${localDateInput(observer.dateIso)}"/></label>
+    <p id="observer-coordinate-help">Accetta decimali (38,1144) o gradi, primi e secondi (38\u00b006\u203251.98\u2033N).</p>
+    <label for="observer-timezone" class="observer-zone">Fuso orario<select id="observer-timezone">${zones.map(zone => `<option value="${escape(zone)}" ${zone === constellationBrowser.timeZone ? 'selected' : ''}>${zone === 'Europe/Rome' ? 'Italia \u00b7 Europe/Rome (CET / CEST)' : zone === 'UTC' ? 'UTC' : escape(zone) + ' \u00b7 dispositivo'}</option>`).join('')}</select></label>
     <div class="observer-actions"><button data-action="observer-now">${icon('rotate-ccw')}Adesso</button><button id="constellation-apply" data-action="apply-observer">Aggiorna ${escape(constellationBrowser.data?.constellations.find(item => item.id === constellationBrowser.id)?.name || 'il cielo')}${icon('arrow-right')}</button></div>
-    <p>Coordinate iniziali: Roma. L\u2019orario segue il fuso del dispositivo. Il cielo resta fermo all\u2019istante scelto; le stelle sotto l\u2019orizzonte non sono visibili. La luminosit\u00e0 diurna, la rifrazione e l\u2019inquinamento luminoso non sono simulati.</p>
+    <button class="observer-preset" data-action="observer-orion-winter">${icon('sparkles')}Prova Orione \u00b7 11 dic 2026, 20:00 in Italia<small>38\u00b006\u203251.98\u2033N \u00b7 15\u00b039\u203200\u2033E</small></button>
+    <p>Il fuso scelto determina l'istante: in Italia, 20:00 in inverno corrisponde a 19:00 UTC. Il cielo resta fermo all'istante scelto; le stelle sotto l'orizzonte non sono visibili. La luminosit\u00e0 diurna, la rifrazione e l'inquinamento luminoso non sono simulati.</p>
   </fieldset>`;
 }
 
@@ -547,6 +565,11 @@ function renderConstellationModal() {
     <p class="catalog-provenance">Le linee sono figure convenzionali della tradizione occidentale. Uniscono stelle spesso molto lontane tra loro. Le distanze mancanti restano escluse dalla vista 3D. Il catalogo HYG \u00e8 una selezione osservativa: non comprende tutte le stelle conosciute. <a href="https://github.com/astronexus/HYG-Database" target="_blank" rel="noopener noreferrer">HYG 4.1 \u00b7 fonte e licenza</a></p>`;
   renderConstellationResults();
   $('#constellation-search').addEventListener('input', event => { constellationBrowser.query = event.target.value; renderConstellationResults(); });
+  $('#observer-fields').addEventListener('input', event => event.target.setCustomValidity?.(''));
+  $('#observer-timezone').addEventListener('change', event => {
+    constellationBrowser.timeZone = event.target.value;
+    $('#observer-datetime').setCustomValidity('');
+  });
   refreshIcons();
 }
 
@@ -568,17 +591,20 @@ async function openConstellations({ observer = false } = {}) {
 function readObserverForm() {
   if (!$('#modal').open || $('#modal').dataset.kind !== 'constellations' || !$('#observer-fields') || constellationBrowser.mode !== 'earth') return true;
   const fields = ['#observer-latitude', '#observer-longitude', '#observer-datetime'].map($);
-  for (const field of fields) {
+  const values = [];
+  for (const [index, field] of fields.entries()) {
+    field.setCustomValidity('');
     if (!field.reportValidity()) return false;
+    try {
+      values[index] = index < 2 ? parseCoordinate(field.value, index === 0 ? 'latitude' : 'longitude') : zonedDateInputToIso(field.value, $('#observer-timezone').value);
+    } catch (error) {
+      field.setCustomValidity(error.message);
+      field.reportValidity();
+      return false;
+    }
   }
-  const date = new Date(fields[2].value);
-  if (!Number.isFinite(date.getTime()) || date.getUTCFullYear() < 1900 || date.getUTCFullYear() > 2100) {
-    fields[2].setCustomValidity('Scegli una data compresa tra il 1900 e il 2100.');
-    fields[2].reportValidity();
-    fields[2].addEventListener('input', () => fields[2].setCustomValidity(''), { once: true });
-    return false;
-  }
-  constellationBrowser.observer = { latitude: Number(fields[0].value), longitude: Number(fields[1].value), dateIso: date.toISOString() };
+  constellationBrowser.timeZone = $('#observer-timezone').value;
+  constellationBrowser.observer = { latitude: values[0], longitude: values[1], dateIso: values[2] };
   return true;
 }
 
@@ -614,6 +640,7 @@ async function selectConstellation(id, mode = constellationBrowser.mode) {
 
 async function chooseConstellationMode(mode, button) {
   if (button.closest('#modal')) {
+    if (!readObserverForm()) return;
     constellationBrowser.mode = mode;
     document.querySelectorAll('#modal [data-constellation-mode]').forEach(item => {
       const selected = item.dataset.constellationMode === mode;
@@ -745,6 +772,18 @@ document.addEventListener('click', async event => {
     case 'planets': openPlanets(); break;
     case 'constellations': await openConstellations(); break;
     case 'constellation-observer': await openConstellations({ observer: true }); break;
+    case 'earth-visible': universe?.setEarthVisible(!constellationBrowser.earthVisible); break;
+    case 'earth-perspective': universe?.viewFromEarth(); break;
+    case 'earth-orbit': universe?.resetView(); break;
+    case 'observer-orion-winter':
+      constellationBrowser.timeZone = 'Europe/Rome';
+      $('#observer-timezone').value = 'Europe/Rome';
+      $('#observer-latitude').value = '38\u00b006\u203251.98\u2033N';
+      $('#observer-longitude').value = '15\u00b039\u203200\u2033E';
+      $('#observer-datetime').value = '2026-12-11T20:00';
+      $('#observer-fields').querySelectorAll('input').forEach(field => field.setCustomValidity(''));
+      await selectConstellation('Ori', 'earth');
+      break;
     case 'cosmic-scales': changeScale(1); break;
     case 'apply-observer': await selectConstellation(constellationBrowser.id); break;
     case 'observer-now':

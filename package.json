@@ -11,7 +11,8 @@
     "test:browser": "node tests/browser.mjs",
     "test:engine": "node tests/engine-browser.mjs",
     "test:constellations": "node tests/constellation-engine.mjs",
-    "test:constellation-ui": "node tests/constellation-ui.mjs"
+    "test:constellation-ui": "node tests/constellation-ui.mjs",
+    "test:earth-reference": "node tests/earth-reference-engine.mjs"
   },
   "dependencies": {
     "three": "^0.180.0",
