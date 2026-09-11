@@ -3,3 +3,5 @@ dist/
 test-results/
 .DS_Store
 *Zone.Identifier
+__pycache__/
+*.pyc

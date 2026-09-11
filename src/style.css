@@ -11,3 +11,61 @@
 .galaxy-art[data-scene="solar"]:before{width:69px;height:69px;left:calc(50% - 35px);top:23px;transform:none;background:radial-gradient(circle at 36% 32%,#ffe5ad,#d9ad58 46%,#ae7634 85%);box-shadow:0 0 24px #ecc37622,0 0 55px #ecc37613;filter:none}
 .galaxy-art[data-scene="stars"]:before{background:radial-gradient(ellipse,#fff8df 0%,#e4ce9755 4%,transparent 32%);transform:none;box-shadow:none}
 .galaxy-art[data-scene="cosmic"]:before{transform:rotate(-18deg);border-radius:0;background:repeating-linear-gradient(28deg,transparent 0 19px,#c3a26d26 20px,transparent 21px 38px),repeating-linear-gradient(-42deg,transparent 0 24px,#9fb3c522 25px,transparent 26px 48px);box-shadow:none}
+
+/* Planet exploration and a completely clear immersive view. */
+.planet-browser-button{display:flex;align-items:center;gap:8px;border:1px solid #99c8d55c;background:#84bac612;padding:11px 15px;border-radius:5px;font-size:11px;color:#bddfe5;white-space:nowrap}
+.planet-browser-button:hover{border-color:#bfe5eb99;color:#e3f9fc;background:#8cbdcb20}
+.view-controls{align-items:flex-end}
+.immersion-button{display:flex;align-items:center;justify-content:center;gap:8px;font-size:10px;padding:10px;background:#111a21d9;border:1px solid #a6c9d83d;border-radius:4px;color:#afc9d3;white-space:nowrap;margin-top:4px}
+.immersion-button:hover{color:#e0f5ff;border-color:#b6d9e577}
+#scale-slider{background:linear-gradient(90deg,#ac8c5d 0%,#37434a 0%)}
+.card-top svg{width:14px;height:14px}
+.planet-art{height:105px;position:relative;display:grid;place-items:center;overflow:hidden}
+.planet-art>span{position:relative;display:block;width:75px;height:75px;background-image:radial-gradient(circle at 76% 68%,#030910f5 4%,transparent 72%),var(--planet-texture,linear-gradient(25deg,var(--planet-color),#cedfdc));background-size:cover,auto 100%;background-position:center,35% center;border-radius:50%;box-shadow:inset 4px 3px 8px #fff2,0 0 29px color-mix(in srgb,var(--planet-color) 16%,transparent)}
+.planet-art-saturn:after{content:'';position:absolute;left:50%;top:50%;width:126px;height:36px;border:9px solid #ccb18b91;border-top:5px solid #aa997b77;border-radius:50%;transform:translate(-50%,-50%) rotate(-27deg);box-shadow:0 0 0 3px #98876835}
+.planet-card-content h2{font-size:22px;overflow-wrap:anywhere}
+.object-card .planet-card-content .card-description{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;line-height:1.65;font-size:10px;margin:10px 0}
+.planet-measurements{display:grid;grid-template-columns:1fr 1fr;gap:12px 10px;border-top:1px solid var(--line);padding:12px 0}
+.planet-measurements span{display:block;font-size:8px;color:#8d999f;line-height:1.55}
+.planet-measurements strong{display:block;font-family:'Space Grotesk',sans-serif;font-weight:400;font-size:11px;color:#d2c8b4;margin-top:4px}
+.card-content .illustration-note{font-size:9px;color:#829298;line-height:1.6;margin:0 0 10px}
+.planet-details-button{font-size:10px;color:#8ab8c9;margin:0 0 10px;padding:0;display:flex;align-items:center;gap:5px}
+.planet-details-button svg{width:12px;height:12px}
+dialog[data-kind="planets"]{width:min(850px,calc(100% - 32px));max-height:92dvh;padding:27px}
+dialog[data-kind="planets"] .dialog-head{margin-bottom:12px}
+.catalog-introduction{margin:0 0 18px}
+.catalog-introduction strong{font-weight:500;color:#d6e3e8}
+.solar-shortcuts{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:17px 0;margin-bottom:22px}
+.solar-shortcuts button{display:flex;align-items:center;flex-direction:column;gap:9px;font-size:10px;color:#c8cdcc;border-radius:5px;padding:6px 3px}
+.solar-shortcuts button:hover{background:#b0d7e312;color:#e0f5ff}
+.planet-preview{position:relative;display:inline-block;flex-shrink:0;width:35px;height:35px;border-radius:50%;background-image:radial-gradient(circle at 83% 73%,#030811e8 2%,transparent 70%),var(--planet-texture,linear-gradient(25deg,var(--planet-color),#d2d6c3));background-size:cover,auto 100%;background-position:center,35% center;box-shadow:inset 2px 1px 4px #ffffff24,0 0 18px #bfdcea09}
+.saturn-preview:after{content:'';position:absolute;inset:12px -9px;border:3px solid #c3ad859c;border-radius:50%;transform:rotate(-28deg)}
+.catalog-filter{display:flex;gap:7px;margin-top:13px}
+.catalog-filter button{font-size:11px;border:1px solid var(--line);padding:8px 13px;border-radius:4px;color:#93a5af}
+.catalog-filter button.active{border-color:#9fcbd274;color:#c7e7ec;background:#96c7cf0e}
+.result-count{font-size:10px;color:#8a9ba5;margin-top:16px;line-height:1.6;min-height:16px}
+.planet-results{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:10px 0 0;max-height:36dvh;min-height:90px;overflow:auto;overscroll-behavior:contain;padding:4px 4px 4px 0;scrollbar-color:#465963 transparent;scrollbar-width:thin}
+.planet-result{display:flex;align-items:center;gap:16px;text-align:left;min-width:0;padding:14px 13px;border:1px solid #acc9d510;background:#a8c5d104;border-radius:5px;min-height:84px}
+.planet-result:hover{background:#a8c5d10e;border-color:#b4d2dc35}
+.planet-result-copy{display:flex;flex:1;min-width:0;flex-direction:column;gap:4px}
+.planet-result-copy strong{font-family:'Space Grotesk',sans-serif;font-weight:400;font-size:14px;overflow-wrap:anywhere;color:#dce5e6}
+.planet-result-copy small{font-size:10px;color:#97a8b0}
+.planet-result-copy>span{font-size:9px;color:#728d9a}
+.planet-result>svg{width:14px;flex-shrink:0;color:#95bbcd}
+.planet-empty{grid-column:1/-1}
+.catalog-pagination{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:13px;padding-top:13px;border-top:1px solid var(--line)}
+.catalog-pagination button{font-size:11px;padding:7px 9px;border:1px solid var(--line);border-radius:4px}
+.catalog-pagination span{font-size:10px;color:#90a3ae;text-align:center}
+dialog .catalog-provenance{font-size:10px;line-height:1.65;color:#738b97;margin:15px 0 0}
+dialog .catalog-provenance a{font-size:10px;color:#9dafb8}
+.cinematic .topbar,.cinematic .intro,.cinematic .left-panel,.cinematic .right-panel,.cinematic .bottom-panel,.cinematic .footer,.cinematic .view-controls,.cinematic .compass,.cinematic .center-caption,.cinematic .labels,.cinematic .toast,.cinematic .webgl-error,.cinematic .loading{visibility:hidden!important;opacity:0!important;pointer-events:none!important}
+.cinematic .vignette{opacity:0}
+.vignette{transition:opacity .65s}
+.exit-cinema{width:44px;height:44px;padding:0;border-radius:50%;background:#12202a91;border-color:#b2d0e039;opacity:0;transition:opacity .5s;align-items:center;justify-content:center}
+.exit-cinema svg{width:18px;height:18px;color:#b4cbd8}
+.cinematic .exit-cinema{display:flex}
+.cinematic .exit-cinema.revealed,.cinematic .exit-cinema:focus-visible,.cinematic .exit-cinema:hover{opacity:.85}
+@media(max-height:800px) and (min-width:901px){.planet-art{height:76px}.planet-art>span{width:56px;height:56px}.planet-art-saturn:after{width:94px;height:26px;border-width:6px}.planet-card-content .card-stats{padding:10px 0}.planet-measurements{padding:9px 0;gap:8px}.planet-card-content .object-source{margin-top:9px}.planet-card-content h2{font-size:20px}}
+@media(max-width:900px){.top-actions{gap:8px}.planet-browser-button{padding:9px 11px}.immersion-button{padding:9px;font-size:9px;gap:6px}.planet-browser-button svg{width:15px}.view-controls{gap:6px}}
+@media(max-width:560px){.topbar{margin:0 15px}.brand{gap:8px}.brand img{width:30px;height:30px}.brand-word{font-size:20px;letter-spacing:4px}.brand-sub{font-size:6px;letter-spacing:1.5px}.top-actions{gap:6px}.planet-browser-button{padding:9px 8px;font-size:10px;gap:5px}.vr-button{font-size:9px;gap:6px;padding:9px 8px}.vr-button svg{width:15px}.intro h1{max-width:270px}.planet-results{grid-template-columns:1fr;max-height:35dvh}.solar-shortcuts{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;padding:9px 0;margin-bottom:16px}.solar-shortcuts button{gap:6px;font-size:9px;padding:5px}.solar-shortcuts .planet-preview{width:29px;height:29px}.catalog-introduction{font-size:11px;margin-bottom:10px}.catalog-filter{gap:5px}.catalog-filter button{font-size:10px;padding:8px 10px}dialog[data-kind="planets"]{padding:20px;max-height:94dvh}dialog[data-kind="planets"] .dialog-head h2{font-size:22px}.planet-result{min-height:73px;padding:11px 14px}.planet-result-copy strong{font-size:13px}.exit-cinema{right:18px;top:18px}}
+@media(max-height:650px){dialog[data-kind="planets"] .solar-shortcuts{display:none}.catalog-provenance{max-height:40px;overflow:auto}}

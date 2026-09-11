@@ -1,4 +1,4 @@
-﻿import nearbyStars from './nearby-stars.json' with { type: 'json' };
+import nearbyStars from './nearby-stars.json' with { type: 'json' };
 export const sources = {
   solar: 'https://science.nasa.gov/solar-system/planet-sizes-and-locations-in-our-solar-system/',
   galaxy: 'https://science.nasa.gov/universe/galaxies/',
@@ -105,3 +105,6 @@ for (const star of nearbyStars) {
     {raDeg:star.raDeg,decDeg:star.decDeg,distanceLy:star.distanceLy,sceneUnitsPerLy:.7,mag:star.mag,measured:true,source:star.source,positionKind:'approximate-equatorial',positionNote:scales[1].positionNote}));
 }
 scales[1].description=`La vista include ${nearbyStars.length} stelle dal catalogo HYG 4.1 entro 25 anni luce dal Sole, oltre ai riferimenti principali. Coordinate equatoriali J2000 e distanze di catalogo; dimensioni e luminosità sono amplificate. Il catalogo non è completo.`;
+
+const displayRadii={mercury:.38,venus:.50,earth:.53,mars:.42,jupiter:1.05,saturn:.95,uranus:.78,neptune:.76};
+for(const planet of catalog.solar){if(displayRadii[planet.id]){planet.size=displayRadii[planet.id];planet.bodyKind='planet';planet.isPlanet=true;}else planet.bodyKind='star';}

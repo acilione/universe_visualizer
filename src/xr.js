@@ -1,13 +1,15 @@
-﻿import * as THREE from 'three';
+import * as THREE from 'three';
 import { singleGripTransform, dualGripTransform, isSelectionGesture } from './xr-math.js';
 
 const WIDTH = 1160;
 const HEIGHT = 420;
 const BUTTONS = [
-  { label: '← SCALA', action: 'previous', x: 28, y: 220, w: 262, h: 74 },
-  { label: 'SCALA →', action: 'next', x: 309, y: 220, w: 262, h: 74 },
-  { label: 'RICENTRA', action: 'reset', x: 590, y: 220, w: 262, h: 74 },
-  { label: 'ESCI VR', action: 'exit', x: 871, y: 220, w: 261, h: 74 },
+  { label: '← SCALA', action: 'previous', x: 28, y: 220, w: 174, h: 74 },
+  { label: 'SCALA →', action: 'next', x: 214, y: 220, w: 174, h: 74 },
+  { label: 'AVVICINA', action: 'focus', x: 400, y: 220, w: 174, h: 74 },
+  { label: 'RICENTRA', action: 'reset', x: 586, y: 220, w: 174, h: 74 },
+  { label: 'LIBERA', action: 'immersive', x: 772, y: 220, w: 174, h: 74 },
+  { label: 'ESCI VR', action: 'exit', x: 958, y: 220, w: 174, h: 74 },
 ];
 const SCALE_NAMES = ['Sistema Solare', 'Stelle vicine', 'Via Lattea', 'Gruppo Locale', 'Universo osservabile'];
 
@@ -16,7 +18,7 @@ const SCALE_NAMES = ['Sistema Solare', 'Stelle vicine', 'Via Lattea', 'Gruppo Lo
  * onScale receives -1/+1; mapRoot transforms must be left to this module in VR.
  * XRInputSource.targetRaySpace works for both hands and handheld controllers.
  */
-export function createXR({ renderer, scene, camera, controls, mapRoot, getTargets, onSelect, onScale, getScale, onMessage = () => {} }) {
+export function createXR({ renderer, scene, camera, controls, mapRoot, getTargets, onSelect, onFocus, onScale, getScale, onImmersiveChange, onMessage = () => {} }) {
   renderer.xr.enabled = true;
   renderer.xr.setReferenceSpaceType('local');
   const raycaster = new THREE.Raycaster();
@@ -36,7 +38,14 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   panel.name = 'XR navigation panel';
   panel.renderOrder = 100;
   panel.visible = false;
-  scene.add(panel);
+  const restoreOrb = new THREE.Mesh(
+    new THREE.SphereGeometry(0.022, 20, 14),
+    new THREE.MeshBasicMaterial({ color: 0xa5efe7, transparent: true, opacity: 0.7, depthTest: false, toneMapped: false }),
+  );
+  restoreOrb.name = 'XR restore controls';
+  restoreOrb.renderOrder = 101;
+  restoreOrb.visible = false;
+  scene.add(panel, restoreOrb);
   const jointGeometry = new THREE.SphereGeometry(1, 8, 6);
   const jointMaterials = [0xa5efe7, 0xf0cf91].map(color => new THREE.MeshBasicMaterial({ color, toneMapped: false }));
   const lineGeometry = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, -1)]);
@@ -44,6 +53,8 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   let active = false;
   let disposed = false;
   let entering = false;
+  let immersive = false;
+  let focusState = null;
   let snapshot = null;
   let recenterPending = false;
   let gesture = null;
@@ -53,8 +64,8 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   let lastScale = null;
   const inputs = [];
   const listeners = [];
-  const ownedGeometries = new Set([panel.geometry, jointGeometry, lineGeometry]);
-  const ownedMaterials = new Set([panel.material, ...jointMaterials]);
+  const ownedGeometries = new Set([panel.geometry, restoreOrb.geometry, jointGeometry, lineGeometry]);
+  const ownedMaterials = new Set([panel.material, restoreOrb.material, ...jointMaterials]);
   function listen(target, type, callback) {
     target.addEventListener(type, callback);
     listeners.push(() => target.removeEventListener(type, callback));
@@ -130,7 +141,9 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     rotationMatrix.extractRotation(input.controller.matrixWorld);
     raycaster.ray.origin.setFromMatrixPosition(input.controller.matrixWorld);
     raycaster.ray.direction.set(0, 0, -1).applyMatrix4(rotationMatrix).normalize();
-    const panelHit = raycaster.intersectObject(panel, false)[0];
+    const orbHit = restoreOrb.visible ? raycaster.intersectObject(restoreOrb, false)[0] : null;
+    if (orbHit) return { ...orbHit, action: 'restore', button: -2, panel: true };
+    const panelHit = panel.visible ? raycaster.intersectObject(panel, false)[0] : null;
     if (panelHit?.uv) {
       const px = panelHit.uv.x * WIDTH;
       const py = (1 - panelHit.uv.y) * HEIGHT;
@@ -146,19 +159,24 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   function activate(hit) {
     if (!hit) return;
     if (hit.panel) {
-      const action = BUTTONS[hit.button]?.action;
+      const action = hit.action || BUTTONS[hit.button]?.action;
       if (action === 'previous' || action === 'next') {
         onScale?.(action === 'previous' ? -1 : 1);
+        recenter();
         panelDirty = true;
+      } else if (action === 'focus' && info.id) {
+        if (onFocus) onFocus(info);
+        else focusObject(info);
       } else if (action === 'reset') {
-        recenterPending = true;
-        for (const input of inputs) cancelInput(input);
+        recenter();
+      } else if (action === 'immersive' || action === 'restore') {
+        setImmersive(action === 'immersive');
       } else if (action === 'exit') {
         renderer.xr.getSession()?.end().catch(() => onMessage('Usa il menu del visore per uscire dalla VR.'));
       }
     } else if (hit.item) {
-      onSelect?.(hit.item);
       setInfo(hit.item);
+      onSelect?.(hit.item);
     }
   }
 
@@ -168,6 +186,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     if (!pose) return;
     input.press = { kind, time: performance.now(), pose, hit: pick(input), manipulated: kind === 'squeeze', maxDistance: 0, maxAngle: 0 };
     gesture = null;
+    if (!input.press.hit?.panel) focusState = null;
   }
 
   function endInput(input) {
@@ -240,8 +259,9 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     mapRoot.updateMatrixWorld(true);
   }
 
-  function recenter() {
+  function placeOverview() {
     gesture = null;
+    focusState = null;
     const viewer = renderer.xr.getCamera();
     const eye = viewer.getWorldPosition(new THREE.Vector3());
     const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(viewer.getWorldQuaternion(new THREE.Quaternion()));
@@ -261,17 +281,124 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     mapRoot.position.copy(eye).addScaledVector(forward, 1.65);
     mapRoot.position.y -= 0.22;
     mapRoot.updateMatrixWorld(true);
-    panel.position.copy(eye).addScaledVector(forward, 1.25);
+    positionPanel();
+    recenterPending = false;
+  }
+
+  function positionPanel() {
+    const viewer = renderer.xr.getCamera();
+    const eye = viewer.getWorldPosition(new THREE.Vector3());
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(viewer.getWorldQuaternion(new THREE.Quaternion()));
+    forward.y = 0;
+    if (forward.lengthSq() < 0.001) forward.set(0, 0, -1);
+    panel.position.copy(eye).addScaledVector(forward.normalize(), 1.25);
     panel.position.y -= 0.76;
     panel.lookAt(eye);
     panel.updateMatrixWorld(true);
-    recenterPending = false;
+  }
+
+  function positionRestoreOrb() {
+    const viewer = renderer.xr.getCamera();
+    restoreOrb.position.set(0.36, -0.31, -0.72)
+      .applyQuaternion(viewer.getWorldQuaternion(new THREE.Quaternion()))
+      .add(viewer.getWorldPosition(new THREE.Vector3()));
+    restoreOrb.updateMatrixWorld(true);
+  }
+
+  /** Hide all panel writing; the peripheral, textless sphere restores controls. */
+  function setImmersive(value) {
+    const changed = immersive !== Boolean(value);
+    immersive = Boolean(value);
+    panel.visible = active && !immersive;
+    restoreOrb.visible = active && immersive;
+    if (active) {
+      if (immersive) positionRestoreOrb();
+      else positionPanel();
+    }
+    hoverButton = -1;
+    panelDirty = true;
+    if (changed) onImmersiveChange?.(immersive);
+  }
+
+  /** Request an overview reset on the next tracked frame. */
+  function recenter() {
+    if (!active) return false;
+    focusState = null;
+    recenterPending = true;
+    for (const input of inputs) cancelInput(input);
+    return true;
+  }
+
+  function objectAnchor(object, extent) {
+    mapRoot.updateWorldMatrix(true, true);
+    const target = (getTargets?.() || []).find(candidate => candidate.userData.object?.id === object?.id);
+    const rootInverse = mapRoot.matrixWorld.clone().invert();
+    const rootScale = mapRoot.getWorldScale(new THREE.Vector3());
+    const relativeScale = target ? target.getWorldScale(new THREE.Vector3()).divide(rootScale) : new THREE.Vector3(1, 1, 1);
+    const inheritedScale = Math.max(Math.abs(relativeScale.x), Math.abs(relativeScale.y), Math.abs(relativeScale.z));
+    // Numeric extents are marker-local radii, including rings when supplied by
+    // the engine. This compensates for animated scaling of the content group.
+    let radius = (typeof extent === 'number' ? extent : object?.size || 0.5) * inheritedScale;
+    let center = target
+      ? target.getWorldPosition(new THREE.Vector3()).applyMatrix4(rootInverse)
+      : new THREE.Vector3().fromArray(object?.position || [0, 0, 0]);
+    // Explicit object extents are already in mapRoot local coordinates.
+    if (extent && typeof extent === 'object') {
+      radius = extent.radius ?? radius;
+      if (extent.center) center = extent.center.isVector3 ? extent.center.clone() : new THREE.Vector3().fromArray(extent.center);
+    }
+    if (!Number.isFinite(radius) || radius <= 0 || !center.toArray().every(Number.isFinite)) return null;
+    return { center, radius };
+  }
+
+  /** Bring a body to the viewer by transforming the map, never the XR camera. */
+  function focusObject(object, extent) {
+    if (!active || !object) return false;
+    if (recenterPending) placeOverview();
+    const anchor = objectAnchor(object, extent);
+    if (!anchor) return false;
+    const viewer = renderer.xr.getCamera();
+    const viewerPosition = viewer.getWorldPosition(new THREE.Vector3());
+    const destination = new THREE.Vector3(0, 0, -1)
+      .applyQuaternion(viewer.getWorldQuaternion(new THREE.Quaternion())).add(viewerPosition);
+    const fromCenter = mapRoot.localToWorld(anchor.center.clone());
+    const radius = THREE.MathUtils.clamp(extent?.displayRadius ?? 0.28, 0.2, 0.35);
+    for (const input of inputs) cancelInput(input);
+    focusState = {
+      object, extent, radius, destination, fromCenter, fromScale: mapRoot.scale.x,
+      quaternion: mapRoot.quaternion.clone(), elapsed: 0, duration: 0.85,
+    };
+    return true;
+  }
+
+  function updateFocus(delta) {
+    if (!focusState) return;
+    const state = focusState;
+    const anchor = objectAnchor(state.object, state.extent);
+    if (!anchor) { focusState = null; return; }
+    const parentScale = mapRoot.parent?.getWorldScale(new THREE.Vector3()) || new THREE.Vector3(1, 1, 1);
+    const scaleFactor = Math.max(Math.abs(parentScale.x), Math.abs(parentScale.y), Math.abs(parentScale.z));
+    const nextScale = state.radius / (anchor.radius * scaleFactor);
+    if (!Number.isFinite(nextScale) || nextScale < 1e-8 || nextScale > 1000) { focusState = null; return; }
+    state.elapsed += Math.max(0, Math.min(Number.isFinite(delta) ? delta : 1 / 60, 0.1));
+    const progress = Math.min(1, state.elapsed / state.duration);
+    const eased = progress * progress * (3 - 2 * progress);
+    const scale = Math.exp(THREE.MathUtils.lerp(Math.log(state.fromScale), Math.log(nextScale), eased));
+    const center = state.fromCenter.clone().lerp(state.destination, eased);
+    if (mapRoot.parent) mapRoot.parent.worldToLocal(center);
+    const position = center.sub(anchor.center.clone().multiplyScalar(scale).applyQuaternion(state.quaternion));
+    applyTransform({ position, quaternion: state.quaternion, scale });
+    // Grabs start from the current inspection scale, without snapping back to
+    // the overview's much smaller limits when the second hand joins.
+    baseScale = scale;
   }
 
   function restoreDesktop() {
     active = false;
     entering = false;
     panel.visible = false;
+    restoreOrb.visible = false;
+    focusState = null;
     for (const input of inputs) {
       cancelInput(input);
       input.cursor.visible = false;
@@ -346,7 +473,8 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       await renderer.xr.setSession(session);
       active = true;
       entering = false;
-      panel.visible = true;
+      panel.visible = !immersive;
+      restoreOrb.visible = immersive;
       recenterPending = true;
       panelDirty = true;
       onMessage('VR attiva. Pizzica e tieni per afferrare; usa due mani per ingrandire.');
@@ -367,9 +495,11 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     }
   }
 
-  function update() {
+  function update(delta = 1 / 60) {
     if (!active || !renderer.xr.isPresenting) return;
-    if (recenterPending) recenter();
+    if (recenterPending) placeOverview();
+    updateFocus(delta);
+    if (immersive) positionRestoreOrb();
     const time = performance.now();
     let nextHover = -1;
     for (let i = 0; i < inputs.length; i++) {
@@ -452,6 +582,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     disposed = true;
     for (const removeListener of listeners) removeListener();
     panel.removeFromParent();
+    restoreOrb.removeFromParent();
     for (const input of inputs) {
       input.ray.removeFromParent();
       input.cursor.removeFromParent();
@@ -466,12 +597,10 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   }
 
   function setInfo(value = {}) {
-    info = typeof value === 'string' ? { name: value, distance: '' } : { name: value.name, distance: value.distance, scaleLabel: value.scaleLabel };
+    info = typeof value === 'string' ? { name: value, distance: '' } : { ...value };
     panelDirty = true;
   }
 
   paintPanel();
-  return { enter, update, setInfo, dispose, get isPresenting() { return active; } };
+  return { enter, update, setInfo, focusObject, recenter, setImmersive, dispose, get isPresenting() { return active; }, get isImmersive() { return immersive; } };
 }
-
-

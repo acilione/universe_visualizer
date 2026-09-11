@@ -1,4 +1,4 @@
-﻿import test from 'node:test';
+import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Vector3, Quaternion } from 'three';
 import { singleGripTransform, dualGripTransform, isSelectionGesture } from '../src/xr-math.js';
@@ -88,9 +88,9 @@ async function withXRHarness(run, requestError = null) {
   mapRoot.add(new THREE.Mesh(new THREE.SphereGeometry(10), new THREE.MeshBasicMaterial()));
   scene.add(mapRoot);
   const controls = { enabled: true, target: new THREE.Vector3(0, 1, 2) };
-  const messages = [], selected = [], targets = [], scaleDeltas = [];
-  const app = createXR({ renderer: { xr }, scene, camera, controls, mapRoot, getTargets: () => targets, getScale: () => 2, onSelect: object => selected.push(object), onScale: delta => scaleDeltas.push(delta), onMessage: message => messages.push(message) });
-  try { await run({ app, session, xr, scene, camera, controls, mapRoot, messages, controllers, hands, targets, selected, scaleDeltas, requests: () => requests, THREE }); }
+  const messages = [], selected = [], targets = [], scaleDeltas = [], focused = [], immersiveChanges = [];
+  const app = createXR({ renderer: { xr }, scene, camera, controls, mapRoot, getTargets: () => targets, getScale: () => 2, onSelect: object => selected.push(object), onFocus: object => focused.push(object), onImmersiveChange: value => immersiveChanges.push(value), onScale: delta => scaleDeltas.push(delta), onMessage: message => messages.push(message) });
+  try { await run({ app, session, xr, scene, camera, controls, mapRoot, messages, controllers, hands, targets, selected, focused, immersiveChanges, scaleDeltas, xrCamera, requests: () => requests, THREE }); }
   finally {
     for (const [key, descriptor] of previous) {
       if (descriptor) Object.defineProperty(globalThis, key, descriptor);
@@ -184,14 +184,14 @@ test('the in-world panel supports scale navigation, reset and exit without DOM c
       controller.dispatchEvent({ type: 'selectstart' });
       controller.dispatchEvent({ type: 'selectend' });
     };
-    pressButton(159);
-    pressButton(440);
+    pressButton(115);
+    pressButton(301);
     assert.deepEqual(scaleDeltas, [-1, 1]);
     mapRoot.position.x = 10;
-    pressButton(721);
+    pressButton(673);
     app.update();
     near(mapRoot.position.x, 0);
-    pressButton(1002);
+    pressButton(1045);
     assert.equal(app.isPresenting, false);
   });
 });
@@ -250,5 +250,141 @@ test('disposing XR releases panel resources and removes its scene objects', asyn
     assert.equal(scene.getObjectByName('XR navigation panel'), undefined);
     assert.equal(await app.enter(), false);
     await app.dispose();
+  });
+});
+
+
+function clickAtPoint(controller, scene, point, THREE) {
+  const origin = controller.getWorldPosition(new THREE.Vector3());
+  controller.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), point.clone().sub(origin).normalize());
+  scene.updateMatrixWorld(true);
+  controller.dispatchEvent({ type: 'selectstart' });
+  controller.dispatchEvent({ type: 'selectend' });
+}
+
+function panelButtonPoint(scene, pixelX, THREE) {
+  return scene.getObjectByName('XR navigation panel').localToWorld(new THREE.Vector3(
+    (pixelX / 1160 - 0.5) * 1.45, (0.5 - 257 / 420) * 1.45 * 420 / 1160, 0,
+  ));
+}
+
+test('AVVICINA forwards the complete selected planet and host context to the engine', async () => {
+  await withXRHarness(async ({ app, controllers, scene, focused, session, THREE }) => {
+    await app.enter();
+    app.update();
+    const planet = { id: 'kepler-186-f', name: 'Kepler-186 f', distance: '580 a.l.', position: [4, 0, -2], size: 0.28, host: 'Kepler-186', scaleLabel: 'Sistema Kepler-186' };
+    app.setInfo(planet);
+    const controller = controllers[0];
+    controller.visible = true;
+    controller.dispatchEvent({ type: 'connected', data: { handedness: 'right' } });
+    clickAtPoint(controller, scene, panelButtonPoint(scene, 487, THREE), THREE);
+    assert.deepEqual(focused, [planet]);
+    await session.end();
+  });
+});
+
+test('planet inspection animates its rendered center and radius without moving the viewer, and reset restores overview', async () => {
+  await withXRHarness(async ({ app, targets, mapRoot, controllers, camera, xrCamera, session, THREE }) => {
+    const planet = { id: 'earth', name: 'Terra', position: [5, 0.2, -2], size: 0.25 };
+    const content = new THREE.Group();
+    content.scale.setScalar(0.92);
+    content.position.set(0.7, -0.4, 1);
+    content.rotation.y = 0.4;
+    const target = new THREE.Mesh(new THREE.SphereGeometry(0.25), new THREE.MeshBasicMaterial());
+    target.position.fromArray(planet.position);
+    target.userData.object = planet;
+    content.add(target);
+    mapRoot.add(content);
+    targets.push(target);
+    await app.enter();
+    app.update();
+    const overviewScale = mapRoot.scale.x;
+    xrCamera.position.set(0.4, 1.2, 0.7);
+    xrCamera.rotation.y = 0.3;
+    const cameraPosition = camera.position.clone(), cameraQuaternion = camera.quaternion.clone();
+    const viewerPosition = xrCamera.position.clone(), viewerQuaternion = xrCamera.quaternion.clone();
+    const destination = new THREE.Vector3(0, 0, -1).applyQuaternion(viewerQuaternion).add(viewerPosition);
+    assert.equal(app.focusObject(planet, 0.25), true);
+    const initialScale = mapRoot.scale.x;
+    app.update(0.05);
+    assert.ok(mapRoot.scale.x > initialScale && mapRoot.scale.x < 1.12, 'inspection begins gradually');
+    for (let i = 0; i < 35; i++) {
+      content.scale.setScalar(Math.min(1, 0.92 + i * 0.004));
+      app.update(0.05);
+    }
+    near(target.getWorldPosition(new THREE.Vector3()).distanceTo(destination), 0);
+    near(target.getWorldScale(new THREE.Vector3()).x * 0.25, 0.28);
+    assert.deepEqual(camera.position.toArray(), cameraPosition.toArray());
+    assert.deepEqual(camera.quaternion.toArray(), cameraQuaternion.toArray());
+    assert.deepEqual(xrCamera.position.toArray(), viewerPosition.toArray());
+    assert.deepEqual(xrCamera.quaternion.toArray(), viewerQuaternion.toArray());
+    const inspectionScale = mapRoot.scale.x;
+    for (let i = 0; i < controllers.length; i++) {
+      const controller = controllers[i];
+      controller.visible = true;
+      controller.position.set(i === 0 ? -0.15 : 0.15, 0.1, -0.5);
+      controller.dispatchEvent({ type: 'connected', data: { handedness: i === 0 ? 'left' : 'right' } });
+      controller.dispatchEvent({ type: 'squeezestart' });
+    }
+    app.update(0);
+    controllers[1].position.x = 0.3;
+    app.update(0);
+    near(mapRoot.scale.x, inspectionScale * 1.5);
+    assert.equal(app.recenter(), true);
+    app.update();
+    near(mapRoot.scale.x, overviewScale);
+    await session.end();
+  });
+});
+
+test('LIBERA hides writing and a textless peripheral sphere restores the panel in VR', async () => {
+  await withXRHarness(async ({ app, controllers, scene, immersiveChanges, targets, selected, session, THREE }) => {
+    await app.enter();
+    app.update();
+    const panel = scene.getObjectByName('XR navigation panel');
+    const orb = scene.getObjectByName('XR restore controls');
+    const controller = controllers[0];
+    controller.visible = true;
+    controller.dispatchEvent({ type: 'connected', data: { handedness: 'right' } });
+    const formerFocusPoint = panelButtonPoint(scene, 487, THREE);
+    clickAtPoint(controller, scene, panelButtonPoint(scene, 859, THREE), THREE);
+    assert.equal(panel.visible, false);
+    assert.equal(orb.visible, true);
+    assert.equal(app.isImmersive, true);
+    assert.deepEqual(immersiveChanges, [true]);
+    // Hidden panel geometry must not intercept rays aimed at the universe.
+    const object = { id: 'unobstructed', name: 'Visible star' };
+    const target = new THREE.Mesh(new THREE.SphereGeometry(0.08), new THREE.MeshBasicMaterial());
+    target.position.copy(formerFocusPoint).multiplyScalar(1.4);
+    target.userData.object = object;
+    targets.push(target);
+    scene.add(target);
+    clickAtPoint(controller, scene, target.position, THREE);
+    assert.deepEqual(selected, [object]);
+    clickAtPoint(controller, scene, orb.position, THREE);
+    assert.equal(panel.visible, true);
+    assert.equal(orb.visible, false);
+    assert.equal(app.isImmersive, false);
+    assert.deepEqual(immersiveChanges, [true, false]);
+    await session.end();
+  });
+});
+
+test('immersive mode selected before VR entry is preserved and the restore sphere is disposed', async () => {
+  await withXRHarness(async ({ app, scene, session }) => {
+    app.setImmersive(true);
+    await app.enter();
+    app.update();
+    const panel = scene.getObjectByName('XR navigation panel');
+    const orb = scene.getObjectByName('XR restore controls');
+    assert.equal(panel.visible, false);
+    assert.equal(orb.visible, true);
+    let disposed = false;
+    orb.geometry.addEventListener('dispose', () => { disposed = true; });
+    await session.end();
+    assert.equal(orb.visible, false);
+    await app.dispose();
+    assert.equal(disposed, true);
+    assert.equal(scene.getObjectByName('XR restore controls'), undefined);
   });
 });

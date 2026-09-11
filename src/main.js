@@ -1,7 +1,8 @@
-﻿import './style.css';
+import './style.css';
 import { createIcons, Orbit, Search, Glasses, Maximize2, Minimize2, Plus, Minus, RotateCcw, Move, MousePointer2, Hand, Play, Pause, Volume2, VolumeX, Settings2, CircleHelp, X, ArrowUpRight, ArrowRight, Focus, Sparkles, Grid3X3, Tags, Compass, Layers, Info, Globe2, Star, Telescope, Check, ExternalLink } from 'lucide';
 import { catalog, scales } from './data.js';
 import { Universe } from './universe.js';
+import { exoplanets, planetCatalogMetadata, findPlanet } from './planets.js';
 
 const icons = { Orbit, Search, Glasses, Maximize2, Minimize2, Plus, Minus, RotateCcw, Move, MousePointer2, Hand, Play, Pause, Volume2, VolumeX, Settings2, CircleHelp, X, ArrowUpRight, ArrowRight, Focus, Sparkles, Grid3X3, Tags, Compass, Layers, Info, Globe2, Star, Telescope, Check, ExternalLink };
 const icon = name => `<i data-lucide="${name}" aria-hidden="true"></i>`;
@@ -11,7 +12,7 @@ const refreshIcons = () => createIcons({ icons, attrs: { 'aria-hidden':'true' } 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const preferences = (() => { try { return JSON.parse(localStorage.getItem('aether.preferences') || '{}') || {}; } catch { return {}; } })();
 const state = {
-  scale: 2, object: catalog.galaxy[0], labels: preferences.labels !== false,
+  scale: 0, context: null, object: catalog.solar[0], labels: preferences.labels !== false,
   grid: preferences.grid !== false, particles: preferences.particles !== false,
   autoRotate: typeof preferences.autoRotate === 'boolean' ? preferences.autoRotate : !reducedMotion,
   quality: preferences.quality === 'low' ? 'low' : 'high',
@@ -20,6 +21,9 @@ const state = {
 let universe = null;
 let tourTimer = null;
 let toastTimer = null;
+let immersionTimer = null;
+let immersionRevealTimer = null;
+const planetBrowser = { query: '', filter: 'all', page: 0 };
 let returnFocus = null;
 let xrSupported = false;
 let xrChecked = false;
@@ -39,17 +43,17 @@ $('#app').innerHTML = `
         <button data-action="collections">Collezioni</button>
         <button data-action="about">Il progetto ${icon('arrow-up-right')}</button>
       </nav>
-      <div class="top-actions"><span class="live"><span class="status-dot"></span><span id="renderer-status">UNIVERSO IN MOVIMENTO</span></span><button class="vr-button" data-action="vr">${icon('glasses')} Entra in VR</button></div>
+      <div class="top-actions"><button class="planet-browser-button" data-action="planets">${icon('globe-2')}<span>Pianeti</span></button><span class="live"><span class="status-dot"></span><span id="renderer-status">UNIVERSO IN MOVIMENTO</span></span><button class="vr-button" data-action="vr">${icon('glasses')} Entra in VR</button></div>
     </header>
     <section class="intro" aria-label="Regione esplorata">
       <div class="eyebrow">UN VIAGGIO ATTRAVERSO L’INFINITO</div>
-      <h1 id="scale-title">${scales[2].title}</h1>
-      <div class="subtitle" id="scale-subtitle">${scales[2].subtitle}</div>
+      <h1 id="scale-title">${scales[0].title}</h1>
+      <div class="subtitle" id="scale-subtitle">${scales[0].subtitle}</div>
     </section>
     <aside class="left-panel" aria-label="Scala e livelli della mappa">
       <div class="section-heading">LA TUA PROSPETTIVA ${icon('layers')}</div>
       <div class="scale-list" role="group" aria-label="Seleziona la scala cosmica">
-        ${scales.map((scale, i) => `<button class="scale-button${i === 2 ? ' active' : ''}" data-scale="${i}" aria-pressed="${i === 2}"><span class="node" aria-hidden="true"></span><span>${scale.short}<small>${scale.extent}</small></span><span class="number">0${i + 1}</span></button>`).join('')}
+        ${scales.map((scale, i) => `<button class="scale-button${i === 0 ? ' active' : ''}" data-scale="${i}" aria-pressed="${i === 0}"><span class="node" aria-hidden="true"></span><span>${scale.short}<small>${scale.extent}</small></span><span class="number">0${i + 1}</span></button>`).join('')}
       </div>
       <div class="layers"><div class="section-heading">LIVELLI DELLA MAPPA</div>
         ${[['labels','Etichette','tags'],['grid','Griglia orbitale','grid-3x3'],['particles','Polvere stellare','sparkles']].map(([name,label,glyph]) => `<div class="layer-row"><span>${icon(glyph)}${label}</span><button class="toggle" role="switch" aria-label="${label}" aria-checked="${state[name]}" data-layer="${name}"></button></div>`).join('')}
@@ -60,7 +64,7 @@ $('#app').innerHTML = `
       <article class="object-card" id="object-card"></article>
       <div class="coordinates"><span>J2000 · RIFERIMENTO</span><span>MAPPA ILLUSTRATIVA</span></div>
     </aside>
-    <div class="center-caption" aria-hidden="true"><div class="galaxy-name" id="region-name">VIA LATTEA</div><div class="galaxy-type" id="region-type">GALASSIA A SPIRALE BARRATA</div></div>
+    <div class="center-caption" aria-hidden="true"><div class="galaxy-name" id="region-name">SISTEMA SOLARE</div><div class="galaxy-type" id="region-type">OTTO MONDI DA ESPLORARE</div></div>
     <div class="compass" aria-hidden="true"><small>N</small><span>✧</span></div>
     <div class="view-controls" role="group" aria-label="Controlli di visualizzazione">
       <button class="icon-button mobile-info" data-action="object" title="Informazioni sull’oggetto" aria-label="Informazioni sull’oggetto">${icon('info')}</button>
@@ -69,13 +73,13 @@ $('#app').innerHTML = `
       <div class="separator"></div>
       <button class="icon-button" data-action="reset" title="Ripristina vista · R" aria-label="Ripristina vista">${icon('rotate-ccw')}</button>
       <button class="icon-button${state.autoRotate ? ' active' : ''}" data-action="rotate" aria-pressed="${state.autoRotate}" title="Rotazione automatica · Spazio" aria-label="Rotazione automatica">${icon('orbit')}</button>
-      <button class="icon-button" data-action="cinema" title="Vista immersiva" aria-label="Vista immersiva">${icon('maximize-2')}</button>
+      <button class="immersion-button" data-action="cinema" title="Nasconde tutte le scritte · Esc per tornare" aria-label="Spazio libero, nascondi tutte le scritte" aria-pressed="false">${icon('maximize-2')}<span>Spazio libero</span></button>
     </div>
     <section class="bottom-panel" aria-label="Viaggio e scala">
-      <div class="scale-readout"><div class="readout-title">SCALA DI RIFERIMENTO</div><div class="readout-value" id="scale-readout">${scales[2].extent}</div></div>
+      <div class="scale-readout"><div class="readout-title">SCALA DI RIFERIMENTO</div><div class="readout-value" id="scale-readout">${scales[0].extent}</div></div>
       <div class="journey">
-        <div class="journey-top"><span>Ogni viaggio inizia con la curiosità.</span><small id="scale-step">03 / 05</small></div>
-        <input id="scale-slider" type="range" min="0" max="4" step="1" value="2" aria-label="Scala cosmica" aria-valuetext="Via Lattea"/>
+        <div class="journey-top"><span>Ogni viaggio inizia con la curiosità.</span><small id="scale-step">01 / 05</small></div>
+        <input id="scale-slider" type="range" min="0" max="4" step="1" value="0" aria-label="Scala cosmica" aria-valuetext="Sistema Solare"/>
         <div class="journey-labels"><span>IL NOSTRO SISTEMA</span><span>L’UNIVERSO OSSERVABILE</span></div>
       </div>
       <div class="play-area"><button class="play-button" data-action="tour" aria-label="Avvia viaggio guidato" aria-pressed="false">${icon('play')}</button><div><strong id="tour-title">Lasciati trasportare</strong><small id="tour-caption">Inizia un viaggio guidato</small></div></div>
@@ -84,7 +88,7 @@ $('#app').innerHTML = `
       <div class="footer-controls"><span>${icon('mouse-pointer-2')} Trascina per orbitare</span><span>${icon('move')} Scroll per esplorare</span><span>${icon('hand')} Mani libere, in VR</span></div>
       <div class="footer-right"><span>ISPIRATO ALLA MERAVIGLIA. RADICATO NELLA SCIENZA.</span><button data-action="sound" aria-pressed="false" aria-label="Attiva suono ambiente">${icon('volume-x')}<span id="sound-label">Suono off</span></button><button data-action="settings" title="Impostazioni" aria-label="Impostazioni">${icon('settings-2')}</button><button data-action="help" title="Guida ai comandi" aria-label="Guida ai comandi">${icon('circle-help')}</button></div>
     </footer>
-    <button class="exit-cinema" data-action="cinema">${icon('minimize-2')} Mostra interfaccia · Esc</button>
+    <button class="exit-cinema" data-action="cinema" aria-label="Mostra interfaccia">${icon('minimize-2')}</button>
     <div class="toast" role="status" aria-live="polite"></div>
     <div class="loading" role="status"><img src="/favicon.svg" alt=""/><span>TRACCIANDO LE STELLE</span></div>
   </main>
@@ -97,6 +101,7 @@ function savePreferences() {
 }
 
 function notify(message) {
+  if (state.cinematic) return;
   const toast = $('.toast');
   toast.textContent = String(message);
   toast.classList.add('visible');
@@ -104,17 +109,36 @@ function notify(message) {
   toastTimer = setTimeout(() => toast.classList.remove('visible'), 4500);
 }
 
+const isPlanet = object => object?.isPlanet || object?.bodyKind === 'exoplanet' || catalog.solar.slice(1).some(planet => planet.id === object?.id);
+const number = (value, unit = '') => Number.isFinite(value) ? `${value.toLocaleString('it-IT', { maximumFractionDigits: 2 })}${unit ? ' ' + unit : ''}` : 'Non disponibile';
+const currentScale = () => scales[state.scale] || {
+  id: 'exoplanets', name: state.context?.name || state.object?.host || 'Sistema esoplanetario',
+  source: 'https://exoplanetarchive.ipac.caltech.edu/', extent: 'Sistema esoplanetario'
+};
+
 function objectMarkup(object, isModal = false) {
-  const scale = scales[state.scale];
-  const isOverview = object.id === catalog[scale.id][0].id;
-  const canDive = Number.isInteger(object.targetScale);
-  const art = isModal ? '' : '<div class="galaxy-art" data-scene="' + scale.id + '" aria-hidden="true"></div>';
-  return `<div class="card-top"><span>${isOverview ? 'TACCUINO DI ESPLORAZIONE' : 'OGGETTO CELESTE'}</span>${icon('sparkles')}</div>${art}
-    <div class="card-content"><h2>${escape(object.name)}</h2><div class="object-type">${escape(object.type)}</div>
+  const scale = currentScale();
+  const planet = isPlanet(object);
+  const exoplanet = object.bodyKind === 'exoplanet';
+  const isOverview = object.id === catalog[scale.id]?.[0]?.id;
+  const canDive = Number.isInteger(object.targetScale) && scales[object.targetScale];
+  const art = isModal ? '' : planet
+    ? `<div class="planet-art${object.id === 'saturn' ? ' planet-art-saturn' : ''}" style="--planet-color:${escape(object.color || '#a6c7d4')};${solarTextures[object.id] ? `--planet-texture:url('/textures/${solarTextures[object.id]}')` : ''}" aria-hidden="true"><span></span></div>`
+    : `<div class="galaxy-art" data-scene="${escape(scale.id)}" aria-hidden="true"></div>`;
+  const measurements = exoplanet ? `<div class="planet-measurements">
+    <div><span>RAGGIO</span><strong>${number(object.radiusEarth, 'R⊕')}</strong></div>
+    <div><span>PERIODO ORBITALE</span><strong>${number(object.periodDays, 'giorni')}</strong></div>
+    ${isModal ? `<div><span>MASSA DA CATALOGO${object.massProvenance ? ' · ' + escape(object.massProvenance) : ''}</span><strong>${number(object.massEarth, 'M⊕')}</strong></div><div><span>TEMPERATURA DI EQUILIBRIO</span><strong>${number(object.temperatureK, 'K')}</strong></div><div><span>SEMIASSE MAGGIORE</span><strong>${number(object.semiMajorAxisAu, 'UA')}</strong></div><div><span>ANNO DI SCOPERTA</span><strong>${Number.isFinite(object.discoveryYear) ? object.discoveryYear : 'Non disponibile'}</strong></div>` : ''}
+    </div>` : '';
+  return `<div class="card-top"><span>${planet ? 'UN MONDO DA ESPLORARE' : isOverview ? 'TACCUINO DI ESPLORAZIONE' : 'OGGETTO CELESTE'}</span>${icon(planet ? 'globe-2' : 'sparkles')}</div>${art}
+    <div class="card-content${planet ? ' planet-card-content' : ''}"><h2>${escape(object.name)}</h2><div class="object-type">${escape(object.type)}${exoplanet ? ' · ' + escape(object.host) : ''}</div>
       <p class="card-description">${escape(object.detail)}</p>
-      <div class="card-stats"><span>${isOverview ? escape(scale.metric) : 'DISTANZA / ESTENSIONE'}</span><strong>${escape(isOverview ? scale.count : object.distance)}</strong></div>
+      <div class="card-stats"><span>${isOverview ? escape(scale.metric) : exoplanet ? 'DISTANZA DALLA TERRA' : 'DISTANZA / ESTENSIONE'}</span><strong>${escape(isOverview ? scale.count : object.distance || 'Non disponibile')}</strong></div>
       ${isOverview ? `<div class="card-stats"><span>ESTENSIONE</span><strong>${escape(scale.extent)}</strong></div>` : ''}
-      <button class="focus-button" data-action="focus">${icon(canDive ? 'arrow-right' : 'focus')}${canDive ? 'Esplora ' + escape(scales[object.targetScale].name) : 'Metti a fuoco'}</button>
+      ${measurements}
+      ${exoplanet ? '<p class="illustration-note">Aspetto illustrativo. Misure e stime dal catalogo NASA.</p>' : ''}
+      ${planet && !isModal ? `<button class="planet-details-button" data-action="object">Dati del pianeta ${icon('arrow-up-right')}</button>` : ''}
+      <button class="focus-button" data-action="focus">${icon(canDive ? 'arrow-right' : 'focus')}${planet ? 'Avvicinati al pianeta' : canDive ? 'Esplora ' + escape(scales[object.targetScale].name) : 'Metti a fuoco'}</button>
       <a class="object-source" href="${escape(object.source || scale.source)}" target="_blank" rel="noopener noreferrer">Fonte scientifica ↗</a>
     </div>`;
 }
@@ -123,32 +147,34 @@ function renderObject(object) {
   if (!object || !object.name) return;
   state.object = object;
   $('#object-card').innerHTML = objectMarkup(object);
-  $('.coordinates').innerHTML = '<span>' + (['stars','local'].includes(scales[state.scale].id) ? 'J2000 · APPROSSIMATA' : 'VISTA SCHEMATICA') + '</span><span>ATLANTE COSMICO</span>';
+  $('.coordinates').innerHTML = '<span>' + (['stars','local'].includes(currentScale().id) ? 'J2000 · APPROSSIMATA' : 'VISTA SCHEMATICA') + '</span><span>ATLANTE COSMICO</span>';
   if ($('#modal').open && $('#modal').dataset.kind === 'object') $('#modal-body').innerHTML = objectMarkup(object, true);
   refreshIcons();
 }
 
-function updateScale(index) {
+function updateScale(index, context = null) {
   index = Number(index);
-  if (!Number.isInteger(index) || !scales[index]) return;
+  if (!Number.isInteger(index) || (index !== 5 && !scales[index])) return;
   state.scale = index;
-  const scale = scales[index];
-  $('#scale-title').textContent = scale.title;
-  $('#scale-subtitle').textContent = scale.subtitle;
+  state.context = index === 5 ? context || state.context : null;
+  const scale = currentScale();
+  const hostView = index === 5;
+  $('#scale-title').textContent = hostView ? `Intorno a ${scale.name}.` : scale.title;
+  $('#scale-subtitle').textContent = hostView ? 'Un altro sole. Nuovi mondi da avvicinare.' : scale.subtitle;
   $('#scale-readout').textContent = scale.extent;
-  $('#scale-step').textContent = `0${index + 1} / 05`;
+  $('#scale-step').textContent = hostView ? 'ESOPIANETI' : `0${index + 1} / 05`;
   $('#region-name').textContent = scale.name.toLocaleUpperCase('it-IT');
-  $('#region-type').textContent = index === 4 ? 'RICOSTRUZIONE CONCETTUALE' : catalog[scale.id][0].type.toLocaleUpperCase('it-IT');
+  $('#region-type').textContent = hostView ? 'SISTEMA ESOPLANETARIO · ORBITE ILLUSTRATIVE' : index === 4 ? 'RICOSTRUZIONE CONCETTUALE' : catalog[scale.id][0].type.toLocaleUpperCase('it-IT');
   const slider = $('#scale-slider');
-  slider.value = index;
-  slider.setAttribute('aria-valuetext', scale.name);
-  slider.style.background = `linear-gradient(90deg,#ac8c5d ${index * 25}%,#37434a ${index * 25}%)`;
+  slider.value = hostView ? 0 : index;
+  slider.setAttribute('aria-valuetext', hostView ? `${scale.name}. Muovi per tornare alle scale cosmiche.` : scale.name);
+  slider.style.background = `linear-gradient(90deg,#ac8c5d ${hostView ? 0 : index * 25}%,#37434a ${hostView ? 0 : index * 25}%)`;
   document.querySelectorAll('[data-scale]').forEach(button => {
     const selected = Number(button.dataset.scale) === index;
     button.classList.toggle('active', selected);
     button.setAttribute('aria-pressed', selected);
   });
-  renderObject(catalog[scale.id][0]);
+  if (!hostView) renderObject(catalog[scale.id][0]);
 }
 
 function changeScale(index, manual = true) {
@@ -162,11 +188,17 @@ function changeScale(index, manual = true) {
 
 function pickObject(index, object) {
   stopTour();
+  closeModal();
+  if (object.bodyKind === 'exoplanet') {
+    if (universe) universe.focusObject(object);
+    else updateScale(5, { name: object.host });
+    renderObject(object);
+    return;
+  }
   if (index !== state.scale) changeScale(index);
   renderObject(object);
   universe?.selectObject(object);
   universe?.focusObject(object);
-  closeModal();
 }
 
 function setLayer(name, enabled) {
@@ -187,13 +219,41 @@ function setRotation(enabled) {
   savePreferences();
 }
 
+function revealImmersionControl() {
+  if (!state.cinematic) return;
+  $('.exit-cinema').classList.add('revealed');
+  clearTimeout(immersionRevealTimer);
+  immersionRevealTimer = setTimeout(() => $('.exit-cinema').classList.remove('revealed'), 2200);
+}
+
 function setCinematic(enabled) {
+  clearTimeout(immersionTimer);
+  immersionTimer = null;
+  if (enabled === state.cinematic) return;
   state.cinematic = enabled;
+  closeModal();
+  $('.toast').classList.remove('visible');
+  $('.toast').textContent = '';
   $('.app-shell').classList.toggle('cinematic', enabled);
-  const selectors = '.topbar,.left-panel,.right-panel,.bottom-panel,.footer,.view-controls';
+  const selectors = '.topbar,.intro,.left-panel,.right-panel,.bottom-panel,.footer,.view-controls,.compass,.center-caption,.labels,.toast,.webgl-error';
   document.querySelectorAll(selectors).forEach(element => { element.inert = enabled; });
-  if (enabled) $('.exit-cinema').focus();
-  else $('[data-action="cinema"]').focus();
+  universe?.setImmersive(enabled);
+  document.querySelectorAll('[data-action="cinema"]').forEach(button => button.setAttribute('aria-pressed', enabled));
+  if (enabled) {
+    $('#universe').focus();
+    revealImmersionControl();
+  } else {
+    clearTimeout(immersionRevealTimer);
+    $('.exit-cinema').classList.remove('revealed');
+    $('.immersion-button').focus();
+  }
+}
+
+function toggleCinematic() {
+  if (state.cinematic) return setCinematic(false);
+  if (immersionTimer) { clearTimeout(immersionTimer); immersionTimer = null; $('.toast').classList.remove('visible'); return; }
+  notify('Spazio libero: tutte le scritte scompaiono. Esc o l’icona in alto a destra per tornare.');
+  immersionTimer = setTimeout(() => setCinematic(true), reducedMotion ? 1200 : 1800);
 }
 
 function renderTour() {
@@ -282,6 +342,9 @@ async function toggleSound() {
 }
 
 function openModal(kind, title, content) {
+  if (state.cinematic) setCinematic(false);
+  clearTimeout(immersionTimer);
+  immersionTimer = null;
   const modal = $('#modal');
   stopTour();
   if (!modal.open) returnFocus = document.activeElement;
@@ -296,20 +359,79 @@ function closeModal() {
   if ($('#modal').open) $('#modal').close();
 }
 
-const searchEntries = scales.flatMap((scale, index) => catalog[scale.id].map(object => ({ index, object, scale })));
-function normalized(value) { return value.toLocaleLowerCase('it-IT').normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+function normalized(value) { return String(value).toLocaleLowerCase('it-IT').normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+const solarPlanets = catalog.solar.filter(isPlanet);
+const solarTextures = { mercury:'2k_mercury.jpg', venus:'2k_venus_atmosphere.jpg', earth:'2k_earth_daymap.jpg', mars:'2k_mars.jpg', jupiter:'2k_jupiter.jpg', saturn:'2k_saturn.jpg', uranus:'2k_uranus.jpg', neptune:'2k_neptune.jpg' };
+const searchEntries = [
+  ...scales.flatMap((scale, index) => catalog[scale.id].map(object => ({ index, object, scaleName: scale.name }))),
+  ...exoplanets.map(object => ({ index: 5, object, scaleName: object.host }))
+].map(entry => ({ ...entry, searchText: normalized(`${entry.object.name} ${entry.object.type} ${entry.scaleName} ${entry.object.host || ''}`) }));
+const planetEntries = [
+  ...solarPlanets.map(object => ({ index: 0, object, category: 'solar' })),
+  ...exoplanets.map(object => ({ index: 5, object, category: 'exoplanet' }))
+].map(entry => ({ ...entry, searchText: normalized(`${entry.object.name} ${entry.object.host || 'Sistema Solare Sole'} ${entry.object.type}`) }));
+const catalogDate = (() => {
+  const date = new Date(planetCatalogMetadata.retrievedAt);
+  return Number.isFinite(date.getTime()) ? date.toLocaleDateString('it-IT', { timeZone:'Europe/Rome', day:'numeric', month:'long', year:'numeric' }) : 'data non disponibile';
+})();
+const planetColor = object => escape(object.color || '#a8c7d8');
+
 function renderSearch(query = '') {
   const needle = normalized(query.trim());
-  const entries = searchEntries.filter(({ object, scale }) => normalized(`${object.name} ${object.type} ${scale.name}`).includes(needle)).slice(0, 24);
-  $('#search-results').innerHTML = entries.length ? entries.map(({ object, index, scale }) => `<button class="search-result" data-object="${escape(object.id)}" data-object-scale="${index}"><span><strong>${escape(object.name)}</strong><small>${escape(scale.name)} · ${escape(object.type)}</small></span>${icon('arrow-up-right')}</button>`).join('') : '<p role="status">Nessun oggetto trovato. Prova “Terra”, “Sirio” o “Andromeda”.</p>';
+  const matches = searchEntries.filter(entry => entry.searchText.includes(needle));
+  const entries = matches.slice(0, 80);
+  $('#search-results').innerHTML = entries.length ? entries.map(({ object, index, scaleName }) => `<button class="search-result" data-object="${escape(object.id)}" data-object-scale="${index}"><span><strong>${escape(object.name)}</strong><small>${escape(scaleName)} · ${escape(object.type)}</small></span>${icon('arrow-up-right')}</button>`).join('') : '<p>Nessun oggetto trovato. Prova “Terra”, “TRAPPIST-1” o “Andromeda”.</p>';
+  $('#search-count').textContent = matches.length > 80 ? `${matches.length.toLocaleString('it-IT')} oggetti trovati · primi 80 risultati. Affina la ricerca per vedere gli altri.` : `${matches.length.toLocaleString('it-IT')} oggetti trovati`;
   refreshIcons();
 }
 
 function openSearch() {
-  openModal('search', 'Cerca nell’universo', '<label for="search-input" class="readout-title">STELLE, PIANETI E GALASSIE</label><input id="search-input" class="search-input" type="search" placeholder="Dove vuoi andare?" autocomplete="off" spellcheck="false" aria-controls="search-results"/><div id="search-results" class="search-results"></div>');
+  openModal('search', 'Cerca nell’universo', '<label for="search-input" class="readout-title">STELLE, PIANETI E GALASSIE</label><input id="search-input" class="search-input" type="search" placeholder="Dove vuoi andare?" autocomplete="off" spellcheck="false" aria-controls="search-results"/><div id="search-count" class="result-count" role="status"></div><div id="search-results" class="search-results"></div>');
   renderSearch();
   $('#search-input').addEventListener('input', event => renderSearch(event.target.value));
   $('#search-input').focus();
+}
+
+function planetPreview(object, className = 'planet-preview') {
+  const texture = solarTextures[object.id];
+  return `<span class="${className}${object.id === 'saturn' ? ' saturn-preview' : ''}" style="--planet-color:${planetColor(object)};${texture ? `--planet-texture:url('/textures/${texture}')` : ''}" aria-hidden="true"></span>`;
+}
+
+function renderPlanets() {
+  const needle = normalized(planetBrowser.query.trim());
+  const matches = planetEntries.filter(entry => (planetBrowser.filter === 'all' || entry.category === planetBrowser.filter) && entry.searchText.includes(needle));
+  const pageSize = 24;
+  const pageCount = Math.max(1, Math.ceil(matches.length / pageSize));
+  planetBrowser.page = Math.min(Math.max(0, planetBrowser.page), pageCount - 1);
+  const start = planetBrowser.page * pageSize;
+  const entries = matches.slice(start, start + pageSize);
+  $('#planet-results').innerHTML = entries.length ? entries.map(({ object, index }) => `<button class="planet-result" data-object="${escape(object.id)}" data-object-scale="${index}">
+    ${planetPreview(object)}<span class="planet-result-copy"><strong>${escape(object.name)}</strong><small>${escape(object.host || 'Sistema Solare')}</small><span>${escape(object.type)}</span></span>${icon('arrow-up-right')}</button>`).join('') : '<p class="planet-empty">Nessun pianeta trovato. Cerca il nome di un pianeta o della sua stella.</p>';
+  $('#planet-count').textContent = matches.length ? `${matches.length.toLocaleString('it-IT')} pianeti · ${start + 1}–${Math.min(start + pageSize, matches.length)}` : '0 pianeti';
+  $('#planet-page').textContent = `Pagina ${planetBrowser.page + 1} di ${pageCount}`;
+  $('[data-catalog-page="previous"]').disabled = planetBrowser.page === 0;
+  $('[data-catalog-page="next"]').disabled = planetBrowser.page >= pageCount - 1;
+  document.querySelectorAll('[data-catalog-filter]').forEach(button => {
+    const active = button.dataset.catalogFilter === planetBrowser.filter;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', active);
+  });
+  refreshIcons();
+}
+
+function openPlanets() {
+  openModal('planets', 'Mondi da esplorare', `
+    <p class="catalog-introduction"><strong>8 pianeti del Sistema Solare + ${exoplanets.length.toLocaleString('it-IT')} esopianeti confermati.</strong> Scegli un mondo per avvicinarti.</p>
+    <div class="solar-shortcuts" role="group" aria-label="Gli otto pianeti del Sistema Solare">${solarPlanets.map(object => `<button data-object="${escape(object.id)}" data-object-scale="0">${planetPreview(object)}<span>${escape(object.name)}</span></button>`).join('')}</div>
+    <label for="planet-search" class="readout-title">CERCA UN PIANETA O LA SUA STELLA</label>
+    <input id="planet-search" class="search-input" type="search" placeholder="Terra, TRAPPIST-1, Kepler…" autocomplete="off" spellcheck="false" value="${escape(planetBrowser.query)}" aria-controls="planet-results"/>
+    <div class="catalog-filter" role="group" aria-label="Tipo di pianeta"><button data-catalog-filter="all">Tutti</button><button data-catalog-filter="solar">Sistema Solare</button><button data-catalog-filter="exoplanet">Esopianeti</button></div>
+    <div id="planet-count" class="result-count" role="status"></div>
+    <div id="planet-results" class="planet-results"></div>
+    <div class="catalog-pagination"><button data-catalog-page="previous" aria-label="Pagina precedente">← Precedenti</button><span id="planet-page"></span><button data-catalog-page="next" aria-label="Pagina successiva">Successivi →</button></div>
+    <p class="catalog-provenance"><a href="https://exoplanetarchive.ipac.caltech.edu/" target="_blank" rel="noopener noreferrer">NASA Exoplanet Archive</a> · Catalogo del ${escape(catalogDate)}. Tutti gli esopianeti confermati nella tabella PSCompPars alla data di acquisizione. I candidati non confermati non sono inclusi. Gli esopianeti hanno un aspetto illustrativo.</p>`);
+  renderPlanets();
+  $('#planet-search').addEventListener('input', event => { planetBrowser.query = event.target.value; planetBrowser.page = 0; renderPlanets(); });
 }
 
 function openCollections() {
@@ -326,7 +448,7 @@ function openAbout() {
   openModal('about', 'Un atlante per la meraviglia', `
     <p>Æther trasforma l’esplorazione del cosmo in un gesto. Una mappa luminosa, ispirata agli strumenti degli antichi navigatori e ai mondi della fantascienza.</p>
     <h3>IL CIELO REALE, UNA MAPPA INTERPRETATA</h3>
-    <p>Gli oggetti selezionabili sono reali; il catalogo è una selezione, non una rappresentazione completa di tutto l’universo conosciuto. Distanze e proprietà sono approssimate.</p>
+    <p>Gli oggetti selezionabili sono reali. Il catalogo planetario include gli otto pianeti del Sistema Solare e tutti i ${exoplanets.length.toLocaleString('it-IT')} esopianeti confermati nella tabella PSCompPars del NASA Exoplanet Archive, acquisita il ${escape(catalogDate)}. Gli altri oggetti sono una selezione dell’universo conosciuto.</p><p>I sistemi esoplanetari mostrano orbite schematiche; gli aspetti dei pianeti sono illustrativi. Misure e stime provengono dall’archivio; i dati mancanti restano indicati come non disponibili.</p><p>Texture planetarie: <a href="https://www.solarsystemscope.com/textures/" target="_blank" rel="noopener noreferrer">Solar System Scope</a>, licenza <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>. Basate su immagini NASA con integrazioni artistiche.</p>
     <p>Le distanze orbitali sono compresse e le dimensioni planetarie amplificate. Le stelle vicine usano coordinate equatoriali J2000 approssimate. La Via Lattea è una ricostruzione illustrativa; nel Gruppo Locale le dimensioni galattiche sono amplificate.</p>
     <p>La rete cosmica e le particelle decorative sono generate proceduralmente. Le posizioni dei suoi ammassi sono schematiche: non sono un catalogo osservativo. La navigazione collega cinque rappresentazioni con scale differenti.</p>
     <h3>STELLE DA CATALOGO</h3>
@@ -340,7 +462,7 @@ function openAbout() {
 
 function openHelp() {
   openModal('help', 'Impara a navigare', `
-    <div class="help-keys"><div><strong>Trascina</strong>Orbita intorno alla mappa</div><div><strong>Rotellina / due dita</strong>Avvicina e allontana</div><div><strong>Clic / tocco</strong>Seleziona un oggetto</div><div><strong>1 — 5</strong>Cambia scala cosmica</div><div><strong>/</strong>Cerca stelle e pianeti</div><div><strong>Spazio</strong>Ferma o riprendi la rotazione</div><div><strong>R</strong>Ripristina l’inquadratura</div><div><strong>Esc</strong>Chiudi finestre e vista immersiva</div></div>
+    <div class="help-keys"><div><strong>Trascina</strong>Orbita intorno alla mappa</div><div><strong>Rotellina / due dita</strong>Avvicina e allontana</div><div><strong>Clic / tocco su un pianeta</strong>Vola vicino alla sua superficie</div><div><strong>Pianeti</strong>Sfoglia tutti gli otto pianeti e gli esopianeti confermati</div><div><strong>Spazio libero</strong>Nasconde tutte le scritte. Esc o l’icona in alto a destra per tornare</div><div><strong>1 — 5</strong>Cambia scala cosmica</div><div><strong>/</strong>Cerca stelle e pianeti</div><div><strong>Spazio</strong>Ferma o riprendi la rotazione</div><div><strong>R</strong>Ripristina l’inquadratura</div><div><strong>Esc</strong>Chiudi finestre e vista immersiva</div></div>
     <h3>NELLA REALTÀ VIRTUALE</h3><p>Con un visore WebXR compatibile puoi osservare la mappa davanti a te. Il tracciamento delle mani richiede un visore e un browser che lo supportino. Anche i controller sono utilizzabili.</p><button class="focus-button" data-action="vr">${icon('glasses')}Scopri i comandi VR</button>`);
 }
 
@@ -357,7 +479,7 @@ function vrContent() {
   const supported = xrSupported && universe;
   const status = !window.isSecureContext ? 'Per attivare WebXR apri questa pagina via HTTPS o su localhost.' : !navigator.xr ? 'Questo browser non espone WebXR. Apri l’atlante nel browser di un visore compatibile.' : !xrChecked ? 'Verifica della compatibilità del visore in corso…' : !xrSupported ? 'Nessun visore VR disponibile in questo browser. Apri l’atlante dal visore oppure collega un dispositivo compatibile.' : !universe ? 'La realtà virtuale richiede una sessione grafica WebGL funzionante.' : 'Visore disponibile. Sei pronto a entrare.';
   return `<p>Il cosmo diventa un ologramma davanti a te. Muoviti intorno alla mappa, avvicinati e segui le sue stelle.</p>
-    <div class="help-keys"><div><strong>Pizzico breve</strong>Seleziona un oggetto sulla mappa</div><div><strong>Pizzico mantenuto</strong>Sposta e ruota; con due mani cambia anche dimensione</div><div><strong>Controller · grilletto</strong>Seleziona un oggetto puntandolo</div><div><strong>Pannello nell’ologramma</strong>Cambia scala, ripristina la vista o esci</div></div>
+    <div class="help-keys"><div><strong>Pizzico breve</strong>Seleziona un oggetto sulla mappa</div><div><strong>Pizzico mantenuto</strong>Sposta e ruota; con due mani cambia anche dimensione</div><div><strong>Controller · grilletto</strong>Seleziona un oggetto puntandolo</div><div><strong>Pannello nell’ologramma</strong>Cambia scala, ripristina la vista o esci</div><div><strong>LIBERA</strong>Nasconde scritte e pannelli; tocca la piccola sfera luminosa per ripristinarli</div></div>
     <p>Attiva il tracciamento delle mani nelle impostazioni del visore. La disponibilità dipende dal dispositivo e dal browser. Con i controller, usa il tasto di presa per afferrare la mappa. Puoi uscire anche dal menu di sistema del visore.</p>
     <p id="xr-status" role="status">${status}</p><button class="focus-button" data-action="start-vr" ${supported ? '' : 'disabled'}>${icon('glasses')}Entra nell’atlante VR</button>`;
 }
@@ -390,7 +512,7 @@ async function startVR(button) {
 document.addEventListener('click', async event => {
   const button = event.target.closest('button, a.brand');
   if (!button || button.disabled) return;
-  if (button.matches('a.brand')) { event.preventDefault(); closeModal(); changeScale(2); universe?.resetView(); return; }
+  if (button.matches('a.brand')) { event.preventDefault(); closeModal(); changeScale(0); universe?.resetView(); return; }
   if (button.dataset.scale !== undefined) return changeScale(button.dataset.scale);
   if (button.dataset.layer) return setLayer(button.dataset.layer, !state[button.dataset.layer]);
   if (button.dataset.quality) {
@@ -404,15 +526,28 @@ document.addEventListener('click', async event => {
     savePreferences();
     return;
   }
+  if (button.dataset.catalogFilter) {
+    planetBrowser.filter = button.dataset.catalogFilter;
+    planetBrowser.page = 0;
+    renderPlanets();
+    return;
+  }
+  if (button.dataset.catalogPage) {
+    planetBrowser.page += button.dataset.catalogPage === 'next' ? 1 : -1;
+    renderPlanets();
+    $('#planet-results').scrollTop = 0;
+    return;
+  }
   if (button.dataset.object) {
     const index = Number(button.dataset.objectScale);
-    const object = catalog[scales[index].id].find(item => item.id === button.dataset.object);
+    const object = index === 5 ? findPlanet(button.dataset.object) : catalog[scales[index]?.id]?.find(item => item.id === button.dataset.object);
     if (object) pickObject(index, object);
     return;
   }
   switch (button.dataset.action) {
     case 'explore': closeModal(); $('#universe').focus(); break;
     case 'collections': openCollections(); break;
+    case 'planets': openPlanets(); break;
     case 'about': openAbout(); break;
     case 'search': openSearch(); break;
     case 'help': openHelp(); break;
@@ -425,7 +560,7 @@ document.addEventListener('click', async event => {
     case 'reset': universe?.resetView(); notify('La rotta è di nuovo al centro.'); break;
     case 'rotate': setRotation(!state.autoRotate); break;
     case 'settings-rotate': setRotation(!state.autoRotate); button.setAttribute('aria-checked', state.autoRotate); break;
-    case 'cinema': setCinematic(!state.cinematic); break;
+    case 'cinema': toggleCinematic(); break;
     case 'sound': await toggleSound(); break;
     case 'tour': toggleTour(); break;
     case 'object': openModal('object', 'Nel tuo campo visivo', objectMarkup(state.object, true)); break;
@@ -450,6 +585,7 @@ document.addEventListener('keydown', event => {
   if (event.key === 'Escape') {
     if ($('#modal').open) return;
     if (state.cinematic) setCinematic(false);
+    if (immersionTimer) { clearTimeout(immersionTimer); immersionTimer = null; $('.toast').classList.remove('visible'); }
     stopTour();
     return;
   }
@@ -459,6 +595,8 @@ document.addEventListener('keydown', event => {
   else if (event.key.toLowerCase() === 'r') { universe?.resetView(); }
   else if (event.code === 'Space' && !event.target.closest('button, a')) { event.preventDefault(); setRotation(!state.autoRotate); }
 });
+document.addEventListener('pointermove', revealImmersionControl, { passive: true });
+document.addEventListener('pointerdown', revealImmersionControl, { passive: true });
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { stopTour(); audioContext?.suspend().catch(() => {}); }
   else if (state.sound) audioContext?.resume().catch(() => {});
@@ -475,7 +613,8 @@ try {
     labelContainer: $('#map-labels'),
     onSelect: renderObject,
     onScale: updateScale,
-    onMessage: notify
+    onMessage: notify,
+    onImmersiveChange: setCinematic
   });
   ['labels','grid','particles'].forEach(name => universe.setLayer(name, state[name]));
   universe.setAutoRotate(state.autoRotate);
@@ -495,8 +634,3 @@ requestAnimationFrame(() => requestAnimationFrame(() => {
   setTimeout(() => $('.loading')?.remove(), 650);
 }));
 checkVR();
-
-
-
-
-
