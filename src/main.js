@@ -1,6 +1,6 @@
 import { getLanguage, setLanguage, t, locale } from './i18n.js';
 import './style.css';
-import { createIcons, Orbit, Search, Glasses, Maximize2, Minimize2, Plus, Minus, RotateCcw, Move, MousePointer2, Hand, Play, Pause, Volume2, VolumeX, Settings2, CircleHelp, X, ArrowUpRight, ArrowRight, Focus, Sparkles, Grid3X3, Tags, Compass, Layers, Info, Globe2, Star, Telescope, Check, ExternalLink } from 'lucide';
+import { createIcons, Orbit, Search, Glasses, Maximize2, Minimize2, Plus, Minus, RotateCcw, Move, MousePointer2, Hand, Play, Pause, Volume2, VolumeX, Settings2, CircleHelp, X, ArrowUpRight, ArrowRight, Focus, Sparkles, Grid3X3, Tags, Layers, Info, Globe2, Star, Telescope, Check, ExternalLink } from 'lucide';
 import { catalog, scales } from './data.js';
 import { Universe } from './universe.js';
 import { exoplanets, planetCatalogMetadata, findPlanet } from './planets.js';
@@ -11,7 +11,7 @@ document.documentElement.lang = getLanguage();
 document.title = t('\u00c6THER \u2014 Scientific cosmic atlas', '\u00c6THER \u2014 Atlante cosmico scientifico');
 document.querySelector('meta[name="description"]').content = t('Interactive astronomical catalogues: planets, stars, galaxies, 3D constellations and Earth sky views with WebXR.', 'Cataloghi astronomici interattivi: pianeti, stelle, galassie, costellazioni 3D e cielo terrestre con WebXR.');
 
-const icons = { Orbit, Search, Glasses, Maximize2, Minimize2, Plus, Minus, RotateCcw, Move, MousePointer2, Hand, Play, Pause, Volume2, VolumeX, Settings2, CircleHelp, X, ArrowUpRight, ArrowRight, Focus, Sparkles, Grid3X3, Tags, Compass, Layers, Info, Globe2, Star, Telescope, Check, ExternalLink };
+const icons = { Orbit, Search, Glasses, Maximize2, Minimize2, Plus, Minus, RotateCcw, Move, MousePointer2, Hand, Play, Pause, Volume2, VolumeX, Settings2, CircleHelp, X, ArrowUpRight, ArrowRight, Focus, Sparkles, Grid3X3, Tags, Layers, Info, Globe2, Star, Telescope, Check, ExternalLink };
 const icon = name => `<i data-lucide="${name}" aria-hidden="true"></i>`;
 const escape = value => String(value).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 const $ = selector => document.querySelector(selector);
@@ -92,7 +92,6 @@ $('#app').innerHTML = `
       <div class="coordinates"><span>${t("J2000 · REFERENCE","J2000 · RIFERIMENTO")}</span><span>${t("ILLUSTRATIVE MAP","MAPPA ILLUSTRATIVA")}</span></div>
     </aside>
     <div class="center-caption" aria-hidden="true"><div class="galaxy-name" id="region-name">${t("SOLAR SYSTEM","SISTEMA SOLARE")}</div><div class="galaxy-type" id="region-type">${t("SUN AND EIGHT PLANETS","SOLE E OTTO PIANETI")}</div></div>
-    <div class="compass" aria-hidden="true"><small>N</small><span>✧</span></div>
     <div class="view-controls" role="group" aria-label="${t("View controls","Controlli di visualizzazione")}">
       <button class="icon-button mobile-info" data-action="object" title="${t("Object information","Informazioni sull’oggetto")}" aria-label="${t("Object information","Informazioni sull’oggetto")}">${icon('info')}</button>
       <button class="icon-button" data-action="zoom-in" title="${t("Zoom in","Avvicina")}" aria-label="${t("Zoom in","Avvicina")}">${icon('plus')}</button>
@@ -154,9 +153,6 @@ function objectMarkup(object, isModal = false) {
   const isOverview = object.id === catalog[scale.id]?.[0]?.id || object.id === state.context?.overview?.id;
   const catalogStar = state.scale >= 6 && Number.isFinite(object.raDeg) && Number.isFinite(object.decDeg);
   const canDive = Number.isInteger(object.targetScale) && scales[object.targetScale];
-  const art = isModal || scale.id === 'constellations' ? '' : planet
-    ? `<div class="planet-art${object.id === 'saturn' ? ' planet-art-saturn' : ''}" style="--planet-color:${escape(object.color || '#a6c7d4')};${solarTextures[object.id] ? `--planet-texture:url('/textures/${solarTextures[object.id]}')` : ''}" aria-hidden="true"><span></span></div>`
-    : `<div class="galaxy-art" data-scene="${escape(scale.id)}" aria-hidden="true"></div>`;
   const measurements = exoplanet ? `<div class="planet-measurements">
     <div><span>${t("RADIUS","RAGGIO")}</span><strong>${number(object.radiusEarth, 'R⊕')}</strong></div>
     <div><span>${t("ORBITAL PERIOD","PERIODO ORBITALE")}</span><strong>${number(object.periodDays, t("days","giorni"))}</strong></div>
@@ -166,7 +162,7 @@ function objectMarkup(object, isModal = false) {
       <div><span>${t("DECLINATION · J2000","DECLINAZIONE · J2000")}</span><strong>${number(object.decDeg, '°')}</strong></div>
       ${isModal ? `<div><span>${t("APPARENT MAGNITUDE","MAGNITUDINE APPARENTE")}</span><strong>${number(object.mag)}</strong></div><div><span>${t("HIPPARCOS IDENTIFIER","IDENTIFICATORE HIPPARCOS")}</span><strong>${object.hip ? 'HIP ' + escape(object.hip) : t("Not available","Non disponibile")}</strong></div>${state.scale === 7 ? `<div><span>${t("ALTITUDE ABOVE HORIZON","ALTEZZA SULL'ORIZZONTE")}</span><strong>${number(object.altitudeDeg, '°')}</strong></div>` : ''}` : ''}
     </div>` : '';
-  return `<div class="card-top"><span>${planet ? t("PLANET DATA","DATI DEL PIANETA") : isOverview ? t("CATALOGUE OVERVIEW","PANORAMICA DEL CATALOGO") : t("CELESTIAL OBJECT","OGGETTO CELESTE")}</span>${icon(planet ? 'globe-2' : 'sparkles')}</div>${art}
+  return `<div class="card-top"><span>${planet ? t("PLANET DATA","DATI DEL PIANETA") : isOverview ? t("CATALOGUE OVERVIEW","PANORAMICA DEL CATALOGO") : t("CELESTIAL OBJECT","OGGETTO CELESTE")}</span>${icon(planet ? 'globe-2' : 'sparkles')}</div>
     <div class="card-content${planet ? ' planet-card-content' : ''}"><h2>${escape(object.name)}</h2><div class="object-type">${escape(object.type || t("Catalogue star","Stella da catalogo"))}${exoplanet ? ' · ' + escape(object.host) : ''}</div>
       <p class="card-description">${escape(object.detail || state.context?.description || '')}</p>
       <div class="card-stats"><span>${isOverview ? escape(scale.metric) : exoplanet ? t("DISTANCE FROM EARTH","DISTANZA DALLA TERRA") : t("DISTANCE / EXTENT","DISTANZA / ESTENSIONE")}</span><strong>${escape(isOverview ? scale.count : object.distance || t("Not available","Non disponibile"))}</strong></div>
@@ -315,7 +311,7 @@ function setCinematic(enabled) {
   $('.toast').classList.remove('visible');
   $('.toast').textContent = '';
   $('.app-shell').classList.toggle('cinematic', enabled);
-  const selectors = '.topbar,.intro,.left-panel,.right-panel,.bottom-panel,.footer,.view-controls,.compass,.center-caption,.labels,.toast,.webgl-error';
+  const selectors = '.topbar,.intro,.left-panel,.right-panel,.bottom-panel,.footer,.view-controls,.center-caption,.labels,.toast,.webgl-error';
   document.querySelectorAll(selectors).forEach(element => { element.inert = enabled; });
   universe?.setImmersive(enabled);
   document.querySelectorAll('[data-action="cinema"]').forEach(button => button.setAttribute('aria-pressed', enabled));
@@ -441,7 +437,6 @@ function closeModal() {
 
 function normalized(value) { return String(value).toLocaleLowerCase(locale()).normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
 const solarPlanets = catalog.solar.filter(isPlanet);
-const solarTextures = { mercury:'2k_mercury.jpg', venus:'2k_venus_atmosphere.jpg', earth:'2k_earth_daymap.jpg', mars:'2k_mars.jpg', jupiter:'2k_jupiter.jpg', saturn:'2k_saturn.jpg', uranus:'2k_uranus.jpg', neptune:'2k_neptune.jpg' };
 const searchEntries = [
   ...scales.flatMap((scale, index) => catalog[scale.id].map(object => ({ index, object, scaleName: scale.name }))),
   ...exoplanets.map(object => ({ index: 5, object, scaleName: object.host }))
@@ -454,7 +449,6 @@ const catalogDate = (() => {
   const date = new Date(planetCatalogMetadata.retrievedAt);
   return Number.isFinite(date.getTime()) ? date.toLocaleDateString(locale(), { timeZone:'Europe/Rome', day:'numeric', month:'long', year:'numeric' }) : t("date unavailable","data non disponibile");
 })();
-const planetColor = object => escape(object.color || '#a8c7d8');
 
 function renderSearch(query = '') {
   const needle = normalized(query.trim());
@@ -472,11 +466,6 @@ function openSearch() {
   $('#search-input').focus();
 }
 
-function planetPreview(object, className = 'planet-preview') {
-  const texture = solarTextures[object.id];
-  return `<span class="${className}${object.id === 'saturn' ? ' saturn-preview' : ''}" style="--planet-color:${planetColor(object)};${texture ? `--planet-texture:url('/textures/${texture}')` : ''}" aria-hidden="true"></span>`;
-}
-
 function renderPlanets() {
   const needle = normalized(planetBrowser.query.trim());
   const matches = planetEntries.filter(entry => (planetBrowser.filter === 'all' || entry.category === planetBrowser.filter) && entry.searchText.includes(needle));
@@ -486,7 +475,7 @@ function renderPlanets() {
   const start = planetBrowser.page * pageSize;
   const entries = matches.slice(start, start + pageSize);
   $('#planet-results').innerHTML = entries.length ? entries.map(({ object, index }) => `<button class="planet-result" data-object="${escape(object.id)}" data-object-scale="${index}">
-    ${planetPreview(object)}<span class="planet-result-copy"><strong>${escape(object.name)}</strong><small>${escape(object.host || t("Solar System","Sistema Solare"))}</small><span>${escape(object.type)}</span></span>${icon('arrow-up-right')}</button>`).join('') : `<p class="planet-empty">${t("No planets found. Search for a planet or its host star.","Nessun pianeta trovato. Cerca il nome di un pianeta o della sua stella.")}</p>`;
+    <span class="planet-result-copy"><strong>${escape(object.name)}</strong><small>${escape(object.host || t("Solar System","Sistema Solare"))}</small><span>${escape(object.type)}</span></span>${icon('arrow-up-right')}</button>`).join('') : `<p class="planet-empty">${t("No planets found. Search for a planet or its host star.","Nessun pianeta trovato. Cerca il nome di un pianeta o della sua stella.")}</p>`;
   $('#planet-count').textContent = matches.length ? `${matches.length.toLocaleString(locale())}${t(matches.length === 1 ? " planet · " : " planets · ", matches.length === 1 ? " pianeta · " : " pianeti · ")}${start + 1}–${Math.min(start + pageSize, matches.length)}` : t("0 planets","0 pianeti");
   $('#planet-page').textContent = `${t("Page ","Pagina ")}${planetBrowser.page + 1}${t(" of "," di ")}${pageCount}`;
   $('[data-catalog-page="previous"]').disabled = planetBrowser.page === 0;
@@ -502,7 +491,7 @@ function renderPlanets() {
 function openPlanets() {
   openModal('planets', t("Planet catalogue","Catalogo planetario"), `
     <p class="catalog-introduction"><strong>${t("8 Solar System planets + ","8 pianeti del Sistema Solare + ")}${exoplanets.length.toLocaleString(locale())}${t(" confirmed exoplanets."," esopianeti confermati.")}</strong>${t(" Select a planet to inspect."," Seleziona un pianeta per osservarlo.")}</p>
-    <div class="solar-shortcuts" role="group" aria-label="${t("The eight Solar System planets","Gli otto pianeti del Sistema Solare")}">${solarPlanets.map(object => `<button data-object="${escape(object.id)}" data-object-scale="0">${planetPreview(object)}<span>${escape(object.name)}</span></button>`).join('')}</div>
+    <div class="solar-shortcuts" role="group" aria-label="${t("The eight Solar System planets","Gli otto pianeti del Sistema Solare")}">${solarPlanets.map(object => `<button data-object="${escape(object.id)}" data-object-scale="0"><span>${escape(object.name)}</span></button>`).join('')}</div>
     <label for="planet-search" class="readout-title">${t("SEARCH FOR A PLANET OR HOST STAR","CERCA UN PIANETA O LA SUA STELLA")}</label>
     <input id="planet-search" class="search-input" type="search" placeholder="${t("Earth, TRAPPIST-1, Kepler…","Terra, TRAPPIST-1, Kepler…")}" autocomplete="off" spellcheck="false" value="${escape(planetBrowser.query)}" aria-controls="planet-results"/>
     <div class="catalog-filter" role="group" aria-label="${t("Planet type","Tipo di pianeta")}"><button data-catalog-filter="all">${t("All","Tutti")}</button><button data-catalog-filter="solar">${t("Solar System","Sistema Solare")}</button><button data-catalog-filter="exoplanet">${t("Exoplanets","Esopianeti")}</button></div>
