@@ -1,6 +1,7 @@
 import { t } from './i18n.js';
 import * as THREE from 'three';
 import { singleGripTransform, dualGripTransform, isSelectionGesture } from './xr-math.js';
+import { computeSpatialPlacement, spatialWorldToLocal } from './spatial-map.js';
 
 const WIDTH = 1160;
 const HEIGHT = 420;
@@ -19,9 +20,9 @@ const SCALE_NAMES = [['Solar System','Sistema Solare'],['Nearby stars','Stelle v
  * onScale receives -1/+1; mapRoot transforms must be left to this module in VR.
  * XRInputSource.targetRaySpace works for both hands and handheld controllers.
  */
-export function createXR({ renderer, scene, camera, controls, mapRoot, getTargets, onSelect, onFocus, onScale, getScale, getPresentationMode = () => 'atlas', onSessionEnd, onImmersiveChange, onMessage = () => {} }) {
+export function createXR({ renderer, scene, camera, controls, mapRoot, getTargets, getBoundsRadius = () => 30, getEnvironment = () => [], onSelect, onFocus, onScale, getScale, getPresentationMode = () => 'atlas', onSessionEnd, onImmersiveChange, onMessage = () => {} }) {
   renderer.xr.enabled = true;
-  renderer.xr.setReferenceSpaceType('local');
+  renderer.xr.setReferenceSpaceType('local-floor');
   const raycaster = new THREE.Raycaster();
   raycaster.near = 0.01;
   raycaster.far = 20;
@@ -54,6 +55,9 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   let active = false;
   let disposed = false;
   let entering = false;
+  let sessionMode = 'immersive-vr';
+  let layout = 'room';
+  let removeReferenceReset = null;
   let immersive = false;
   let focusState = null;
   let snapshot = null;
@@ -165,7 +169,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       return { ...panelHit, button, panel: true };
     }
     // The terrestrial sky is a 60 m dome, not a miniature held at arm's length.
-    raycaster.far = isPlanetarium() ? 120 : 20;
+    raycaster.far = isPlanetarium() || layout === 'room' ? 120 : 20;
     const targets = (getTargets?.() || []).filter(visibleObject);
     const hits = raycaster.intersectObjects(targets, false);
     if (!hits.length) return null;
@@ -264,10 +268,11 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   }
 
   function rootTransform() {
-    return { position: mapRoot.position.clone(), quaternion: mapRoot.quaternion.clone(), scale: mapRoot.scale.x };
+    mapRoot.updateWorldMatrix(true, false);
+    return { position: mapRoot.getWorldPosition(new THREE.Vector3()), quaternion: mapRoot.getWorldQuaternion(new THREE.Quaternion()), scale: mapRoot.getWorldScale(new THREE.Vector3()).x };
   }
 
-  function applyTransform(value) {
+  function applyLocalTransform(value) {
     if (!value) return;
     mapRoot.position.copy(value.position);
     mapRoot.quaternion.copy(value.quaternion);
@@ -275,39 +280,49 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     mapRoot.updateMatrixWorld(true);
   }
 
+  function applyTransform(value) {
+    if (value) applyLocalTransform(spatialWorldToLocal(value, mapRoot.parent));
+  }
+
   function placeOverview() {
     gesture = null;
     focusState = null;
     const viewer = renderer.xr.getCamera();
-    const eye = viewer.getWorldPosition(new THREE.Vector3());
-    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(viewer.getWorldQuaternion(new THREE.Quaternion()));
-    forward.y = 0;
-    if (forward.lengthSq() < 0.001) forward.set(0, 0, -1);
-    forward.normalize();
-    mapRoot.position.set(0, 0, 0);
-    mapRoot.quaternion.identity();
-    mapRoot.scale.setScalar(1);
-    mapRoot.updateMatrixWorld(true);
-    if (isPlanetarium()) {
-      baseScale = 1;
-      mapRoot.position.copy(eye);
-      if (mapRoot.parent) mapRoot.parent.worldToLocal(mapRoot.position);
-      mapRoot.updateMatrixWorld(true);
-      positionPanel();
-      recenterPending = false;
-      return;
-    }
-    const bounds = new THREE.Box3().setFromObject(mapRoot);
-    const size = bounds.getSize(new THREE.Vector3());
-    const extent = Math.max(size.x, size.y, size.z, 1);
-    baseScale = Number.isFinite(extent) ? 2.1 / extent : 0.04;
-    mapRoot.scale.setScalar(baseScale);
-    mapRoot.rotation.x = 0.3;
-    mapRoot.position.copy(eye).addScaledVector(forward, 1.65);
-    mapRoot.position.y -= 0.22;
-    mapRoot.updateMatrixWorld(true);
+    const placement = computeSpatialPlacement({
+      boundsRadius: getBoundsRadius(),
+      viewerPosition: viewer.getWorldPosition(new THREE.Vector3()),
+      viewerQuaternion: viewer.getWorldQuaternion(new THREE.Quaternion()),
+      layout, planetarium: isPlanetarium(),
+    });
+    baseScale = placement.scale;
+    applyTransform(placement);
     positionPanel();
     recenterPending = false;
+  }
+
+  /** A floor-space origin reset changes coordinates, not the physical map pose. */
+  function referenceReset(event) {
+    for (const input of inputs) cancelInput(input);
+    focusState = null;
+    if (!event.transform?.matrix) {
+      recenter();
+      onMessage(t('Tracking origin changed. The map has been recentered.', 'Origine del tracciamento cambiata. La mappa è stata ricentrata.'));
+      return;
+    }
+    // The event transform is the new origin in old coordinates (WebXR spec).
+    // Its inverse converts existing world poses to the new reference space.
+    const correction = new THREE.Matrix4().fromArray(event.transform.matrix).invert();
+    for (const object of [mapRoot, panel]) {
+      object.updateWorldMatrix(true, false);
+      const matrix = object.matrixWorld.clone().premultiply(correction);
+      const position = new THREE.Vector3(), quaternion = new THREE.Quaternion(), scale = new THREE.Vector3();
+      matrix.decompose(position, quaternion, scale);
+      const local = spatialWorldToLocal({ position, quaternion, scale: scale.x }, object.parent);
+      object.position.copy(local.position);
+      object.quaternion.copy(local.quaternion);
+      object.scale.setScalar(local.scale);
+      object.updateMatrixWorld(true);
+    }
   }
 
   function positionPanel() {
@@ -412,13 +427,16 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     const center = state.fromCenter.clone().lerp(state.destination, eased);
     if (mapRoot.parent) mapRoot.parent.worldToLocal(center);
     const position = center.sub(anchor.center.clone().multiplyScalar(scale).applyQuaternion(state.quaternion));
-    applyTransform({ position, quaternion: state.quaternion, scale });
+    applyLocalTransform({ position, quaternion: state.quaternion, scale });
     // Grabs start from the current inspection scale, without snapping back to
     // the overview's much smaller limits when the second hand joins.
-    baseScale = scale;
+    baseScale = scale * scaleFactor;
   }
 
   function restoreDesktop() {
+    if (!snapshot && !active && !entering) return;
+    removeReferenceReset?.();
+    removeReferenceReset = null;
     const currentMode = presentationMode();
     const previousPresentationMode = snapshot?.presentationMode ?? currentMode;
     const viewChanged = snapshot ? snapshot.scale !== getScale?.() : false;
@@ -435,6 +453,11 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       input.hand.visible = false;
     }
     if (snapshot) {
+      scene.background = snapshot.background;
+      scene.fog = snapshot.fog;
+      if (snapshot.clearColor) renderer.setClearColor?.(snapshot.clearColor, snapshot.clearAlpha);
+      else renderer.setClearAlpha?.(snapshot.clearAlpha);
+      for (const [object, visible] of snapshot.environment) object.visible = visible;
       camera.position.copy(snapshot.cameraPosition);
       camera.quaternion.copy(snapshot.cameraQuaternion);
       camera.near = snapshot.near;
@@ -449,16 +472,19 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       mapRoot.updateMatrixWorld(true);
       if (controls) {
         // A view can change inside VR; restore controls for the current view.
-        controls.enabled = currentMode !== 'planetarium';
+        controls.enabled = viewChanged || currentMode !== previousPresentationMode ? currentMode !== 'planetarium' : snapshot.controlsEnabled;
         controls.target.copy(snapshot.target);
       }
       snapshot = null;
     }
     onSessionEnd?.({ presentationMode: currentMode, previousPresentationMode, viewChanged, modeChanged: currentMode !== previousPresentationMode });
-    onMessage(t("VR session ended. The desktop atlas is restored.","Sessione VR terminata. Sei tornato all’atlante."));
+    onMessage(sessionMode === 'immersive-ar'
+      ? t('Mixed reality session ended. The desktop atlas is restored.', 'Sessione di realtà mista terminata. Sei tornato all’atlante.')
+      : t('VR session ended. The desktop atlas is restored.', 'Sessione VR terminata. Sei tornato all’atlante.'));
   }
 
-  async function enter() {
+  async function enter({ mode = 'immersive-vr', layout: requestedLayout = 'room' } = {}) {
+    if (mode !== 'immersive-vr' && mode !== 'immersive-ar') return false;
     if (disposed) return false;
     if (active) {
       await renderer.xr.getSession()?.end();
@@ -475,42 +501,78 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     }
     entering = true;
     let session;
+    let ended = false;
     try {
       // Request immediately from the button gesture: an awaited support probe can
       // consume transient activation on some browsers and prevent entry.
-      session = await navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['hand-tracking', 'local-floor'] });
+      session = await navigator.xr.requestSession(mode, { requiredFeatures: ['local-floor'], optionalFeatures: ['hand-tracking'] });
       if (disposed) {
         entering = false;
         await session.end();
         return false;
       }
+      sessionMode = mode;
+      layout = requestedLayout === 'tabletop' ? 'tabletop' : 'room';
       snapshot = {
+        background: scene.background, fog: scene.fog,
+        clearColor: renderer.getClearColor?.(new THREE.Color()), clearAlpha: renderer.getClearAlpha?.() ?? 1,
+        environment: getEnvironment().filter(Boolean).map(object => [object, object.visible]), controlsEnabled: controls?.enabled,
         cameraPosition: camera.position.clone(), cameraQuaternion: camera.quaternion.clone(),
         near: camera.near, far: camera.far, fov: camera.fov, aspect: camera.aspect, zoom: camera.zoom,
         rootPosition: mapRoot.position.clone(), rootQuaternion: mapRoot.quaternion.clone(), rootScale: mapRoot.scale.clone(),
         target: controls?.target.clone(), presentationMode: presentationMode(), scale: getScale?.(),
       };
+      if (mode === 'immersive-ar') {
+        scene.background = null;
+        scene.fog = null;
+        renderer.setClearColor?.(0x000000, 0);
+        for (const [object] of snapshot.environment) object.visible = false;
+      }
       if (controls) controls.enabled = false;
       camera.position.set(0, 0, 0);
       camera.quaternion.identity();
       camera.near = 0.01;
       camera.far = 1000;
       camera.updateProjectionMatrix();
-      session.addEventListener('end', restoreDesktop, { once: true });
+      session.addEventListener('end', () => {
+        ended = true;
+        // This listener is installed before Three's setSession listener. Let
+        // Three release its framebuffer, restore canvas size and clear
+        // isPresenting before restoring the camera and notifying the engine.
+        if (renderer.xr.isPresenting) queueMicrotask(restoreDesktop);
+        else restoreDesktop();
+      }, { once: true });
       session.addEventListener('visibilitychange', () => {
         if (session.visibilityState !== 'visible') for (const input of inputs) cancelInput(input);
       });
       await renderer.xr.setSession(session);
+      if (disposed || ended) {
+        if (!ended) await session.end();
+        if (snapshot) restoreDesktop();
+        return false;
+      }
+      const referenceSpace = renderer.xr.getReferenceSpace?.();
+      if (referenceSpace?.addEventListener) {
+        referenceSpace.addEventListener('reset', referenceReset);
+        removeReferenceReset = () => referenceSpace.removeEventListener('reset', referenceReset);
+      }
       active = true;
       lastPresentationMode = presentationMode();
+      lastScale = getScale?.();
       entering = false;
       panel.visible = !immersive;
       restoreOrb.visible = immersive;
       recenterPending = true;
       panelDirty = true;
-      onMessage(isPlanetarium()
+      onMessage(mode === 'immersive-ar' && isPlanetarium()
+        ? t('Mixed reality active. Look around the sky; point and pinch to select a star.', 'Realtà mista attiva. Osserva il cielo intorno a te; punta e pizzica per selezionare una stella.')
+        : mode === 'immersive-ar'
+        ? t('Mixed reality active. The map stays fixed in your room. Walk around it; hold to move, use two hands to resize.', 'Realtà mista attiva. La mappa resta fissa nella stanza. Muoviti al suo interno; tieni per spostarla, usa due mani per ridimensionarla.')
+        : isPlanetarium()
         ? t("VR active. Look around the sky; point and pinch to select a star.","VR attiva. Osserva il cielo intorno a te; punta e pizzica per selezionare una stella.")
-        : t("VR active. Pinch and hold to grab; use two hands to zoom.","VR attiva. Pizzica e tieni per afferrare; usa due mani per ingrandire."));
+        : layout === 'tabletop'
+        ? t('VR active. Hold to move the map; use two hands to resize.', 'VR attiva. Tieni per spostare la mappa; usa due mani per ridimensionarla.')
+        : t('VR active. Walk inside the fixed map. Hold to move it; use two hands to resize.', 'VR attiva. Cammina nella mappa fissa. Tieni per spostarla; usa due mani per ridimensionarla.'));
       return true;
     } catch (error) {
       if (session) {
@@ -519,9 +581,13 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       }
       entering = false;
       const message = error?.name === 'NotAllowedError' || error?.name === 'SecurityError'
-        ? t("VR access was denied. Retry using the VR button and allow headset access.","Accesso VR non consentito. Puoi riprovare dal pulsante VR e consentire l’accesso al visore.")
+        ? (mode === 'immersive-ar'
+          ? t('Mixed reality access was denied. Retry using the MR button and allow headset access.', 'Accesso alla realtà mista non consentito. Riprova dal pulsante MR e consenti l’accesso al visore.')
+          : t('VR access was denied. Retry using the VR button and allow headset access.', 'Accesso VR non consentito. Puoi riprovare dal pulsante VR e consentire l’accesso al visore.'))
         : error?.name === 'NotSupportedError'
-          ? t("No WebXR headset is available. Connect a headset or open the page in its browser.","Nessun visore WebXR disponibile. Collega un visore o apri la pagina nel suo browser.")
+          ? (mode === 'immersive-ar'
+            ? t('Mixed reality with floor tracking is unavailable. Open this page in Meta Quest Browser or choose VR / PC preview.', 'Realtà mista con tracciamento del pavimento non disponibile. Apri la pagina in Meta Quest Browser oppure scegli VR / anteprima PC.')
+            : t('VR with floor tracking is unavailable. Connect a headset or choose PC preview.', 'VR con tracciamento del pavimento non disponibile. Collega un visore oppure scegli anteprima PC.'))
           : t("Unable to start VR. Check the headset connection and retry.","Impossibile avviare la VR. Verifica che il visore sia collegato e riprova.");
       onMessage(message);
       return false;
@@ -531,12 +597,19 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   function update(delta = 1 / 60) {
     if (!active || !renderer.xr.isPresenting) return;
     const currentMode = presentationMode();
-    if (currentMode !== lastPresentationMode) {
+    const currentScale = getScale?.();
+    if (currentMode !== lastPresentationMode || currentScale !== lastScale) {
+      lastScale = currentScale;
       lastPresentationMode = currentMode;
       recenter();
       panelDirty = true;
     }
-    if (recenterPending) placeOverview();
+    if (recenterPending) {
+      const frame = renderer.xr.getFrame?.();
+      const referenceSpace = renderer.xr.getReferenceSpace?.();
+      if (frame && referenceSpace && !frame.getViewerPose(referenceSpace)) return;
+      placeOverview();
+    }
     updateFocus(delta);
     if (immersive) positionRestoreOrb();
     const time = performance.now();
@@ -620,8 +693,8 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
 
   async function dispose() {
     if (disposed) return;
-    if (active) await renderer.xr.getSession()?.end();
     disposed = true;
+    if (active) await renderer.xr.getSession()?.end();
     for (const removeListener of listeners) removeListener();
     panel.removeFromParent();
     restoreOrb.removeFromParent();
@@ -643,6 +716,13 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     panelDirty = true;
   }
 
+  function setLayout(value) {
+    const next = value === 'tabletop' ? 'tabletop' : 'room';
+    if (next === layout) return;
+    layout = next;
+    recenter();
+  }
+
   paintPanel();
-  return { enter, update, setInfo, focusObject, recenter, setImmersive, dispose, get isPresenting() { return active; }, get isImmersive() { return immersive; } };
+  return { enter, setLayout, update, setInfo, focusObject, recenter, setImmersive, dispose, get layout() { return layout; }, get mode() { return sessionMode; }, get isPresenting() { return active; }, get isImmersive() { return immersive; } };
 }

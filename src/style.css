@@ -211,3 +211,43 @@ dialog[data-kind="search"]{width:min(740px,calc(100% - 32px));max-height:92dvh}
 .nasa-sky-view [data-action="rotate"]{display:none}
 @media(max-width:900px){.catalogue-shortcuts{display:none}.nasa-sky-view .readout-value{font-size:12px}.nasa-sky-view .intro h1{max-width:calc(100vw - 90px)}}
 @media(max-width:560px){dialog[data-kind="search"]{padding:20px}.search-filters{gap:5px}.search-filters button{padding:8px;font-size:10px}#search-results{max-height:35dvh}}
+
+/* First-person preview shares the headset layout without requiring WebXR. */
+.xr-layout-setting{display:grid;gap:8px;font-size:12px;color:#becfcd;margin:20px 0}
+.xr-layout-setting select,.preview-fields select{font:inherit;min-width:0;max-width:100%;padding:10px;border:1px solid #85b4b448;border-radius:5px;background:#0b151b;color:#e5e7df}
+.xr-mode-options{display:grid;gap:12px}
+.xr-mode-card{padding:16px;border:1px solid #86aca830;border-radius:6px;background:#90b9b706}
+.xr-mode-card h3{margin:0 0 10px}.xr-mode-card p{margin:0 0 14px;font-size:12px}.xr-mode-card small{display:block;color:#8fa6ac;font-size:11px;line-height:1.6;margin-top:10px}
+.xr-mode-card:first-child{border-color:#b6dcd35e;background:#80bbad0a}
+.preview-active.app-shell{min-height:0}
+.preview-active :is(.topbar,.intro,.left-panel,.right-panel,.bottom-panel,.footer,.view-controls,.center-caption,.labels,.exit-cinema){display:none!important}
+.preview-active .vignette{opacity:.15}
+.preview-hud[hidden],#preview-restore[hidden]{display:none!important}
+.preview-hud{position:absolute;inset:0;z-index:8;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between;padding:24px;gap:20px}
+.preview-top,.preview-bottom{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
+.preview-top{align-items:center}
+.preview-heading{display:grid;gap:6px;text-shadow:0 2px 8px #000}
+.preview-heading strong{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:500;color:#e0e9e4}
+.preview-heading span{font-size:11px;color:#a1b9ba}
+.preview-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.preview-hud button,#preview-restore{pointer-events:auto;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 12px;font-size:11px;background:#102027e8;border:1px solid #8cafaa48;border-radius:5px;min-height:38px}
+.preview-hud button:hover,#preview-restore:hover{background:#1c343be8;border-color:#cde4d675;color:#e2eeda}
+.preview-bottom{align-items:flex-end}
+.preview-controls{max-width:520px;padding:14px;border:1px solid #85b4b432;border-radius:6px;background:#0c181fe8;backdrop-filter:blur(8px)}
+.preview-fields{display:flex;gap:12px;margin-bottom:12px;pointer-events:auto}
+.preview-fields label{display:grid;gap:6px;font-size:10px;color:#9eb7bc;min-width:0}
+.preview-fields label:first-child{flex:1}
+.preview-fields select{width:100%;font-size:12px;padding:8px}
+.preview-object{margin-top:12px;max-width:100%;justify-content:space-between!important;width:100%;text-align:left}
+.preview-object span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#e4d3ac}
+.preview-object svg{flex-shrink:0}
+.preview-help{font-size:11px;line-height:1.6;text-align:right;text-shadow:0 2px 5px #000;color:#b4c6c7}
+.preview-help p{margin:3px 0}.preview-help button{margin-top:10px}
+#preview-restore{position:absolute;right:24px;top:24px;z-index:10}
+.preview-clean .preview-hud{visibility:hidden}
+.preview-reticle{display:none;position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px;border-radius:50%;background:#d5f5e9aa;box-shadow:0 0 8px #a9e4d5;pointer-events:none;z-index:2}
+.preview-pointer-locked .preview-reticle{display:block}
+.preview-active .toast{bottom:50%;}
+@media(max-width:800px){.preview-hud{padding:16px}.preview-bottom{flex-direction:column;align-items:stretch;gap:12px}.preview-help{text-align:left;display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center}.preview-help button{margin-top:0}.preview-controls{max-width:none}.preview-top{align-items:flex-start}.preview-heading span{line-height:1.5}.preview-actions button{padding:9px}.preview-top .preview-actions{justify-content:flex-end;flex-shrink:0}.preview-top .preview-actions button:first-child span{display:none}}
+@media(max-width:480px){.preview-hud{padding:12px}.preview-heading strong{font-size:13px}.preview-heading span{font-size:10px}.preview-top{gap:10px}.preview-top .preview-actions{gap:5px}.preview-hud button{font-size:10px;padding:8px}.preview-help{font-size:10px}.preview-controls{padding:10px}.preview-fields{gap:8px}.preview-fields select{font-size:11px}.preview-fields label:last-child{max-width:43%}.preview-map-actions{gap:5px}}
+@media(max-height:550px){.preview-hud{padding:12px}.preview-bottom{flex-direction:row;align-items:flex-end}.preview-controls{padding:8px;max-width:64%}.preview-help{font-size:10px;max-width:34%}.preview-heading span{display:none}}

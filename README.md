@@ -58,9 +58,11 @@ The Earth sky model includes J2000 precession. Proper motion, parallax, nutation
 
 Shortcuts: **1–5** reference scale, **R** reset, **/** search, **Space** auto-rotation, **Esc** close dialog or immersive view.
 
-## WebXR
+## Immersive preview, VR and mixed reality
 
-Use **Enter VR** in a compatible headset browser. Hand tracking is optional; controllers are supported.
+Open **VR / MR**. **Start desktop preview** provides the room-scale first-person view on a PC without a headset: W A S D to walk, Q / E to change height, drag to look around, and click to select. The preview includes map size, rotation, search and clear-screen controls.
+
+On Quest, choose **Enter mixed reality** for passthrough or **Enter VR atlas** for the virtual background. **Room scale** is the default: the map starts around the viewer and stays fixed in the session's floor coordinates as they walk. Hand tracking is optional; controllers are supported. **Tabletop** remains available. See [Immersive views](IMMERSIVE.md) for controls and headset setup.
 
 - Brief pinch or trigger: select an object.
 - Hold a pinch or controller grip: move/rotate the spatial atlas.

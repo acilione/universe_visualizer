@@ -65,9 +65,11 @@ Cinque scale cosmiche (Sistema Solare, stelle vicine, Via Lattea, Gruppo Locale,
 
 Comandi di base: trascina per orbitare, tasto destro per spostare, rotellina per zoom, `/` ricerca, `1`–`5` scala, `R` ricentra, `Spazio` rotazione, `Esc` chiude le finestre o esce dalla vista libera.
 
-## VR e mani
+## Anteprima PC, VR e realtà mista
 
-Premi **Entra in VR** in un browser e visore compatibili con WebXR. Il tracciamento delle mani è opzionale; in alternativa sono utilizzabili i controller.
+Apri **VR / MR** e scegli **Avvia anteprima PC** per vedere la mappa in prima persona senza visore. W A S D per camminare, Q / E per cambiare altezza, trascinamento per guardare intorno e clic per selezionare. Sono disponibili ricerca, dimensione e rotazione della mappa e comandi per nascondere le scritte.
+
+Su Quest, scegli **Entra in realtà mista** per il passthrough oppure **Entra nell'atlante VR** per lo sfondo virtuale. La disposizione predefinita **Scala ambiente** mette la mappa intorno all'osservatore e la mantiene fissa nelle coordinate della sessione mentre cammina. Rimane disponibile la **Mappa ridotta** davanti all'utente. Il tracciamento delle mani è opzionale; in alternativa sono utilizzabili i controller. [Viste immersive](IMMERSIVE.md) descrive comandi e configurazione del visore.
 
 - Pizzico breve o grilletto: seleziona.
 - Pizzico mantenuto o impugnatura: afferra, sposta e ruota.

@@ -59,7 +59,7 @@ function createHarness(t, initialMode = 'planetarium') {
   let mode = initialMode;
   let scale = mode === 'planetarium' ? 7 : 6;
   const xr = createXR({ renderer: { xr: manager }, scene, camera, controls, mapRoot,
-    getTargets: () => [star, opposite], getPresentationMode: () => mode, getScale: () => scale,
+    getTargets: () => [star, opposite], getBoundsRadius: () => 60, getPresentationMode: () => mode, getScale: () => scale,
     onSelect: value => selected.push(value), onScale: sign => scaleActions.push(sign), onFocus: value => focusActions.push(value), onMessage: message => messages.push(message),
     onSessionEnd: event => ended.push({ ...event, controlsEnabled: controls.enabled }),
   });
@@ -144,7 +144,7 @@ test('changing into sky mode cancels an atlas grab and exit uses the current con
   h.connect();
   await h.xr.enter();
   h.xr.update();
-  assert.ok(h.mapRoot.scale.x < 0.1);
+  assert.equal(h.mapRoot.scale.x, 0.1);
   h.controllers[0].dispatchEvent({ type: 'squeezestart' });
   h.xr.update();
   h.grips[0].position.x += 0.4;
@@ -168,7 +168,7 @@ test('leaving the sky restores atlas focus and enables current desktop orbit con
   h.xr.update();
   h.setMode('atlas');
   h.xr.update();
-  assert.ok(h.mapRoot.scale.x < 0.1);
+  assert.equal(h.mapRoot.scale.x, 0.1);
   assert.equal(h.xr.focusObject(h.object, 0.5), true);
   h.xr.update(0.1);
   await h.session.end();
