@@ -128,3 +128,7 @@ La verifica del renderer e dello zoom usa anche `npm run test:engine` con il ser
 La verifica delle costellazioni nel renderer usa `npm run test:constellations` con il server di sviluppo su porta 5173. Include proiezione del cielo, stelle sotto l?orizzonte, trascinamento, zoom, distanze ignote e ritorno ai pianeti. `npm run test:constellation-ui` verifica la navigazione desktop/mobile sull?anteprima di produzione (porta 5174).
 
 La verifica del riferimento terrestre e della camera usa **npm run test:earth-reference** sul server di sviluppo. Comprende visibilità, persistenza fra figure, prospettiva dall’origine, transizione animata e ritorno all’orbita. I test astronomici includono il caso di Orione dell’11 dicembre 2026 alle 20:00 CET.
+
+## Satelliti naturali
+
+Il catalogo **Pianeti e satelliti** include 28 satelliti principali di sei pianeti, compresa la Luna terrestre. Le schede mostrano raggio medio, semiasse maggiore e periodo orbitale medio da NASA/JPL. **Satelliti principali** filtra il catalogo per pianeta; **Osserva il sistema di satelliti** inquadra il pianeta con le sue lune. Ogni satellite si può selezionare e osservare da vicino anche in VR. Le orbite sono schematiche; questa è una selezione dei satelliti conosciuti. Dati e fonti: [DATA_MOONS.md](DATA_MOONS.md).

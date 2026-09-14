@@ -2,7 +2,8 @@
 import { Universe } from '/src/universe.js';
 import { catalog } from '/src/data.js';
 import { exoplanets } from '/src/planets.js';
-window.catalog=catalog;window.exoplanets=exoplanets;
+import { solarMoons, moonsForPlanet } from '/src/moons.js';
+window.catalog=catalog;window.exoplanets=exoplanets;window.solarMoons=solarMoons;window.moonsForPlanet=moonsForPlanet;
 window.atlas=new Universe({canvas:document.querySelector('canvas'),labelContainer:document.querySelector('.labels')});
 window.atlas.setAutoRotate(false);
 </script></body></html>

@@ -7,6 +7,7 @@ const PLANETS = {
   mercury: { map: '2k_mercury.jpg', tilt: 0.03, bump: 0.004 },
   venus: { map: '2k_venus_atmosphere.jpg', tilt: 177.4, glow: '#edd1a2' },
   earth: { map: '2k_earth_daymap.jpg', tilt: 23.44, glow: '#69dbff' },
+  moon: { map: '2k_moon.jpg', tilt: 0 },
   mars: { map: '2k_mars.jpg', tilt: 25.19, bump: 0.003, glow: '#df9c76' },
   jupiter: { map: '2k_jupiter.jpg', tilt: 3.13, glow: '#e6c8a2' },
   saturn: { map: '2k_saturn.jpg', tilt: 26.73, glow: '#edd2a0' },
@@ -122,6 +123,7 @@ const exoplanetFragment = `
   uniform vec3 uAccent;
   uniform float uSeed;
   uniform float uGas;
+  uniform float uRimStrength;
   uniform float uOpacity;
   varying vec3 vPosition;
   varying vec3 vNormal;
@@ -162,7 +164,7 @@ const exoplanetFragment = `
     vec3 L = normalize(vec3(-0.6, 0.6, 0.8));
     float light = 0.22 + 0.85 * max(dot(N, L), 0.0);
     float rim = pow(1.0 - max(dot(N, V), 0.0), 4.0);
-    color = color * light + uAccent * rim * 0.15;
+    color = color * light + uAccent * rim * uRimStrength;
     gl_FragColor = vec4(color, uOpacity);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
@@ -177,9 +179,15 @@ function seedFor(id) {
 
 function exoplanetMaterial(object) {
   const seed = seedFor(object.id);
-  const gas = Number(object.radiusEarth) >= 2;
+  const moon = object.bodyKind === 'moon';
+  const gas = !moon && Number(object.radiusEarth) >= 2;
   const temperature = Number(object.temperatureK) || 0;
-  const palette = temperature > 1100
+  // Unmapped satellites use muted variations of their catalogue display color.
+  // These are illustrative surfaces, with no implied geographic features.
+  const moonColor = new THREE.Color(object.color || '#b3b0a7');
+  const palette = moon
+    ? [moonColor.clone().multiplyScalar(0.52), moonColor, moonColor.clone().lerp(new THREE.Color('#ffffff'), 0.12)]
+    : temperature > 1100
     ? ['#45271e', '#e4ac73', '#ffd69b']
     : temperature > 550
       ? ['#504b38', '#c9b47d', '#eee0ad']
@@ -199,6 +207,7 @@ function exoplanetMaterial(object) {
       uAccent: { value: new THREE.Color(palette[2]) },
       uSeed: { value: seed * 31 },
       uGas: { value: gas ? 1 : 0 },
+      uRimStrength: { value: moon ? 0 : 0.15 },
       uOpacity: { value: 1 },
     },
     transparent: true,
@@ -210,12 +219,13 @@ function exoplanetMaterial(object) {
 /** Build a centered body. Its parent owns placement, orbit and focus transforms. */
 export function createPlanetVisual(object) {
   const radius = Math.max(0.01, Number(object.size) || 0.45);
+  const moon = object.bodyKind === 'moon';
   const group = new THREE.Group();
   group.name = 'planet-' + object.id;
   const definition = PLANETS[object.id] || (object.bodyKind === 'star' ? PLANETS.sun : undefined);
   const axialTilt = new THREE.Group();
   const surface = new THREE.Group();
-  axialTilt.rotation.z = THREE.MathUtils.degToRad(definition?.tilt ?? seedFor(object.id) * 28);
+  axialTilt.rotation.z = THREE.MathUtils.degToRad(definition?.tilt ?? (moon ? 0 : seedFor(object.id) * 28));
   axialTilt.add(surface);
   group.add(axialTilt);
   group.userData.surface = surface;
@@ -241,7 +251,7 @@ export function createPlanetVisual(object) {
     });
   }
   material.userData.baseOpacity = 1;
-  const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 96, 64), material);
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, moon ? 48 : 96, moon ? 32 : 64), material);
   mesh.name = 'planet-surface';
   surface.add(mesh);
   // Start on a recognizable longitude, with the Americas facing the default camera.

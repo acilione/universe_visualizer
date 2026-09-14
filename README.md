@@ -24,7 +24,7 @@ The application needs no account, API key or backend. Data and planet textures a
 
 ## Catalogues and reference frames
 
-- **Solar System:** Sun and eight planets with local surface textures. Planet sizes are enlarged and orbital spacing compressed for navigation.
+- **Solar System:** Sun, eight planets and 28 selected major moons across six planetary systems. Earth’s Moon has a local lunar surface map; other satellite surfaces are illustrative. Planet sizes are enlarged and orbital spacing compressed for navigation.
 - **Exoplanets:** all **6,360 confirmed planets** in the NASA PSCompPars snapshot, across **4,769 host stars**. Retrieval: **10 September 2026, 23:49 UTC**. The **28 planets with unknown distance** remain searchable. Host-system orbits and exoplanet surfaces are illustrative.
 - **Nearby stars:** curated references and a HYG subset of 156 additional stars within 25 light-years.
 - **Constellations:** **119,625 HYG v4.1 stars**, with **88 constellation figures** using Stellarium geometry. The 3D view uses a common linear distance scale. The Earth view projects sky directions for the selected location and instant.
@@ -34,7 +34,7 @@ English uses IAU constellation names; Italian uses localized names. Search accep
 
 ## Navigation
 
-Drag to orbit and scroll or pinch to zoom. Select a planet to inspect its surface; the camera's minimum distance scales with the planet radius. The **Planets** catalogue supports name/host search, filters and pagination.
+Drag to orbit and scroll or pinch to zoom. Select a planet or moon to inspect its surface; the camera's minimum distance scales with the body radius. The **Planets & moons** catalogue supports name/host search, category and parent-planet filters, and pagination. A planet's **Major moons** button lists its included satellites; **View moon system** frames the planet and its moons together. Moon cards show the parent planet, mean radius, orbital semimajor axis and mean orbital period. Close moon inspection hides reference guides; the system view restores them. This is a curated selection of moons with schematic orbits, not a live ephemeris.
 
 In **Constellations**, choose **3D space** or **Earth surface**:
 
@@ -71,6 +71,7 @@ Simulated VR tests cover interaction and session behavior; tracking and comfort 
 
 ## Sources
 
+- [Moon catalogue](DATA_MOONS.md): 28 selected NASA/JPL natural satellites and their measured properties.
 - [Planetary snapshot](DATA_EXOPLANETS.md): NASA archive, nullable measurements and importer.
 - [Stellar catalogues and constellation geometry](DATA_CONSTELLATIONS.md): HYG / David Nash and Stellarium, CC BY-SA 4.0, pinned revisions and checksums.
 - [Nearby stars and curated sources](DATA_SOURCES.md).
@@ -86,6 +87,7 @@ npm run build
 # Keep dev on :5173 and preview on :5174 running for browser checks:
 npm run test:browser
 npm run test:engine
+npm run test:moons
 npm run test:constellations
 npm run test:constellation-ui
 npm run test:earth-reference

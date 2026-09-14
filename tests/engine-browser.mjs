@@ -7,7 +7,7 @@ try {
  await page.goto((process.env.ENGINE_TEST_URL||'http://localhost:5173')+'/tests/fixtures/engine.html',{waitUntil:'networkidle'});
  await page.waitForFunction(()=>window.atlas?.ready);
  assert.equal(await page.evaluate(()=>atlas.index),0);
- assert.equal(await page.evaluate(()=>atlas.targets.length),9);
+ assert.equal(await page.evaluate(()=>atlas.targets.length),await page.evaluate(()=>catalog.solar.length+solarMoons.length));
  await page.evaluate(()=>atlas.focusObject(catalog.solar.find(p=>p.id==='earth')));
  await page.waitForFunction(()=>!atlas.cameraFlight);
  const focused=await page.evaluate(()=>({radius:atlas.selected.size,distance:atlas.camera.position.distanceTo(atlas.controls.target),minimum:atlas.controls.minDistance,target:atlas.controls.target.toArray(),position:atlas.selected.position}));
