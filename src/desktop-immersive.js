@@ -212,8 +212,8 @@ export function createDesktopImmersive({ canvas, camera, controls, mapRoot,
       for (let node = target; node; node = node.parent) if (!node.visible) return false;
       return true;
     });
-    const hit = raycaster.intersectObjects(targets, false).find(item => item.object.userData.object);
-    if (hit) onSelect(hit.object.userData.object);
+    const hit = raycaster.intersectObjects(targets, false).find(item => item.dataObject || item.object.userData.object);
+    if (hit) onSelect(hit.dataObject || hit.object.userData.object);
   }
 
   listen(canvas, 'pointerdown', event => {

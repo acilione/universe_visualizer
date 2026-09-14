@@ -62,6 +62,8 @@ Shortcuts: **1–5** reference scale, **R** reset, **/** search, **Space** auto-
 
 Open **VR / MR**. **Start desktop preview** provides the room-scale first-person view on a PC without a headset: W A S D to walk, Q / E to change height, drag to look around, and click to select. The preview includes map size, rotation, search and clear-screen controls.
 
+Choose **Map content → Combined map: planets, stars and nebulae** to load all three categories together. The **Planets**, **Stars** and **Nebulae** switches work independently in the preview, sidebar and headset panel; choices are saved. The preview’s **Map** selector also opens this mode. It combines the schematic Solar System and moons with NASA stars, nebulae and exoplanet host directions on a surrounding sky projection, using separate display scales.
+
 On Quest, choose **Enter mixed reality** for passthrough or **Enter VR atlas** for the virtual background. **Room scale** is the default: the map starts around the viewer and stays fixed in the session's floor coordinates as they walk. Hand tracking is optional; controllers are supported. **Tabletop** remains available. See [Immersive views](IMMERSIVE.md) for controls and headset setup.
 
 - Brief pinch or trigger: select an object.
@@ -105,6 +107,8 @@ npm run test:constellation-ui
 npm run test:earth-reference
 npm run test:language
 npm run test:layout
+npm run test:immersive
+npm run test:combined
 ```
 
 Browser checks require Playwright Chromium (`npx playwright install chromium` if needed). They cover layout at ten viewport sizes, both languages and explicit language persistence, planet navigation, the reported winter Orion case, immersion, and actual rendered camera transitions. Screenshots are written to `test-results/`.

@@ -26,6 +26,7 @@ const state = {
   grid: preferences.grid !== false, particles: preferences.particles !== false,
   autoRotate: typeof preferences.autoRotate === 'boolean' ? preferences.autoRotate : !reducedMotion,
   quality: preferences.quality === 'low' ? 'low' : 'high',
+  objectLayers: Object.fromEntries(['planets','stars','nebulae'].map(name=>[name,preferences.objectLayers?.[name]!==false])),
   tour: false, sound: false, cinematic: false
 };
 let universe = null;
@@ -47,6 +48,12 @@ let returnFocus = null;
 let xrSupported = false;
 let mrSupported = false;
 let spatialLayout = 'room';
+let immersiveContent = 'current';
+let combinedData = null;
+let combinedPromise = null;
+let combinedLoading = false;
+let combinedError = '';
+
 let previewClean = false;
 let xrChecked = false;
 let audioContext = null;
@@ -74,6 +81,7 @@ $('#app').innerHTML = `
     </section>
     <aside class="left-panel" aria-label="${t("Map scale and layers","Scala e livelli della mappa")}">
       <div class="section-heading">${t("REFERENCE FRAME","SISTEMA DI RIFERIMENTO")} ${icon('layers')}</div>
+      <div id="combined-desktop-layers" class="object-layer-switches" role="group" aria-label="${t("Object categories","Categorie di oggetti")}" hidden>${objectLayerButtons()}</div>
       <section class="constellation-controls" id="constellation-controls" aria-label="${t("Constellation perspective","Prospettiva della costellazione")}" hidden>
         <button class="constellation-change" data-action="constellations"><span id="constellation-current">${t("Constellations","Costellazioni")}</span>${icon('search')}</button>
         <div class="constellation-mode" role="group" aria-label="${t("Observer position","Punto di osservazione")}">
@@ -134,7 +142,8 @@ $('#app').innerHTML = `
       </div>
       <div class="preview-bottom">
         <div class="preview-controls">
-          <div class="preview-fields"><label>${t("Map","Mappa")}<select id="preview-scale">${scales.map((scale,i)=>`<option value="${i}">${scale.name}</option>`).join('')}</select></label><label>${t("Layout","Disposizione")}<select id="preview-layout"><option value="room">${t("Room scale","Scala ambiente")}</option><option value="tabletop">${t("Tabletop","Mappa ridotta")}</option></select></label></div>
+          <div class="preview-fields"><label>${t("Map","Mappa")}<select id="preview-scale">${scales.map((scale,i)=>`<option value="${i}">${scale.name}</option>`).join('')}<option value="9">${t('Combined map','Mappa combinata')}</option></select></label><label>${t("Layout","Disposizione")}<select id="preview-layout"><option value="room">${t("Room scale","Scala ambiente")}</option><option value="tabletop">${t("Tabletop","Mappa ridotta")}</option></select></label></div>
+          <div id="combined-object-layers" class="object-layer-switches" role="group" aria-label="${t("Object categories","Categorie di oggetti")}" hidden>${objectLayerButtons()}</div><p id="combined-preview-status" class="combined-status" role="status" hidden></p>
           <div class="preview-actions preview-map-actions" role="group" aria-label="${t("Transform the map","Trasforma la mappa")}"><button data-action="preview-scale-down" aria-label="${t("Reduce map size","Riduci dimensione mappa")}" title="${t("Reduce map size","Riduci dimensione mappa")}">${icon('minus')}</button><button data-action="preview-scale-up" aria-label="${t("Increase map size","Aumenta dimensione mappa")}" title="${t("Increase map size","Aumenta dimensione mappa")}">${icon('plus')}</button><button data-action="preview-rotate-left" aria-label="${t("Rotate map left","Ruota mappa a sinistra")}" title="${t("Rotate map left","Ruota mappa a sinistra")}">${icon('rotate-ccw')}</button><button data-action="preview-rotate-right" aria-label="${t("Rotate map right","Ruota mappa a destra")}" title="${t("Rotate map right","Ruota mappa a destra")}">${icon('rotate-cw')}</button><button data-action="recenter-preview">${t("Reset placement","Ripristina posizione")}</button><button data-action="preview-replay" aria-label="${t("Replay map opening","Ripeti apertura della mappa")}" title="${t("Replay map opening","Ripeti apertura della mappa")}">${icon('play')}${t("Replay opening","Ripeti apertura")}</button><button data-action="preview-search">${icon('search')}${t("Search","Cerca")}</button></div>
           <button class="preview-object" data-action="preview-object"><span id="preview-selection"></span>${icon('info')}</button>
         </div>
@@ -150,8 +159,8 @@ $('#app').innerHTML = `
 `;
 
 function savePreferences() {
-  const { labels, grid, particles, autoRotate, quality } = state;
-  try { localStorage.setItem('aether.preferences', JSON.stringify({ labels, grid, particles, autoRotate, quality })); } catch { /* Storage can be unavailable in private browsers. */ }
+  const { labels, grid, particles, autoRotate, quality, objectLayers } = state;
+  try { localStorage.setItem('aether.preferences', JSON.stringify({ labels, grid, particles, autoRotate, quality, objectLayers })); } catch { /* Storage can be unavailable in private browsers. */ }
 }
 
 function notify(message) {
@@ -167,7 +176,7 @@ const isPlanet = object => object?.isPlanet || object?.bodyKind === 'exoplanet' 
 const isMoon = object => object?.isMoon || object?.bodyKind === 'moon';
 const number = (value, unit = '') => Number.isFinite(value) ? `${value.toLocaleString(locale(), { maximumFractionDigits: 2 })}${unit ? ' ' + unit : ''}` : t("Not available","Non disponibile");
 const currentScale = () => scales[state.scale] || {
-  id: state.scale === 8 ? 'nasa-sky' : state.scale >= 6 ? 'constellations' : 'exoplanets',
+  id: state.scale === 9 ? 'combined-map' : state.scale === 8 ? 'nasa-sky' : state.scale >= 6 ? 'constellations' : 'exoplanets',
   name: state.context?.name || state.object?.host || t("Exoplanet system","Sistema esoplanetario"),
   source: state.scale >= 6 ? 'https://github.com/astronexus/HYG-Database' : 'https://exoplanetarchive.ipac.caltech.edu/',
   extent: state.scale >= 6 ? t("HYG star catalogue","Catalogo stellare HYG") : t("Exoplanet system","Sistema esoplanetario"),
@@ -223,7 +232,7 @@ function renderObject(object) {
   state.object = object;
   updatePreviewHud();
   $('#object-card').innerHTML = objectMarkup(object);
-  $('.coordinates').innerHTML = `<span>${state.scale === 8 ? t("EQUATORIAL SKY DIRECTIONS","DIREZIONI CELESTI EQUATORIALI") : state.scale === 7 ? t("LOCAL HORIZON","ORIZZONTE LOCALE") : state.scale === 6 ? t("J2000 · HYG DISTANCES","J2000 · DISTANZE HYG") : ['stars','local'].includes(currentScale().id) ? t("J2000 · APPROXIMATE","J2000 · APPROSSIMATA") : t("SCHEMATIC VIEW","VISTA SCHEMATICA")}</span><span>${state.scale === 8 ? 'NASA HEASARC' : state.scale >= 6 ? t("HYG 4.1 CATALOGUE","CATALOGO HYG 4.1") : t("COSMIC ATLAS","ATLANTE COSMICO")}</span>`;
+  $('.coordinates').innerHTML = `<span>${state.scale === 9 ? t("COMBINED DISPLAY SCALES","SCALE VISIVE COMBINATE") : state.scale === 8 ? t("EQUATORIAL SKY DIRECTIONS","DIREZIONI CELESTI EQUATORIALI") : state.scale === 7 ? t("LOCAL HORIZON","ORIZZONTE LOCALE") : state.scale === 6 ? t("J2000 · HYG DISTANCES","J2000 · DISTANZE HYG") : ['stars','local'].includes(currentScale().id) ? t("J2000 · APPROXIMATE","J2000 · APPROSSIMATA") : t("SCHEMATIC VIEW","VISTA SCHEMATICA")}</span><span>${state.scale === 9 ? 'NASA / JPL / HEASARC' : state.scale === 8 ? 'NASA HEASARC' : state.scale >= 6 ? t("HYG 4.1 CATALOGUE","CATALOGO HYG 4.1") : t("COSMIC ATLAS","ATLANTE COSMICO")}</span>`;
   if ($('#modal').open && $('#modal').dataset.kind === 'object') $('#modal-body').innerHTML = objectMarkup(object, true);
   refreshIcons();
   enrichStellarInformation(object);
@@ -242,7 +251,7 @@ function enrichStellarInformation(object) {
 
 function updateScale(index, context = null) {
   index = Number(index);
-  if (!Number.isInteger(index) || ![5, 6, 7, 8].includes(index) && !scales[index]) return;
+  if (!Number.isInteger(index) || ![5, 6, 7, 8, 9].includes(index) && !scales[index]) return;
   if (index !== state.scale) { clearTimeout(toastTimer); $('.toast').classList.remove('visible'); }
   state.scale = index;
   state.context = index >= 5 ? context || state.context : null;
@@ -251,6 +260,7 @@ function updateScale(index, context = null) {
   const hostView = index === 5;
   const constellationView = index === 6 || index === 7;
   const nasaView = index === 8;
+  const combined = index === 9;
   const detached = index >= 5;
   if (constellationView) {
     constellationBrowser.id = context?.constellationId || constellationBrowser.id;
@@ -258,12 +268,12 @@ function updateScale(index, context = null) {
     if (typeof context?.earthVisible === 'boolean') constellationBrowser.earthVisible = context.earthVisible;
     if (context?.observer) constellationBrowser.observer = { ...constellationBrowser.observer, ...context.observer };
   }
-  $('#scale-title').textContent = nasaView ? scale.name : constellationView ? `${scale.name}.` : hostView ? `${t("Host star: ","Stella ospite: ")}${scale.name}.` : scale.title;
-  $('#scale-subtitle').textContent = nasaView ? t("NASA catalogue sky positions; radial distance is not represented.","Posizioni celesti dai cataloghi NASA; la distanza radiale non viene rappresentata.") : constellationView ? index === 7 ? t("Local sky coordinates for the selected observer and time.","Coordinate del cielo per l’osservatore e l’istante selezionati.") : t("J2000 stellar positions and catalogue distances.","Posizioni stellari J2000 e distanze di catalogo.") : hostView ? t("Confirmed planets around the selected host star.","Pianeti confermati intorno alla stella selezionata.") : scale.subtitle;
+  $('#scale-title').textContent = combined ? t('Combined map','Mappa combinata') : nasaView ? scale.name : constellationView ? `${scale.name}.` : hostView ? `${t("Host star: ","Stella ospite: ")}${scale.name}.` : scale.title;
+  $('#scale-subtitle').textContent = combined ? t('Solar System model and projected NASA sky. Independent object layers.','Modello del Sistema Solare e cielo NASA proiettato. Categorie indipendenti.') : nasaView ? t("NASA catalogue sky positions; radial distance is not represented.","Posizioni celesti dai cataloghi NASA; la distanza radiale non viene rappresentata.") : constellationView ? index === 7 ? t("Local sky coordinates for the selected observer and time.","Coordinate del cielo per l’osservatore e l’istante selezionati.") : t("J2000 stellar positions and catalogue distances.","Posizioni stellari J2000 e distanze di catalogo.") : hostView ? t("Confirmed planets around the selected host star.","Pianeti confermati intorno alla stella selezionata.") : scale.subtitle;
   $('#scale-readout').textContent = scale.extent;
-  $('#scale-step').textContent = nasaView ? 'NASA HEASARC' : constellationView ? index === 7 ? t("EARTH VIEW","DALLA TERRA") : t("CONSTELLATIONS","COSTELLAZIONI") : hostView ? t("EXOPLANETS","ESOPIANETI") : `0${index + 1} / 05`;
+  $('#scale-step').textContent = combined ? t('COMBINED VIEW','VISTA COMBINATA') : nasaView ? 'NASA HEASARC' : constellationView ? index === 7 ? t("EARTH VIEW","DALLA TERRA") : t("CONSTELLATIONS","COSTELLAZIONI") : hostView ? t("EXOPLANETS","ESOPIANETI") : `0${index + 1} / 05`;
   $('#region-name').textContent = scale.name.toLocaleUpperCase(locale());
-  $('#region-type').textContent = nasaView ? t("STARS AND NEBULAE","STELLE E NEBULOSE") : constellationView ? index === 7 ? t("LOCAL SKY · GEOMETRIC HORIZON","CIELO LOCALE · ORIZZONTE GEOMETRICO") : t("HYG STELLAR COORDINATES","COORDINATE STELLARI HYG") : hostView ? t("EXOPLANET SYSTEM · SCHEMATIC ORBITS","SISTEMA ESOPLANETARIO · ORBITE ILLUSTRATIVE") : index === 0 ? t("SUN, PLANETS AND MAJOR MOONS","SOLE, PIANETI E SATELLITI PRINCIPALI") : index === 4 ? t("CONCEPTUAL MODEL","RICOSTRUZIONE CONCETTUALE") : catalog[scale.id][0].type.toLocaleUpperCase(locale());
+  $('#region-type').textContent = combined ? t('PLANETS, STARS AND NEBULAE','PIANETI, STELLE E NEBULOSE') : nasaView ? t("STARS AND NEBULAE","STELLE E NEBULOSE") : constellationView ? index === 7 ? t("LOCAL SKY · GEOMETRIC HORIZON","CIELO LOCALE · ORIZZONTE GEOMETRICO") : t("HYG STELLAR COORDINATES","COORDINATE STELLARI HYG") : hostView ? t("EXOPLANET SYSTEM · SCHEMATIC ORBITS","SISTEMA ESOPLANETARIO · ORBITE ILLUSTRATIVE") : index === 0 ? t("SUN, PLANETS AND MAJOR MOONS","SOLE, PIANETI E SATELLITI PRINCIPALI") : index === 4 ? t("CONCEPTUAL MODEL","RICOSTRUZIONE CONCETTUALE") : catalog[scale.id][0].type.toLocaleUpperCase(locale());
   const slider = $('#scale-slider');
   slider.disabled = detached;
   slider.hidden = detached;
@@ -273,6 +283,8 @@ function updateScale(index, context = null) {
   $('.journey-labels').hidden = detached;
   $('.cosmic-return').hidden = !detached;
   $('.journey-top > span').textContent = detached ? t("Reference scale navigation","Navigazione fra scale di riferimento") : t("Reference scale navigation","Navigazione fra scale di riferimento");
+  $('.app-shell').classList.toggle('combined-view', combined);
+  $('#combined-desktop-layers').hidden=!combined;
   $('.app-shell').classList.toggle('constellation-view', constellationView);
   $('.app-shell').classList.toggle('nasa-sky-view', nasaView);
   $('.app-shell').classList.toggle('earth-sky-view', index === 7);
@@ -312,14 +324,18 @@ function updateScale(index, context = null) {
 
 function changeScale(index, manual = true) {
   index = Number(index);
+  if(index===9){stopTour();showCombinedView();return;}
   if (!Number.isInteger(index) || !scales[index]) return;
   if (manual) stopTour();
-  if (index === state.scale) return;
+  if (index === state.scale) {universe?.cancelPendingView();return;}
   updateScale(index);
   universe?.setScale(index);
 }
 
 function pickObject(index, object) {
+  if(state.scale===9&&universe?.combinedView.getObject(object.id)){
+    stopTour();closeModal();universe.focusObject(universe.combinedView.getObject(object.id));return;
+  }
   if (index === 8 || object.nasaCatalogue) { selectNasaObject(object); return; }
   stopTour();
   closeModal();
@@ -821,7 +837,37 @@ function openSettings() {
     <p>${reducedMotion ? t("Reduced motion detected: rotation is off by default unless you have saved another preference.","Riduzione del movimento rilevata: la rotazione parte disattivata, salvo una tua preferenza salvata.") : t("Preferences are saved on this device.","Le preferenze vengono salvate su questo dispositivo.")}</p>`);
 }
 
+function objectLayerButtons(){
+  return [['planets',t('Planets','Pianeti')],['stars',t('Stars','Stelle')],['nebulae',t('Nebulae','Nebulose')]].map(([name,label])=>`<button data-object-layer="${name}" aria-pressed="${state.objectLayers[name]}"><span class="object-layer-dot" aria-hidden="true"></span>${label}</button>`).join('');
+}
+function onObjectLayersChange(value){
+  state.objectLayers={...value};
+  document.querySelectorAll('[data-object-layer]').forEach(button=>button.setAttribute('aria-pressed',Boolean(value[button.dataset.objectLayer])));
+  updatePreviewHud();savePreferences();
+}
+function refreshCombinedLoading(){
+  if($('#modal').open&&$('#modal').dataset.kind==='vr'){$('#modal-body').innerHTML=vrContent();refreshIcons();}
+  const status=$('#combined-preview-status');
+  status.hidden=!combinedLoading&&!combinedError;
+  status.textContent=combinedLoading?t('Loading combined NASA catalogues…','Caricamento dei cataloghi NASA combinati…'):combinedError;
+}
+function prepareCombinedCatalogue(){
+  if(combinedData)return Promise.resolve(combinedData);
+  if(combinedPromise)return combinedPromise;
+  combinedLoading=true;combinedError='';refreshCombinedLoading();
+  combinedPromise=loadCelestialCatalog().then(data=>{combinedData=data;return data;}).catch(error=>{combinedError=error.message;throw error;}).finally(()=>{combinedLoading=false;combinedPromise=null;refreshCombinedLoading();});
+  return combinedPromise;
+}
+async function showCombinedView(){
+  if(!universe)return;
+  combinedError='';combinedLoading=true;refreshCombinedLoading();
+  try{await universe.showCombinedMap(combinedData);combinedData=universe.catalogueData||combinedData;}
+  catch(error){combinedError=error.message;notify(error.message);}
+  finally{combinedLoading=false;refreshCombinedLoading();updatePreviewHud();}
+}
 function vrContent() {
+  const contentReady=immersiveContent!=='combined'||Boolean(combinedData);
+
   const status = !universe ? t("3D rendering is unavailable. Enable browser hardware acceleration and reload.","Il rendering 3D non è disponibile. Attiva l'accelerazione hardware del browser e ricarica.")
     : !window.isSecureContext ? t("Headset modes require HTTPS or localhost. Desktop preview is available here.","Le modalità visore richiedono HTTPS o localhost. L'anteprima PC è disponibile qui.")
     : !navigator.xr ? t("No WebXR device is available in this browser. Use Desktop preview, or open this page in Meta Quest Browser for headset modes.","Nessun dispositivo WebXR disponibile in questo browser. Usa l'anteprima PC oppure apri la pagina in Meta Quest Browser per le modalità visore.")
@@ -830,17 +876,19 @@ function vrContent() {
     : t("Available headset modes are enabled below.","Le modalità visore disponibili sono attive qui sotto.");
   return `<p>${t("Walk inside a map placed in the room. Objects keep their positions as you move; grabbing, rotating and resizing the map changes its placement explicitly.","Cammina dentro una mappa collocata nell'ambiente. Gli oggetti mantengono la posizione mentre ti muovi; presa, rotazione e ridimensionamento modificano esplicitamente la mappa.")}</p>
     <label class="xr-layout-setting" for="xr-layout">${t("Initial map layout","Disposizione iniziale della mappa")}<select id="xr-layout"><option value="room" ${spatialLayout==='room'?'selected':''}>${t("Room scale · map surrounds you","Scala ambiente · mappa intorno a te")}</option><option value="tabletop" ${spatialLayout==='tabletop'?'selected':''}>${t("Tabletop · small map in front","Mappa ridotta · davanti a te")}</option></select></label>
+    <label class="xr-layout-setting" for="xr-content">${t('Map content','Contenuto della mappa')}<select id="xr-content"><option value="current" ${immersiveContent==='current'?'selected':''}>${t('Current map','Mappa attuale')}</option><option value="combined" ${immersiveContent==='combined'?'selected':''}>${t('Combined map: planets, stars and nebulae','Mappa combinata: pianeti, stelle e nebulose')}</option></select></label>
+    ${immersiveContent==='combined'?`<div class="object-layer-switches" role="group" aria-label="${t('Object categories','Categorie di oggetti')}">${objectLayerButtons()}</div><p class="combined-projection-note">${t('Solar System model plus NASA sky directions. Exoplanet markers share their host positions; sky distances use a separate display scale.','Modello del Sistema Solare e direzioni celesti NASA. Gli esopianeti condividono la posizione della stella ospite; il cielo usa una scala visiva separata.')}</p><p id="combined-load-status" role="status">${combinedLoading?t('Loading NASA catalogues…','Caricamento cataloghi NASA…'):escape(combinedError||t('All three object categories are available.','Tutte e tre le categorie di oggetti sono disponibili.'))}</p>${combinedError?`<button class="focus-button" data-action="retry-combined">${t('Retry catalogue loading','Riprova caricamento cataloghi')}</button>`:''}`:''}
     <div class="xr-mode-options">
-      <article class="xr-mode-card"><h3>${t("DESKTOP PREVIEW","ANTEPRIMA PC")}</h3><p>${t("View the same spatial layout on your PC. Walk with W A S D, change height with Q / E and drag to look around. No headset required.","Osserva la stessa disposizione spaziale sul PC. Cammina con W A S D, cambia altezza con Q / E e trascina per guardarti intorno. Non serve un visore.")}</p><button class="focus-button" data-action="start-preview" ${universe?'':'disabled'}>${icon('monitor')}${t("Start desktop preview","Avvia anteprima PC")}</button></article>
-      <article class="xr-mode-card"><h3>${t("META QUEST MIXED REALITY","REALTÀ MISTA META QUEST")}</h3><p>${t("See your room through passthrough, with the map fixed around you. Walk between objects and use hands or controllers to interact.","Vedi il tuo ambiente attraverso il passthrough, con la mappa fissa intorno a te. Cammina tra gli oggetti e interagisci con mani o controller.")}</p><button class="focus-button" data-action="start-mr" ${mrSupported&&universe?'':'disabled'}>${icon('scan')}${t("Enter mixed reality","Entra in realtà mista")}</button><small>${mrSupported?t("Passthrough session supported.","Sessione passthrough supportata."):t("Requires an immersive AR session in a compatible headset browser.","Richiede una sessione AR immersiva nel browser di un visore compatibile.")}</small></article>
-      <article class="xr-mode-card"><h3>${t("VIRTUAL REALITY","REALTÀ VIRTUALE")}</h3><p>${t("Enter the spatial map with a fully virtual background. Room-scale walking and the same map interactions are available.","Entra nella mappa spaziale con uno sfondo interamente virtuale. Puoi camminare nell'ambiente e usare gli stessi comandi della mappa.")}</p><button class="focus-button" data-action="start-vr" ${xrSupported&&universe?'':'disabled'}>${icon('glasses')}${t("Enter VR atlas","Entra nell'atlante VR")}</button></article>
+      <article class="xr-mode-card"><h3>${t("DESKTOP PREVIEW","ANTEPRIMA PC")}</h3><p>${t("View the same spatial layout on your PC. Walk with W A S D, change height with Q / E and drag to look around. No headset required.","Osserva la stessa disposizione spaziale sul PC. Cammina con W A S D, cambia altezza con Q / E e trascina per guardarti intorno. Non serve un visore.")}</p><button class="focus-button" data-action="start-preview" ${universe&&contentReady?'':'disabled'}>${icon('monitor')}${t("Start desktop preview","Avvia anteprima PC")}</button></article>
+      <article class="xr-mode-card"><h3>${t("META QUEST MIXED REALITY","REALTÀ MISTA META QUEST")}</h3><p>${t("See your room through passthrough, with the map fixed around you. Walk between objects and use hands or controllers to interact.","Vedi il tuo ambiente attraverso il passthrough, con la mappa fissa intorno a te. Cammina tra gli oggetti e interagisci con mani o controller.")}</p><button class="focus-button" data-action="start-mr" ${mrSupported&&universe&&contentReady?'':'disabled'}>${icon('scan')}${t("Enter mixed reality","Entra in realtà mista")}</button><small>${mrSupported?t("Passthrough session supported.","Sessione passthrough supportata."):t("Requires an immersive AR session in a compatible headset browser.","Richiede una sessione AR immersiva nel browser di un visore compatibile.")}</small></article>
+      <article class="xr-mode-card"><h3>${t("VIRTUAL REALITY","REALTÀ VIRTUALE")}</h3><p>${t("Enter the spatial map with a fully virtual background. Room-scale walking and the same map interactions are available.","Entra nella mappa spaziale con uno sfondo interamente virtuale. Puoi camminare nell'ambiente e usare gli stessi comandi della mappa.")}</p><button class="focus-button" data-action="start-vr" ${xrSupported&&universe&&contentReady?'':'disabled'}>${icon('glasses')}${t("Enter VR atlas","Entra nell'atlante VR")}</button></article>
     </div>
     <p id="xr-status" role="status">${status}</p>
     <h3>${t("HANDS AND CONTROLLERS","MANI E CONTROLLER")}</h3><p>${t("Brief pinch or trigger: select. Hold a pinch or grip: move and rotate the map. Two hands: resize. Release to fix the map in its new position. The spatial panel provides scale navigation, reset and exit.","Pizzico breve o grilletto: seleziona. Pizzico mantenuto o presa: sposta e ruota la mappa. Due mani: ridimensiona. Rilascia per fissare la nuova posizione. Il pannello spaziale permette di cambiare scala, ripristinare ed uscire.")}</p>
     <p>${t("Enable hand tracking in the headset settings. Earth and catalogue sky views retain their angular projection; their sky cannot be grabbed or walked through.","Attiva il tracciamento delle mani nelle impostazioni del visore. Le viste del cielo terrestre e del catalogo mantengono la proiezione angolare; il cielo non può essere afferrato o attraversato.")}</p>`;
 }
 
-function openVR() { openModal('vr', t("Immersive views","Viste immersive"), vrContent()); }
+function openVR() {if(state.scale===9)immersiveContent='combined';openModal('vr', t("Immersive views","Viste immersive"), vrContent());if(immersiveContent==='combined')prepareCombinedCatalogue().catch(()=>{});}
 
 async function checkVR() {
   const supports = async mode => { try { return Boolean(window.isSecureContext && navigator.xr && await navigator.xr.isSessionSupported(mode)); } catch { return false; } };
@@ -851,8 +899,10 @@ async function checkVR() {
 
 async function startVR(button, mode='immersive-vr') {
   if (!universe || !(mode==='immersive-ar'?mrSupported:xrSupported)) return;
+  if(immersiveContent==='combined'&&!combinedData)return;
   button.disabled = true;
   try {
+    if(immersiveContent==='combined'&&universe.index!==9)universe.buildCombinedMap(combinedData);
     const started = await universe.enterVR({mode,layout:spatialLayout});
     if (started) closeModal();
   } catch (error) { notify(error?.message || t("Unable to start the immersive session.","Impossibile avviare la sessione immersiva.")); }
@@ -861,11 +911,12 @@ async function startVR(button, mode='immersive-vr') {
 
 function updatePreviewHud() {
   if (!$('#preview-hud')) return;
-  $('#preview-selection').textContent = state.object?.name || '';
+  $('#preview-selection').textContent = state.scale===9&&!Object.values(state.objectLayers).some(Boolean)?t('All object categories disabled','Tutte le categorie disattivate'):state.object?.name || '';
+  $('#combined-object-layers').hidden=state.scale!==9;
   const sky = state.scale===7 || state.scale===8 || state.context?.earthPerspective;
-  $('#preview-space-note').textContent = sky ? t("Angular sky projection · look around and select","Proiezione celeste angolare · osserva e seleziona") : t("Map fixed in room coordinates","Mappa fissa nelle coordinate dell'ambiente");
+  $('#preview-space-note').textContent = state.scale===9?t('Solar System model + projected NASA sky','Modello del Sistema Solare + cielo NASA proiettato'):sky ? t("Angular sky projection · look around and select","Proiezione celeste angolare · osserva e seleziona") : t("Map fixed in room coordinates","Mappa fissa nelle coordinate dell'ambiente");
   $('#preview-scale').querySelector('[data-context]')?.remove();
-  if (state.scale>=5) { const option=document.createElement('option');option.value=state.scale;option.textContent=currentScale().name;option.dataset.context='true';$('#preview-scale').append(option); }
+  if (state.scale>=5&&state.scale!==9) { const option=document.createElement('option');option.value=state.scale;option.textContent=currentScale().name;option.dataset.context='true';$('#preview-scale').append(option); }
   $('#preview-scale').value=state.scale;
   $('#preview-layout').value=spatialLayout;
   document.querySelectorAll('.preview-map-actions button').forEach(button=>{button.disabled=Boolean(sky && /preview-(scale|rotate)/.test(button.dataset.action));});
@@ -892,13 +943,15 @@ function onPreviewChange(active, details={}) {
 }
 
 function startPreview() {
-  if(!universe)return;
+  if(!universe||(immersiveContent==='combined'&&!combinedData))return;
+  if(immersiveContent==='combined'&&universe.index!==9)universe.buildCombinedMap(combinedData);
   stopTour();if(state.cinematic)setCinematic(false);closeModal();
   universe.enterPreview({layout:spatialLayout});
   $('#universe').focus();
 }
 
 document.addEventListener('change', event => {
+  if(event.target.id==='xr-content'){immersiveContent=event.target.value==='combined'?'combined':'current';refreshCombinedLoading();if(immersiveContent==='combined')prepareCombinedCatalogue().catch(()=>{});else refreshCombinedLoading();return;}
   if(event.target.id==='xr-layout'||event.target.id==='preview-layout'){spatialLayout=event.target.value==='tabletop'?'tabletop':'room';if(universe?.preview.isActive)universe.preview.setLayout(spatialLayout);return;}
   if(event.target.id==='preview-scale'){changeScale(event.target.value);$('#universe').focus();return;}
   if (event.target.id !== 'language-setting' || event.target.value === getLanguage()) return;
@@ -919,6 +972,7 @@ document.addEventListener('click', async event => {
   if (!button || button.disabled) return;
   if (button.matches('a.brand')) { event.preventDefault(); closeModal(); changeScale(0); universe?.resetView(); return; }
   if (button.dataset.scale !== undefined) return changeScale(button.dataset.scale);
+  if(button.dataset.objectLayer){universe?.setObjectLayer(button.dataset.objectLayer,!state.objectLayers[button.dataset.objectLayer]);return;}
   if (button.dataset.layer) return setLayer(button.dataset.layer, !state[button.dataset.layer]);
   if (button.dataset.quality) {
     state.quality = button.dataset.quality;
@@ -964,7 +1018,7 @@ document.addEventListener('click', async event => {
       if (parent) {
         stopTour();
         closeModal();
-        if (state.scale !== 0) changeScale(0);
+        if (state.scale !== 0&&state.scale!==9) changeScale(0);
         renderObject(parent);
         universe?.focusMoonSystem(parent);
       }
@@ -1001,6 +1055,7 @@ document.addEventListener('click', async event => {
     case 'start-vr': await startVR(button); break;
     case 'start-mr': await startVR(button,'immersive-ar'); break;
     case 'start-preview': startPreview(); break;
+    case 'retry-combined': prepareCombinedCatalogue().catch(()=>{}); break;
     case 'exit-preview': universe?.exitPreview(); break;
     case 'preview-clean': setPreviewClean(!previewClean); break;
     case 'recenter-preview': universe?.preview.recenter(); break;
@@ -1074,7 +1129,9 @@ try {
     onScale: updateScale,
     onMessage: notify,
     onImmersiveChange: setCinematic,
-    onPreviewChange
+    onPreviewChange,
+    objectLayers:state.objectLayers,
+    onObjectLayersChange
   });
   ['labels','grid','particles'].forEach(name => universe.setLayer(name, state[name]));
   universe.setAutoRotate(state.autoRotate);
@@ -1104,7 +1161,8 @@ async function restoreLanguageView() {
   } catch { return; }
   if (!saved || !universe) return;
   try {
-    if (saved.scale === 8) {
+    if(saved.scale===9){await universe.showCombinedMap();combinedData=universe.catalogueData;const selected=universe.combinedView.getObject(saved.objectId);if(selected&&state.objectLayers[selected.combinedLayer])universe.selectObject(selected);}
+    else if (saved.scale === 8) {
       const data = await ensureNasaSearch();
       const object = data.byId.get(saved.objectId);
       if (object) await universe.showCatalogueObject(object, data);

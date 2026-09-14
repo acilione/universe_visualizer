@@ -228,3 +228,20 @@ test('desktop animation events follow placement and explicit map changes, not vi
     assert.equal(f.mapActions.length, count);
   } finally { f.dispose(); }
 });
+
+
+test('desktop immersive selects catalogue point records and respects hidden parent layers', () => {
+  const f = fixture();
+  try {
+    f.preview.enter();
+    const target = f.addTarget(new THREE.Vector3(0, 0, -4));
+    const layer = new THREE.Group(); f.root.add(layer); layer.add(target);
+    const object = { id: 'ngc-1976', name: 'Orion Nebula' };
+    target.raycast = (raycaster, hits) => hits.push({ distance: 2, point: raycaster.ray.at(2, new THREE.Vector3()), object: target, dataObject: object });
+    f.canvas.fire('pointerdown'); f.canvas.fire('pointerup');
+    assert.deepEqual(f.selected, [object]);
+    layer.visible = false;
+    f.canvas.fire('pointerdown'); f.canvas.fire('pointerup');
+    assert.equal(f.selected.length, 1);
+  } finally { f.dispose(); }
+});

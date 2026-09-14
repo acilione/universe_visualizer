@@ -50,6 +50,16 @@ The reference space is **session-local** (`local-floor`), with metre units and a
 
 Earth sky and NASA catalogue sky views are angular projections. They remain centred as a sky around the observer: walking through them would imply distances that those projections do not contain. Desktop translation is disabled for these views; looking and selecting still work. Use a spatial map level or a constellation's **3D space** view to explore a volume.
 
+## Combined map: planets, stars and nebulae
+
+In the immersive-mode chooser, set **Map content** to **Combined map**, wait for the NASA catalogue to load, then start the PC preview, VR or mixed reality. You can also choose **Combined map** from the preview's reference selector. All three object layers start enabled: **Planets**, **Stars** and **Nebulae**. Planets includes the supported natural satellites and exoplanets; the Sun belongs to Stars.
+
+Use the object-layer controls to show or hide each category independently. The desktop atlas, PC preview and headset controls use the same choices, which are remembered on this browser. Turning a layer off removes its objects from rendering and selection without moving the map or resetting your viewpoint. Turning all three off is valid. Searching for an object and locating it enables its layer and keeps the combined map open; its scientific information remains available through **Object data**.
+
+This view combines different presentation scales. The Solar System and its supported moons occupy the foreground using the atlas's schematic planetary model. Exoplanets are shown at their catalogue host directions. The NASA stellar and nebular catalogues provide the surrounding equatorial sky; these directions are not a common physical-distance model with the foreground planets. Nebular extents use the available angular-size data, and the scientific object panels retain the catalogue measurements and sources. The combined view does not invent distances for objects whose distance is unknown.
+
+In the room layout, the combined map stays fixed in the tracked space as you walk. Changing object layers only changes visibility; it does not recenter, rotate or resize the map. The existing map opening, interaction effects, manual placement and clean-view controls also apply to this view.
+
 ## Animated map projection
 
 PC preview, VR and mixed reality share a gradual map opening: luminous arcs expand through the surrounding reference grid as the map becomes visible. Fine cyan lines and amber particles provide depth cues inside spatial views. Selecting an object produces a local pulse; manipulating the map adds light near the hands or controllers. The effects do not change catalogue coordinates or move the viewer.

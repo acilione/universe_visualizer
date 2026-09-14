@@ -13,6 +13,12 @@ const BUTTONS = [
   { label: ["IMMERSIVE", "LIBERA"], action: 'immersive', x: 772, y: 220, w: 174, h: 74 },
   { label: ["EXIT VR", "ESCI VR"], action: 'exit', x: 958, y: 220, w: 174, h: 74 },
 ];
+const LAYER_HEIGHT = 150;
+const LAYER_BUTTONS = [
+  { name: 'planets', label: ['PLANETS', 'PIANETI'], x: 28, y: 45, w: 356, h: 76 },
+  { name: 'stars', label: ['STARS', 'STELLE'], x: 402, y: 45, w: 356, h: 76 },
+  { name: 'nebulae', label: ['NEBULAE', 'NEBULOSE'], x: 776, y: 45, w: 356, h: 76 },
+];
 const SCALE_NAMES = [['Solar System','Sistema Solare'],['Nearby stars','Stelle vicine'],['Milky Way','Via Lattea'],['Local Group','Gruppo Locale'],['Observable universe','Universo osservabile']];
 
 /**
@@ -20,7 +26,7 @@ const SCALE_NAMES = [['Solar System','Sistema Solare'],['Nearby stars','Stelle v
  * onScale receives -1/+1; mapRoot transforms must be left to this module in VR.
  * XRInputSource.targetRaySpace works for both hands and handheld controllers.
  */
-export function createXR({ renderer, scene, camera, controls, mapRoot, getTargets, getBoundsRadius = () => 30, getEnvironment = () => [], onSelect, onFocus, onScale, getScale, getPresentationMode = () => 'atlas', onSessionEnd, onImmersiveChange, onMessage = () => {}, onMapAction = () => {} }) {
+export function createXR({ renderer, scene, camera, controls, mapRoot, getTargets, getBoundsRadius = () => 30, getEnvironment = () => [], onSelect, onFocus, onScale, getScale, getPresentationMode = () => 'atlas', getObjectLayers = () => null, onObjectLayerChange = () => {}, onSessionEnd, onImmersiveChange, onMessage = () => {}, onMapAction = () => {} }) {
   renderer.xr.enabled = true;
   renderer.xr.setReferenceSpaceType('local-floor');
   const raycaster = new THREE.Raycaster();
@@ -40,6 +46,21 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   panel.name = 'XR navigation panel';
   panel.renderOrder = 100;
   panel.visible = false;
+  const layerCanvas = document.createElement('canvas');
+  layerCanvas.width = WIDTH;
+  layerCanvas.height = LAYER_HEIGHT;
+  const layerContext = layerCanvas.getContext('2d');
+  const layerTexture = new THREE.CanvasTexture(layerCanvas);
+  layerTexture.colorSpace = THREE.SRGBColorSpace;
+  const layerPanel = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.45, 1.45 * LAYER_HEIGHT / WIDTH),
+    new THREE.MeshBasicMaterial({ map: layerTexture, transparent: true, depthTest: false, toneMapped: false }),
+  );
+  layerPanel.name = 'XR object layers';
+  layerPanel.position.y = -1.45 * (HEIGHT + LAYER_HEIGHT) / WIDTH / 2 - 0.018;
+  layerPanel.renderOrder = 100;
+  layerPanel.visible = false;
+  panel.add(layerPanel);
   const restoreOrb = new THREE.Mesh(
     new THREE.SphereGeometry(0.022, 20, 14),
     new THREE.MeshBasicMaterial({ color: 0xa5efe7, transparent: true, opacity: 0.7, depthTest: false, toneMapped: false }),
@@ -68,16 +89,63 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   let hoverButton = -1;
   let panelDirty = true;
   let lastScale = null;
+  let lastLayerState = '';
   let lastPresentationMode = presentationMode();
   function presentationMode() { return getPresentationMode() === 'planetarium' ? 'planetarium' : 'atlas'; }
   function isPlanetarium() { return presentationMode() === 'planetarium'; }
   const inputs = [];
   const listeners = [];
-  const ownedGeometries = new Set([panel.geometry, restoreOrb.geometry, jointGeometry, lineGeometry]);
-  const ownedMaterials = new Set([panel.material, restoreOrb.material, ...jointMaterials]);
+  const ownedGeometries = new Set([panel.geometry, layerPanel.geometry, restoreOrb.geometry, jointGeometry, lineGeometry]);
+  const ownedMaterials = new Set([panel.material, layerPanel.material, restoreOrb.material, ...jointMaterials]);
   function listen(target, type, callback) {
     target.addEventListener(type, callback);
     listeners.push(() => target.removeEventListener(type, callback));
+  }
+
+  function syncLayerState() {
+    const layers = getObjectLayers();
+    const signature = layers ? LAYER_BUTTONS.map(button => Number(Boolean(layers[button.name]))).join('') : '';
+    layerPanel.visible = active && !immersive && Boolean(layers);
+    if (signature !== lastLayerState) {
+      lastLayerState = signature;
+      panelDirty = true;
+    }
+    return layers;
+  }
+
+  function paintLayers() {
+    const layers = syncLayerState();
+    if (!layers) return;
+    layerContext.clearRect(0, 0, WIDTH, LAYER_HEIGHT);
+    layerContext.fillStyle = 'rgba(6, 17, 22, .95)';
+    layerContext.beginPath();
+    layerContext.roundRect(1, 1, WIDTH - 2, LAYER_HEIGHT - 2, 18);
+    layerContext.fill();
+    layerContext.strokeStyle = '#796849';
+    layerContext.lineWidth = 2;
+    layerContext.stroke();
+    layerContext.textBaseline = 'middle';
+    layerContext.textAlign = 'left';
+    layerContext.font = '500 20px sans-serif';
+    layerContext.fillStyle = '#afbfbd';
+    layerContext.fillText(t('VISIBLE OBJECTS', 'OGGETTI VISIBILI'), 28, 23);
+    for (let i = 0; i < LAYER_BUTTONS.length; i++) {
+      const button = LAYER_BUTTONS[i];
+      const enabled = Boolean(layers[button.name]);
+      const hovered = hoverButton === BUTTONS.length + i;
+      layerContext.fillStyle = hovered ? '#d6b882' : enabled ? '#244b50' : '#142026';
+      layerContext.beginPath();
+      layerContext.roundRect(button.x, button.y, button.w, button.h, 9);
+      layerContext.fill();
+      layerContext.strokeStyle = enabled ? '#a5efe7' : '#57635a';
+      layerContext.lineWidth = enabled ? 2 : 1;
+      layerContext.stroke();
+      layerContext.textAlign = 'center';
+      layerContext.fillStyle = hovered ? '#142026' : enabled ? '#e0f5ec' : '#95a6a8';
+      layerContext.font = '600 24px sans-serif';
+      layerContext.fillText(`${t(...button.label)}  ${enabled ? t('ON', 'SI') : t('OFF', 'NO')}`, button.x + button.w / 2, button.y + button.h / 2);
+    }
+    layerTexture.needsUpdate = true;
   }
 
   function paintPanel() {
@@ -132,6 +200,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       ? t("CONTROLLERS  ·  Trigger: select   /   Recenter: reposition the horizon","CONTROLLER  ·  Grilletto: seleziona   /   Ricentra: riposiziona l’orizzonte")
       : t("CONTROLLERS  ·  Trigger: select   /   Grip: grab","CONTROLLER  ·  Grilletto: seleziona   /   Impugnatura: afferra"), 30, 375, 1090);
     texture.needsUpdate = true;
+    paintLayers();
     panelDirty = false;
   }
 
@@ -162,6 +231,13 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     raycaster.ray.direction.set(0, 0, -1).applyMatrix4(rotationMatrix).normalize();
     const orbHit = restoreOrb.visible ? raycaster.intersectObject(restoreOrb, false)[0] : null;
     if (orbHit) return { ...orbHit, action: 'restore', button: -2, panel: true };
+    const layersHit = visibleObject(layerPanel) ? raycaster.intersectObject(layerPanel, false)[0] : null;
+    if (layersHit?.uv) {
+      const px = layersHit.uv.x * WIDTH;
+      const py = (1 - layersHit.uv.y) * LAYER_HEIGHT;
+      const index = LAYER_BUTTONS.findIndex(button => px >= button.x && px <= button.x + button.w && py >= button.y && py <= button.y + button.h);
+      return { ...layersHit, button: index < 0 ? -1 : BUTTONS.length + index, action: 'object-layer', layer: LAYER_BUTTONS[index]?.name, panel: true };
+    }
     const panelHit = panel.visible ? raycaster.intersectObject(panel, false)[0] : null;
     if (panelHit?.uv) {
       const px = panelHit.uv.x * WIDTH;
@@ -173,15 +249,22 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     raycaster.far = isPlanetarium() || layout === 'room' ? 120 : 20;
     const targets = (getTargets?.() || []).filter(visibleObject);
     const hits = raycaster.intersectObjects(targets, false);
-    if (!hits.length) return null;
-    return { ...hits[0], item: hits[0].object.userData.object };
+    const hit = hits.find(candidate => candidate.dataObject || candidate.object.userData.object);
+    return hit ? { ...hit, item: hit.dataObject || hit.object.userData.object } : null;
   }
 
   function activate(hit) {
     if (!hit) return;
     if (hit.panel) {
       const action = hit.action || BUTTONS[hit.button]?.action;
-      if (action === 'previous' || action === 'next') {
+      if (action === 'object-layer' && hit.layer) {
+        const layers = getObjectLayers();
+        if (layers && Object.hasOwn(layers, hit.layer)) {
+          onObjectLayerChange(hit.layer, !layers[hit.layer]);
+          syncLayerState();
+          panelDirty = true;
+        }
+      } else if (action === 'previous' || action === 'next') {
         onScale?.(action === 'previous' ? -1 : 1);
         recenter();
         panelDirty = true;
@@ -375,6 +458,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     const changed = immersive !== Boolean(value);
     immersive = Boolean(value);
     panel.visible = active && !immersive;
+    syncLayerState();
     restoreOrb.visible = active && immersive;
     if (active) {
       if (immersive) positionRestoreOrb();
@@ -469,6 +553,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     active = false;
     entering = false;
     panel.visible = false;
+    layerPanel.visible = false;
     restoreOrb.visible = false;
     focusState = null;
     for (const input of inputs) {
@@ -587,6 +672,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       lastScale = getScale?.();
       entering = false;
       panel.visible = !immersive;
+      syncLayerState();
       restoreOrb.visible = immersive;
       recenterPending = true;
       panelDirty = true;
@@ -624,6 +710,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     if (!active || !renderer.xr.isPresenting) return;
     const currentMode = presentationMode();
     const currentScale = getScale?.();
+    syncLayerState();
     if (currentMode !== lastPresentationMode || currentScale !== lastScale) {
       lastScale = currentScale;
       lastPresentationMode = currentMode;
@@ -740,6 +827,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     for (const geometry of ownedGeometries) geometry.dispose();
     for (const material of ownedMaterials) material.dispose();
     texture.dispose();
+    layerTexture.dispose();
   }
 
   function setInfo(value = {}) {

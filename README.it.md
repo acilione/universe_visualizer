@@ -69,6 +69,8 @@ Comandi di base: trascina per orbitare, tasto destro per spostare, rotellina per
 
 Apri **VR / MR** e scegli **Avvia anteprima PC** per vedere la mappa in prima persona senza visore. W A S D per camminare, Q / E per cambiare altezza, trascinamento per guardare intorno e clic per selezionare. Sono disponibili ricerca, dimensione e rotazione della mappa e comandi per nascondere le scritte.
 
+Scegli **Contenuto della mappa → Mappa combinata: pianeti, stelle e nebulose** per caricare tutte e tre le categorie insieme. I pulsanti **Pianeti**, **Stelle** e **Nebulose** sono indipendenti e disponibili nell’anteprima, nel pannello laterale e nel visore; le preferenze vengono salvate. Anche il selettore **Mappa** dell’anteprima apre questa vista. Il Sistema Solare schematico, con i satelliti, è circondato da una proiezione delle direzioni NASA di stelle, nebulose e sistemi esoplanetari, con scale visive separate.
+
 Su Quest, scegli **Entra in realtà mista** per il passthrough oppure **Entra nell'atlante VR** per lo sfondo virtuale. La disposizione predefinita **Scala ambiente** mette la mappa intorno all'osservatore e la mantiene fissa nelle coordinate della sessione mentre cammina. Rimane disponibile la **Mappa ridotta** davanti all'utente. Il tracciamento delle mani è opzionale; in alternativa sono utilizzabili i controller. [Viste immersive](IMMERSIVE.md) descrive comandi e configurazione del visore.
 
 - Pizzico breve o grilletto: seleziona.

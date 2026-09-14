@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { createXR } from '../src/xr.js';
 
-function createHarness(t, initialMode = 'planetarium') {
+function createHarness(t, initialMode = 'planetarium', initialLayers = null) {
   const savedGlobals = new Map(['document', 'window', 'navigator'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
   const text = [];
   const context = new Proxy({ fillText: value => text.push(value) }, { get: (target, key) => target[key] ?? (() => {}) });
@@ -57,13 +57,18 @@ function createHarness(t, initialMode = 'planetarium') {
   const focusActions = [];
   const ended = [];
   const messages = [];
+  const layerActions = [];
+  let layers = initialLayers;
+  const targets = [star, opposite];
   let mode = initialMode;
-  let scale = mode === 'planetarium' ? 7 : 6;
+  let scale = initialLayers ? 9 : mode === 'planetarium' ? 7 : 6;
   const xr = createXR({ renderer: { xr: manager }, scene, camera, controls, mapRoot,
-    getTargets: () => [star, opposite], getBoundsRadius: () => 60, getPresentationMode: () => mode, getScale: () => scale,
+    getTargets: () => targets, getBoundsRadius: () => 60, getPresentationMode: () => mode, getScale: () => scale,
     onSelect: value => selected.push(value), onScale: sign => scaleActions.push(sign), onFocus: value => focusActions.push(value), onMessage: message => messages.push(message),
     onSessionEnd: event => ended.push({ ...event, controlsEnabled: controls.enabled }),
     onMapAction: event => mapActions.push(event),
+    getObjectLayers: () => layers,
+    onObjectLayerChange: (name, enabled) => { layerActions.push([name, enabled]); layers = { ...layers, [name]: enabled }; },
   });
   const setMode = next => { mode = next; scale = next === 'planetarium' ? 7 : 6; };
   const connect = (index = 0, hand = false) => controllers[index].dispatchEvent({ type: 'connected', data: hand ? { hand: {} } : {} });
@@ -76,7 +81,7 @@ function createHarness(t, initialMode = 'planetarium') {
       else delete globalThis[key];
     }
   });
-  return { xr, mapRoot, camera, viewer, controls, controllers, grips, hands, selected, scaleActions, focusActions, ended, messages, text, object, session, setMode, connect, mapActions, manager };
+  return { xr, mapRoot, camera, viewer, controls, controllers, grips, hands, selected, scaleActions, focusActions, ended, messages, text, object, session, setMode, connect, mapActions, manager, targets, star, layerActions, setLayers(value) { layers = value; } };
 }
 
 const identity = () => new THREE.Quaternion();
@@ -293,4 +298,108 @@ test('hand tracking loss and session exit clear feedback while planetarium grips
   h.controllers[0].dispatchEvent({ type: 'squeezestart' }); h.xr.update();
   await h.session.end();
   assert.equal(h.mapActions.at(-1).type, 'grab-end');
+});
+
+
+function pointAtLayer(h, index) {
+  const panel = h.mapRoot.parent.getObjectByName('XR object layers');
+  const x = [206, 580, 954][index];
+  const point = panel.localToWorld(new THREE.Vector3((x / 1160 - .5) * 1.45, (.5 - 83 / 150) * 1.45 * 150 / 1160, 0));
+  const controller = h.controllers[0];
+  controller.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), point.sub(controller.getWorldPosition(new THREE.Vector3())).normalize());
+}
+
+const fixedPose = root => ({ position: root.position.toArray(), quaternion: root.quaternion.toArray(), scale: root.scale.toArray() });
+
+test('combined VR controller toggles every object layer without recentering the map', async t => {
+  const h = createHarness(t, 'atlas', { planets: true, stars: true, nebulae: true });
+  h.connect();
+  await h.xr.enter(); h.xr.update();
+  const panel = h.mapRoot.parent.getObjectByName('XR object layers');
+  assert.equal(panel.visible, true);
+  assert.ok(h.text.includes('PLANETS  ON'));
+  h.mapRoot.position.x += .9;
+  const fixed = fixedPose(h.mapRoot), animationCount = h.mapActions.length;
+  for (const index of [0, 1, 2, 1]) {
+    pointAtLayer(h, index);
+    h.controllers[0].dispatchEvent({ type: 'selectstart' });
+    h.controllers[0].dispatchEvent({ type: 'selectend' });
+    h.xr.update();
+    assert.deepEqual(fixedPose(h.mapRoot), fixed);
+  }
+  assert.deepEqual(h.layerActions, [['planets', false], ['stars', false], ['nebulae', false], ['stars', true]]);
+  assert.equal(h.selected.length, 0);
+  assert.equal(h.mapActions.length, animationCount);
+  assert.ok(h.text.includes('PLANETS  OFF'));
+  h.setLayers({ planets: false, stars: false, nebulae: true });
+  h.xr.setInfo({ name: 'Updated object' }); h.xr.update();
+  assert.ok(h.text.includes('Updated object'));
+  assert.ok(h.text.slice(-4).includes('NEBULAE  ON'));
+  assert.deepEqual(fixedPose(h.mapRoot), fixed);
+});
+
+test('combined VR hand pinch toggles a layer and a held panel pinch cannot grab the map', async t => {
+  const h = createHarness(t, 'atlas', { planets: true, stars: true, nebulae: true });
+  h.connect(0, true);
+  await h.xr.enter(); h.xr.update(); pointAtLayer(h, 2);
+  const fixed = fixedPose(h.mapRoot);
+  const joints = h.hands[0].joints;
+  const setGap = gap => {
+    joints['thumb-tip'].position.x = -gap / 2;
+    joints['index-finger-tip'].position.x = gap / 2;
+    h.xr.update();
+  };
+  setGap(.01); setGap(.06);
+  assert.deepEqual(h.layerActions, [['nebulae', false]]);
+  setGap(.01);
+  h.hands[0].position.x += .5; h.xr.update();
+  setGap(.06);
+  assert.deepEqual(fixedPose(h.mapRoot), fixed);
+  assert.equal(h.layerActions.length, 1, 'moving a held pinch does not activate a button');
+  assert.equal(h.mapActions.filter(event => event.type.startsWith('grab')).length, 0);
+});
+
+test('combined layer controls hide with immersive writing and are absent outside combined mode', async t => {
+  const h = createHarness(t, 'atlas', { planets: true, stars: true, nebulae: true });
+  h.connect();
+  await h.xr.enter(); h.xr.update();
+  const scene = h.mapRoot.parent, panel = scene.getObjectByName('XR object layers');
+  h.xr.setImmersive(true); h.xr.update();
+  assert.equal(panel.visible, false);
+  assert.equal(scene.getObjectByName('XR navigation panel').visible, false);
+  assert.equal(scene.getObjectByName('XR restore controls').visible, true);
+  h.xr.setImmersive(false); h.xr.update();
+  assert.equal(panel.visible, true);
+  h.setLayers(null); h.xr.update();
+  assert.equal(panel.visible, false);
+  pointAtLayer(h, 0);
+  h.controllers[0].dispatchEvent({ type: 'selectstart' });
+  h.controllers[0].dispatchEvent({ type: 'selectend' });
+  assert.equal(h.layerActions.length, 0);
+  h.setLayers({ planets: false, stars: false, nebulae: true }); h.xr.update();
+  assert.equal(panel.visible, true);
+  const disposed = [];
+  panel.geometry.addEventListener('dispose', () => disposed.push('geometry'));
+  panel.material.addEventListener('dispose', () => disposed.push('material'));
+  panel.material.map.addEventListener('dispose', () => disposed.push('texture'));
+  await h.xr.dispose();
+  assert.deepEqual(disposed.sort(), ['geometry', 'material', 'texture']);
+  assert.equal(scene.getObjectByName('XR object layers'), undefined);
+});
+
+test('XR selects the per-point catalogue record and ignores hidden cloud groups', async t => {
+  const h = createHarness(t, 'atlas', { planets: true, stars: true, nebulae: true });
+  h.connect();
+  const catalogueObject = { id: 'hip-113881', name: 'Scheat', position: [0, 0, -10] };
+  const layer = new THREE.Group(); h.mapRoot.add(layer); layer.add(h.star);
+  h.targets.splice(0, h.targets.length, h.star);
+  h.star.raycast = (raycaster, hits) => hits.push({ distance: 2, point: raycaster.ray.at(2, new THREE.Vector3()), object: h.star, dataObject: catalogueObject });
+  await h.xr.enter(); h.xr.update();
+  h.controllers[0].dispatchEvent({ type: 'selectstart' });
+  h.controllers[0].dispatchEvent({ type: 'selectend' });
+  assert.deepEqual(h.selected, [catalogueObject]);
+  layer.visible = false;
+  h.controllers[0].dispatchEvent({ type: 'selectstart' });
+  h.controllers[0].dispatchEvent({ type: 'selectend' });
+  assert.equal(h.selected.length, 1);
 });
