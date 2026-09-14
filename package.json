@@ -20,7 +20,9 @@
     "test:immersive": "node tests/immersive-ui.mjs",
     "test:immersive-effects": "node tests/immersive-effects-browser.mjs",
     "test:combined": "node tests/combined-map-browser.mjs",
-    "test:drilldown": "node tests/drilldown-browser.mjs"
+    "test:drilldown": "node tests/drilldown-browser.mjs",
+    "test:experiments": "node tests/experiments-browser.mjs",
+    "audit:gaia": "node scripts/audit-gaia.mjs"
   },
   "dependencies": {
     "three": "^0.180.0",

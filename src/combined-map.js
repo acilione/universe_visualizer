@@ -241,13 +241,14 @@ export function createCombinedMap({catalogue = {}, planets = [], exoplanets = []
     id: 'combined-map', mode: 'combined-map', name: t('Combined immersive map', 'Mappa immersiva combinata'), short: t('Combined map', 'Mappa combinata'),
     extent: t('Solar System + equatorial sky', 'Sistema Solare + cielo equatoriale'), metric: t('PLACED OBJECTS', 'OGGETTI POSIZIONATI'), count: formatNumber(objects.length),
     description: t('Solar System bodies, NASA catalogue stars, nebulae and confirmed exoplanet host directions in one view.', 'Corpi del Sistema Solare, stelle dei cataloghi NASA, nebulose e direzioni delle stelle con esopianeti confermati in una vista.'),
-    source: 'https://heasarc.gsfc.nasa.gov/W3Browse/star-catalog/hipparcos.html', positionNote,
+    source: 'https://heasarc.gsfc.nasa.gov/W3Browse/star-catalog/hipparcos.html', positionNote, gaiaDr3: catalogue.metadata?.gaiaDr3 || null,
     overview: t('Planets, stars and nebulae', 'Pianeti, stelle e nebulose'),
     renderedStarCount: stars.length, catalogStarCount: (catalogue.stars || []).length, nebulaCount: nebulae.length, catalogNebulaCount: (catalogue.nebulae || []).length,
     exoplanetCount: hosts.length, catalogExoplanetCount: exoplanets.length, solarBodyCount: solar.length,
     unplacedCounts, unplacedCount: Object.values(unplacedCounts).reduce((sum, count) => sum + count, 0),
     nebulaPatchCount: nebulae.filter(extentKnown).length,
   };
+  if (catalogue.metadata?.gaiaDr3) context.description += t(' Includes the ESA Gaia DR3 bright-source experiment.',' Include il sottoinsieme sperimentale di sorgenti luminose ESA Gaia DR3.');
   return {
     group, objects, targets, context, radius: RADIUS, layers, byId,
     setLayer(name, visible) {if (!Object.hasOwn(layers, name)) throw new RangeError(`Unknown combined map layer: ${name}`);layers[name].visible = Boolean(visible);},

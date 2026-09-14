@@ -6,7 +6,9 @@ import { Universe } from './universe.js';
 import { exoplanets, planetCatalogMetadata, findPlanet } from './planets.js';
 import { solarMoons, moonsForPlanet, findMoon, moonCatalogMetadata } from './moons.js';
 import { loadConstellations } from './constellation-catalog.js';
-import { loadCelestialCatalog, normalizeCelestialSearch, findNasaStarForObject } from './celestial-catalog.js';
+import { loadCelestialCatalog, normalizeCelestialSearch, findNasaStarForObject, setGaiaCatalogueEnabled } from './celestial-catalog.js';
+import { loadNasaImageSearch } from './official-images.js';
+import { imageGalleryMarkup } from './image-gallery.js';
 import { celestialMeasurements, celestialSourceLinks } from './celestial-info.js';
 import { parseCoordinate, dateInputInZone, zonedDateInputToIso } from './observer-input.js';
 
@@ -26,9 +28,11 @@ const state = {
   grid: preferences.grid !== false, particles: preferences.particles !== false,
   autoRotate: typeof preferences.autoRotate === 'boolean' ? preferences.autoRotate : !reducedMotion,
   quality: preferences.quality === 'low' ? 'low' : 'high',
+  gaiaDr3: preferences.gaiaDr3 === true,
   objectLayers: Object.fromEntries(['planets','stars','nebulae'].map(name=>[name,preferences.objectLayers?.[name]!==false])),
   tour: false, sound: false, cinematic: false
 };
+setGaiaCatalogueEnabled(state.gaiaDr3);
 let universe = null;
 let tourTimer = null;
 let toastTimer = null;
@@ -53,6 +57,10 @@ let combinedData = null;
 let combinedPromise = null;
 let combinedLoading = false;
 let combinedError = '';
+let imageObject = null;
+let imageController = null;
+let imageSearch = { records: null, loading: false, error: '' };
+let gaiaInspectionRequest = 0;
 
 let previewClean = false;
 let xrChecked = false;
@@ -159,8 +167,8 @@ $('#app').innerHTML = `
 `;
 
 function savePreferences() {
-  const { labels, grid, particles, autoRotate, quality, objectLayers } = state;
-  try { localStorage.setItem('aether.preferences', JSON.stringify({ labels, grid, particles, autoRotate, quality, objectLayers })); } catch { /* Storage can be unavailable in private browsers. */ }
+  const { labels, grid, particles, autoRotate, quality, objectLayers, gaiaDr3 } = state;
+  try { localStorage.setItem('aether.preferences', JSON.stringify({ labels, grid, particles, autoRotate, quality, objectLayers, gaiaDr3 })); } catch { /* Storage can be unavailable in private browsers. */ }
 }
 
 function notify(message) {
@@ -187,7 +195,7 @@ function objectMarkup(object, isModal = false) {
   const scale = currentScale();
   const planet = isPlanet(object);
   const moon = isMoon(object);
-  const nasa = object.nasaCatalogue || object.nasaInfo;
+  const nasa = object.nasaCatalogue || object.nasaInfo || object.gaiaCatalogue;
   const nebula = object.bodyKind === 'nebula';
   const moons = planet ? moonsForPlanet(object.id) : [];
   const exoplanet = object.bodyKind === 'exoplanet';
@@ -214,14 +222,15 @@ function objectMarkup(object, isModal = false) {
       <div class="card-stats"><span>${moon ? t("PARENT PLANET","PIANETA PRINCIPALE") : isOverview ? escape(scale.metric) : exoplanet ? t("DISTANCE FROM EARTH","DISTANZA DALLA TERRA") : t("DISTANCE / EXTENT","DISTANZA / ESTENSIONE")}</span><strong>${escape(moon ? object.parentName : isOverview ? scale.count : object.distance || t("Not available","Non disponibile"))}</strong></div>
       ${isOverview ? `<div class="card-stats"><span>${t("EXTENT","ESTENSIONE")}</span><strong>${escape(scale.extent)}</strong></div>` : ''}
       ${measurements}
-      ${catalogStar && !object.nasaCatalogue ? `<p class="illustration-note">${state.scale === 7 ? (object.altitudeDeg < 0 ? t("Below the horizon at the selected location and time.","Sotto l’orizzonte nel luogo e all’orario scelti.") : t("Sky direction at the selected location and time.","Direzione nel cielo dal luogo e all’orario scelti.")) : Number.isFinite(object.distanceLy) ? t("3D position from catalogue coordinates and distance.","Posizione 3D da coordinate e distanza di catalogo.") : t("Distance unavailable; included in the Earth sky view.","Distanza non disponibile: visibile nella vista dalla Terra.")}</p>${!isModal ? `<button class="planet-details-button" data-action="object">${t("Star data","Dati della stella")} ${icon('arrow-up-right')}</button>` : ''}` : ''}
-      ${object.nasaCatalogue && !isModal ? `<button class="planet-details-button" data-action="object">${t("Catalogue data","Dati di catalogo")} ${icon('arrow-up-right')}</button>` : ''}
+      ${catalogStar && !object.nasaCatalogue && !object.gaiaCatalogue ? `<p class="illustration-note">${state.scale === 7 ? (object.altitudeDeg < 0 ? t("Below the horizon at the selected location and time.","Sotto l’orizzonte nel luogo e all’orario scelti.") : t("Sky direction at the selected location and time.","Direzione nel cielo dal luogo e all’orario scelti.")) : Number.isFinite(object.distanceLy) ? t("3D position from catalogue coordinates and distance.","Posizione 3D da coordinate e distanza di catalogo.") : t("Distance unavailable; included in the Earth sky view.","Distanza non disponibile: visibile nella vista dalla Terra.")}</p>${!isModal ? `<button class="planet-details-button" data-action="object">${t("Star data","Dati della stella")} ${icon('arrow-up-right')}</button>` : ''}` : ''}
+      ${(object.nasaCatalogue || object.gaiaCatalogue) && !isModal ? `<button class="planet-details-button" data-action="object">${t("Catalogue data","Dati di catalogo")} ${icon('arrow-up-right')}</button>` : ''}
       ${isModal && object.positionNote ? `<p class="illustration-note">${escape(object.positionNote)}</p>` : ''}
       ${exoplanet ? `<p class="illustration-note">${t("Illustrative appearance. Measurements and estimates from the NASA catalogue.","Aspetto illustrativo. Misure e stime dal catalogo NASA.")}</p>` : ''}
       ${(planet || moon) && !isModal ? `<button class="planet-details-button" data-action="object">${moon ? t("Moon data","Dati del satellite") : t("Planet data","Dati del pianeta")} ${icon('arrow-up-right')}</button>` : ''}
       ${moons.length ? `<div class="moon-system-actions"><button class="moon-catalog-button" data-action="moons" data-parent="${escape(object.id)}">${t("Major moons","Satelliti principali")} (${moons.length}) ${icon('arrow-up-right')}</button><button class="moon-system-button" data-action="moon-system" data-parent="${escape(object.id)}">${icon('orbit')}${t("View moon system","Osserva il sistema di satelliti")}</button></div>` : ''}
-      <button class="focus-button" data-action="focus"${object.nasaCatalogue && (!Number.isFinite(object.raDeg) || !Number.isFinite(object.decDeg)) ? ' disabled' : ''}>${icon(canDive ? 'arrow-right' : 'focus')}${object.nasaCatalogue ? t("Locate in sky","Localizza nel cielo") : moon ? t("Inspect moon","Osserva il satellite") : planet ? t("Inspect planet","Osserva il pianeta") : canDive ? t("Open ","Apri ") + escape(scales[object.targetScale].name) : t("Focus","Metti a fuoco")}</button>
+      <button class="focus-button" data-action="focus"${(object.nasaCatalogue || object.gaiaCatalogue) && (!Number.isFinite(object.raDeg) || !Number.isFinite(object.decDeg)) ? ' disabled' : ''}>${icon(canDive ? 'arrow-right' : 'focus')}${object.nasaCatalogue || object.gaiaCatalogue ? t("Locate in sky","Localizza nel cielo") : moon ? t("Inspect moon","Osserva il satellite") : planet ? t("Inspect planet","Osserva il pianeta") : canDive ? t("Open ","Apri ") + escape(scales[object.targetScale].name) : t("Focus","Metti a fuoco")}</button>
       ${moon ? `<button class="moon-parent-button" data-object="${escape(object.parentId)}" data-object-scale="0">${icon('arrow-right')}${t("Return to ","Torna a ")}${escape(object.parentName)}</button>` : ''}
+      <button class="planet-details-button" data-action="official-images">${icon('telescope')}${t("Archive images","Immagini d\u2019archivio")}</button>
       ${nasa ? celestialSourceLinks(object) : ''}
       <a class="object-source" href="${escape(object.source || scale.source)}" target="_blank" rel="noopener noreferrer">${t("Scientific source ↗","Fonte scientifica ↗")}</a>
     </div>`;
@@ -232,14 +241,14 @@ function renderObject(object) {
   state.object = object;
   updatePreviewHud();
   $('#object-card').innerHTML = objectMarkup(object);
-  $('.coordinates').innerHTML = `<span>${state.scale === 9 ? t("COMBINED DISPLAY SCALES","SCALE VISIVE COMBINATE") : state.scale === 8 ? t("EQUATORIAL SKY DIRECTIONS","DIREZIONI CELESTI EQUATORIALI") : state.scale === 7 ? t("LOCAL HORIZON","ORIZZONTE LOCALE") : state.scale === 6 ? t("J2000 · HYG DISTANCES","J2000 · DISTANZE HYG") : ['stars','local'].includes(currentScale().id) ? t("J2000 · APPROXIMATE","J2000 · APPROSSIMATA") : t("SCHEMATIC VIEW","VISTA SCHEMATICA")}</span><span>${state.scale === 9 ? 'NASA / JPL / HEASARC' : state.scale === 8 ? 'NASA HEASARC' : state.scale >= 6 ? t("HYG 4.1 CATALOGUE","CATALOGO HYG 4.1") : t("COSMIC ATLAS","ATLANTE COSMICO")}</span>`;
+  $('.coordinates').innerHTML = `<span>${state.scale === 9 ? t("COMBINED DISPLAY SCALES","SCALE VISIVE COMBINATE") : state.scale === 8 ? t("EQUATORIAL SKY DIRECTIONS","DIREZIONI CELESTI EQUATORIALI") : state.scale === 7 ? t("LOCAL HORIZON","ORIZZONTE LOCALE") : state.scale === 6 ? t("J2000 · HYG DISTANCES","J2000 · DISTANZE HYG") : ['stars','local'].includes(currentScale().id) ? t("J2000 · APPROXIMATE","J2000 · APPROSSIMATA") : t("SCHEMATIC VIEW","VISTA SCHEMATICA")}</span><span>${state.scale === 9 ? (state.gaiaDr3 ? 'NASA / JPL / ESA GAIA' : 'NASA / JPL / HEASARC') : state.scale === 8 ? (state.gaiaDr3 ? 'NASA HEASARC + ESA GAIA' : 'NASA HEASARC') : state.scale >= 6 ? t("HYG 4.1 CATALOGUE","CATALOGO HYG 4.1") : t("COSMIC ATLAS","ATLANTE COSMICO")}</span>`;
   if ($('#modal').open && $('#modal').dataset.kind === 'object') $('#modal-body').innerHTML = objectMarkup(object, true);
   refreshIcons();
   enrichStellarInformation(object);
 }
 
 function enrichStellarInformation(object) {
-  if (object.nasaCatalogue || object.nasaInfo || nasaEnrichments.has(object.id) || !(object.bodyKind === 'catalog-star' || object.measured && Number.isFinite(object.raDeg))) return;
+  if (object.nasaCatalogue || object.gaiaCatalogue || object.nasaInfo || nasaEnrichments.has(object.id) || !(object.bodyKind === 'catalog-star' || object.measured && Number.isFinite(object.raDeg))) return;
   nasaEnrichments.add(object.id);
   loadCelestialCatalog().then(data => {
     const info = findNasaStarForObject(data, object);
@@ -269,9 +278,9 @@ function updateScale(index, context = null) {
     if (context?.observer) constellationBrowser.observer = { ...constellationBrowser.observer, ...context.observer };
   }
   $('#scale-title').textContent = combined ? t('Combined map','Mappa combinata') : nasaView ? scale.name : constellationView ? `${scale.name}.` : hostView ? `${t("Host star: ","Stella ospite: ")}${scale.name}.` : scale.title;
-  $('#scale-subtitle').textContent = combined ? t('Solar System model and projected NASA sky. Independent object layers.','Modello del Sistema Solare e cielo NASA proiettato. Categorie indipendenti.') : nasaView ? t("NASA catalogue sky positions; radial distance is not represented.","Posizioni celesti dai cataloghi NASA; la distanza radiale non viene rappresentata.") : constellationView ? index === 7 ? t("Local sky coordinates for the selected observer and time.","Coordinate del cielo per l’osservatore e l’istante selezionati.") : t("J2000 stellar positions and catalogue distances.","Posizioni stellari J2000 e distanze di catalogo.") : hostView ? t("Confirmed planets around the selected host star.","Pianeti confermati intorno alla stella selezionata.") : scale.subtitle;
+  $('#scale-subtitle').textContent = combined ? t('Solar System model and projected catalogue sky. Independent object layers.','Modello del Sistema Solare e cielo di catalogo proiettato. Categorie indipendenti.') : nasaView ? t("Catalogue sky positions; radial distance is not represented.","Posizioni celesti dai cataloghi; la distanza radiale non viene rappresentata.") : constellationView ? index === 7 ? t("Local sky coordinates for the selected observer and time.","Coordinate del cielo per l’osservatore e l’istante selezionati.") : t("J2000 stellar positions and catalogue distances.","Posizioni stellari J2000 e distanze di catalogo.") : hostView ? t("Confirmed planets around the selected host star.","Pianeti confermati intorno alla stella selezionata.") : scale.subtitle;
   $('#scale-readout').textContent = scale.extent;
-  $('#scale-step').textContent = combined ? t('COMBINED VIEW','VISTA COMBINATA') : nasaView ? 'NASA HEASARC' : constellationView ? index === 7 ? t("EARTH VIEW","DALLA TERRA") : t("CONSTELLATIONS","COSTELLAZIONI") : hostView ? t("EXOPLANETS","ESOPIANETI") : `0${index + 1} / 05`;
+  $('#scale-step').textContent = combined ? t('COMBINED VIEW','VISTA COMBINATA') : nasaView ? (state.gaiaDr3 ? 'NASA + ESA GAIA' : 'NASA HEASARC') : constellationView ? index === 7 ? t("EARTH VIEW","DALLA TERRA") : t("CONSTELLATIONS","COSTELLAZIONI") : hostView ? t("EXOPLANETS","ESOPIANETI") : `0${index + 1} / 05`;
   $('#region-name').textContent = scale.name.toLocaleUpperCase(locale());
   $('#region-type').textContent = combined ? t('PLANETS, STARS AND NEBULAE','PIANETI, STELLE E NEBULOSE') : nasaView ? t("STARS AND NEBULAE","STELLE E NEBULOSE") : constellationView ? index === 7 ? t("LOCAL SKY · GEOMETRIC HORIZON","CIELO LOCALE · ORIZZONTE GEOMETRICO") : t("HYG STELLAR COORDINATES","COORDINATE STELLARI HYG") : hostView ? t("EXOPLANET SYSTEM · SCHEMATIC ORBITS","SISTEMA ESOPLANETARIO · ORBITE ILLUSTRATIVE") : index === 0 ? t("SUN, PLANETS AND MAJOR MOONS","SOLE, PIANETI E SATELLITI PRINCIPALI") : index === 4 ? t("CONCEPTUAL MODEL","RICOSTRUZIONE CONCETTUALE") : catalog[scale.id][0].type.toLocaleUpperCase(locale());
   const slider = $('#scale-slider');
@@ -336,7 +345,7 @@ function pickObject(index, object) {
   if(state.scale===9&&universe?.combinedView.getObject(object.id)){
     stopTour();closeModal();universe.focusObject(universe.combinedView.getObject(object.id));return;
   }
-  if (index === 8 || object.nasaCatalogue) { selectNasaObject(object); return; }
+  if (index === 8 || object.nasaCatalogue || object.gaiaCatalogue) { selectNasaObject(object); return; }
   stopTour();
   closeModal();
   if (object.bodyKind === 'exoplanet') {
@@ -497,6 +506,7 @@ function openModal(kind, title, content) {
   clearTimeout(immersionTimer);
   immersionTimer = null;
   const modal = $('#modal');
+  if (kind !== 'images') imageController?.abort();
   stopTour();
   if (!modal.open) returnFocus = document.activeElement;
   modal.dataset.kind = kind;
@@ -507,6 +517,7 @@ function openModal(kind, title, content) {
 }
 
 function closeModal() {
+  imageController?.abort();
   if ($('#modal').open) $('#modal').close();
 }
 
@@ -533,7 +544,7 @@ async function ensureNasaSearch() {
   try {
     const data = await loadCelestialCatalog();
     nasaCatalogue = data;
-    nasaSearchEntries = data.objects.map(object => ({ index: 8, object, searchText: object.searchText, scaleName: object.nasaCatalogue === 'ngc2000' ? 'NGC2000 \u00b7 NASA HEASARC' : object.nasaCatalogue === 'hipparcos' ? 'Hipparcos \u00b7 NASA HEASARC' : 'Bright Star Catalogue \u00b7 NASA HEASARC' }));
+    nasaSearchEntries = data.objects.map(object => ({ index: 8, object, searchText: object.searchText, scaleName: (object.gaiaCatalogue ? 'Gaia DR3 \u00b7 ESA' : object.nasaCatalogue === 'ngc2000' ? 'NGC2000 \u00b7 NASA HEASARC' : object.nasaCatalogue === 'hipparcos' ? 'Hipparcos \u00b7 NASA HEASARC' : 'Bright Star Catalogue \u00b7 NASA HEASARC') + (object.gaiaData && !object.gaiaCatalogue ? ' + Gaia DR3' : '') }));
     return data;
   } catch (error) { searchBrowser.error = error.message; throw error; }
   finally {
@@ -563,6 +574,7 @@ function renderSearch(query = searchBrowser.query) {
   $('[data-search-page="previous"]').disabled = searchBrowser.page === 0;
   $('[data-search-page="next"]').disabled = searchBrowser.page >= pageCount - 1;
   $('#search-status').textContent = searchBrowser.error || (searchBrowser.loading ? t('Loading complete NASA archive snapshots\u2026','Caricamento degli archivi NASA completi\u2026') : nasaCatalogue ? t('NASA HEASARC: complete Hipparcos, Bright Star and NGC2000 nebular records. Unknown measurements are preserved.','NASA HEASARC: cataloghi Hipparcos e Bright Star completi e voci nebulari NGC2000. Le misure mancanti restano non disponibili.') : '');
+  if (!searchBrowser.loading && !searchBrowser.error && nasaCatalogue?.metadata.gaiaDr3) $('#search-status').textContent += ' ' + gaiaSummary(nasaCatalogue.metadata.gaiaDr3);
   $('[data-action="retry-nasa"]').hidden = !searchBrowser.error;
   $('#search-results').setAttribute('aria-busy', String(searchBrowser.loading));
   document.querySelectorAll('[data-search-scope]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.searchScope === scope)));
@@ -794,7 +806,7 @@ function openCollections() {
     { scale:3, id:'andromeda', icon:'orbit', name:t("Local Group","Gruppo Locale"), subtitle:t("Milky Way, Andromeda and satellite galaxies","Via Lattea, Andromeda e galassie satelliti") },
     { scale:4, id:'laniakea', icon:'sparkles', name:t("Large-scale structure","Struttura a grande scala"), subtitle:t("Galaxy clusters and cosmic web","Ammassi galattici e rete cosmica") }
   ];
-  openModal('collections', t("Catalogue sections","Sezioni del catalogo"), `<p>${t("Browse objects by astronomical scale.","Consulta gli oggetti per scala astronomica.")}</p><div class="collection-grid"><button class="collection-item" data-action="nasa-stars">${icon('star')}<strong>${t("NASA star catalogues","Cataloghi stellari NASA")}</strong><small>Hipparcos · Bright Star Catalogue</small></button><button class="collection-item" data-action="nasa-nebulae">${icon('sparkles')}<strong>${t("Nebulae","Nebulose")}</strong><small>NGC2000 · NASA HEASARC</small></button>${featured.map(item => `<button class="collection-item" data-object="${item.id}" data-object-scale="${item.scale}">${icon(item.icon)}<strong>${item.name}</strong><small>${item.subtitle}</small></button>`).join('')}</div>`);
+  openModal('collections', t("Catalogue sections","Sezioni del catalogo"), `<p>${t("Browse objects by astronomical scale.","Consulta gli oggetti per scala astronomica.")}</p><div class="collection-grid"><button class="collection-item" data-action="gaia-info">${icon('star')}<strong>Gaia DR3</strong><small>${t("ESA bright-source experiment","Esperimento ESA: sorgenti luminose")}</small></button><button class="collection-item" data-action="nasa-stars">${icon('star')}<strong>${t("NASA star catalogues","Cataloghi stellari NASA")}</strong><small>Hipparcos · Bright Star Catalogue</small></button><button class="collection-item" data-action="nasa-nebulae">${icon('sparkles')}<strong>${t("Nebulae","Nebulose")}</strong><small>NGC2000 · NASA HEASARC</small></button>${featured.map(item => `<button class="collection-item" data-object="${item.id}" data-object-scale="${item.scale}">${icon(item.icon)}<strong>${item.name}</strong><small>${item.subtitle}</small></button>`).join('')}</div>`);
 }
 
 function openAbout() {
@@ -822,6 +834,56 @@ function openHelp() {
     <h3>${t("VIRTUAL REALITY","NELLA REALTÀ VIRTUALE")}</h3><p>${t("Desktop preview provides a first-person view without a headset. WebXR supports room-scale VR and mixed reality with a compatible headset. Hand tracking requires device and browser support; controllers are also supported.","L’anteprima PC offre una visuale in prima persona senza visore. Un visore WebXR compatibile permette di usare VR e realtà mista alla scala dell’ambiente. Il tracciamento delle mani richiede un visore e un browser che lo supportino. Anche i controller sono utilizzabili.")}</p><button class="focus-button" data-action="vr">${icon('glasses')}${t("VR controls","Comandi VR")}</button>`);
 }
 
+function openImages() {
+  imageController?.abort();
+  imageObject=state.object;
+  imageSearch={records:null,loading:false,error:''};
+  openModal('images',t('Archive images: ','Immagini d\u2019archivio: ')+imageObject.name,imageGalleryMarkup(imageObject,imageSearch));
+}
+async function searchOfficialImages() {
+  if(!imageObject)return;
+  imageController?.abort();
+  const controller=new AbortController();imageController=controller;
+  const object=imageObject;
+  imageSearch={records:null,loading:true,error:''};
+  $('#modal-body').innerHTML=imageGalleryMarkup(object,imageSearch);
+  try {
+    const result=await loadNasaImageSearch(object,{signal:controller.signal});
+    if(controller.signal.aborted)return;
+    imageSearch={records:result.records,loading:false,error:''};
+  } catch(error) {
+    if(controller.signal.aborted)return;
+    imageSearch={records:null,loading:false,error:t('NASA image search is unavailable. Retry or open the archive search link.','La ricerca immagini NASA non \u00e8 disponibile. Riprova o apri il collegamento all\u2019archivio.')};
+  }
+  if($('#modal').open&&$('#modal').dataset.kind==='images'&&imageObject===object)$('#modal-body').innerHTML=imageGalleryMarkup(object,imageSearch);
+}
+function gaiaSummary(metadata) {
+  const matches=metadata?.matching;
+  if(!matches)return '';
+  return t(`Gaia DR3 experiment: ${number(matches.uniqueSourceCount)} sources (G \u2264 6), ${number(matches.matchedCount)} NASA associations, ${number(matches.addedCount)} added sources, ${number(matches.quarantinedCount)} withheld for review.`, `Esperimento Gaia DR3: ${number(matches.uniqueSourceCount)} sorgenti (G \u2264 6), ${number(matches.matchedCount)} associazioni NASA, ${number(matches.addedCount)} nuove sorgenti, ${number(matches.quarantinedCount)} escluse in attesa di verifica.`);
+}
+async function openGaiaInfo() {
+  const request=++gaiaInspectionRequest;
+  openModal('gaia',t('Gaia DR3 catalogue experiment','Esperimento catalogo Gaia DR3'),`<p role="status">${t('Loading catalogue comparison\u2026','Caricamento confronto cataloghi\u2026')}</p>`);
+  try {
+    const data=await loadCelestialCatalog({includeGaia:true});
+    if(request!==gaiaInspectionRequest||!$('#modal').open||$('#modal').dataset.kind!=='gaia')return;
+    const metadata=data.metadata.gaiaDr3;
+    const matches=metadata.matching;
+    const labels={matchedCount:t('Associated with NASA records','Associate a voci NASA'),addedCount:t('Additional displayed sources','Sorgenti aggiuntive visualizzate'),quarantinedCount:t('Withheld ambiguous sources','Sorgenti ambigue escluse'),repeatedRowCount:t('Repeated source rows','Righe di sorgenti ripetute')};
+    $('#modal-body').innerHTML=`<p>${t('ESA Gaia DR3: all archive sources with mean G magnitude \u2264 6. This is a bright-source subset, not the full Gaia release.','ESA Gaia DR3: tutte le sorgenti di archivio con magnitudine media G \u2264 6. \u00c8 un sottoinsieme di sorgenti luminose, non l\u2019intero rilascio Gaia.')}</p>
+      <p id="gaia-summary">${escape(gaiaSummary(metadata))}</p>
+      <div class="planet-measurements gaia-audit">${Object.entries(labels).map(([key,label])=>`<div><span>${escape(label)}</span><strong data-gaia-count="${key}">${number(matches[key])}</strong></div>`).join('')}</div>
+      <p>${t('Unique official Hipparcos associations add Gaia measurements to the existing star. NASA identifiers, coordinates and visual magnitudes are retained. Ambiguous matches and close unlinked sources are withheld from the map for review.','Le associazioni Hipparcos ufficiali univoche aggiungono le misure Gaia alla stella esistente. Identificatori NASA, coordinate e magnitudini visuali sono conservati. Corrispondenze ambigue e sorgenti vicine non collegate sono escluse dalla mappa in attesa di verifica.')}</p>
+      <p>${t('Native Gaia coordinates use ICRS at epoch J2016.0. Positions for added map sources are propagated towards J2000 only when proper motion is available. Gaia G, BP and RP photometry remains separate from NASA V magnitudes.','Le coordinate native Gaia usano ICRS all\u2019epoca J2016.0. Le posizioni delle sorgenti aggiunte vengono propagate verso J2000 solo se il moto proprio \u00e8 disponibile. La fotometria Gaia G, BP e RP resta separata dalle magnitudini V NASA.')}</p>
+      <div class="archive-search-actions"><button class="focus-button" data-action="toggle-gaia">${state.gaiaDr3?t('Disable Gaia DR3 and reload map','Disattiva Gaia DR3 e ricarica mappa'):t('Enable Gaia DR3 and reload map','Attiva Gaia DR3 e ricarica mappa')}</button>
+      <a href="${import.meta.env.BASE_URL}catalog/gaia-match-audit.json" target="_blank" rel="noopener noreferrer">${t('Cross-match audit (JSON)','Verifica corrispondenze (JSON)')} \u2197</a>
+      <a href="https://www.cosmos.esa.int/web/gaia/dr3" target="_blank" rel="noopener noreferrer">ESA Gaia DR3 \u2197</a></div>`;
+  } catch(error) {
+    if(request===gaiaInspectionRequest&&$('#modal').dataset.kind==='gaia')$('#modal-body').innerHTML=`<p role="status">${escape(error.message)}</p><button class="focus-button" data-action="gaia-info">${t('Retry comparison','Riprova confronto')}</button>`;
+  }
+}
+
 function openSettings() {
   openModal('settings', t("Settings","Impostazioni"), `
     <h3>${t('LANGUAGE', 'LINGUA')}</h3>
@@ -830,6 +892,10 @@ function openSettings() {
       <option value="en" ${getLanguage() === 'en' ? 'selected' : ''}>English</option>
       <option value="it" ${getLanguage() === 'it' ? 'selected' : ''}>Italiano</option>
     </select>
+    <h3>${t("EXPERIMENTAL CATALOGUE","CATALOGO SPERIMENTALE")}</h3>
+    <div class="layer-row"><span>Gaia DR3 \u00b7 G \u2264 6</span><button class="toggle" role="switch" data-action="toggle-gaia" aria-label="Gaia DR3" aria-checked="${state.gaiaDr3}"></button></div>
+    <p>${t("Adds Gaia measurements and unmatched sources from the bright-star subset. Changing this setting reloads the current map.","Aggiunge misure Gaia e sorgenti non corrispondenti dal sottoinsieme di stelle luminose. Il cambio ricarica la mappa attuale.")}</p>
+    <button class="planet-details-button" data-action="gaia-info">${t("Gaia coverage and cross-matches","Copertura Gaia e corrispondenze")}${icon('arrow-up-right')}</button>
     <h3>${t("GRAPHICS QUALITY","QUALITÀ GRAFICA")}</h3><div class="quality" role="group" aria-label="${t("Graphics quality","Qualità grafica")}"><button data-quality="low" class="${state.quality === 'low' ? 'active' : ''}" aria-pressed="${state.quality === 'low'}">${t("Low","Bassa")}</button><button data-quality="high" class="${state.quality === 'high' ? 'active' : ''}" aria-pressed="${state.quality === 'high'}">${t("High","Alta")}</button></div><p>${t("Low detail reduces particle count and rendering load.","Il dettaglio basso riduce particelle e carico grafico.")}</p>
     <h3>${t("MOTION AND LAYERS","MOVIMENTO E LIVELLI")}</h3>
     <div class="layer-row"><span>${t("Auto-rotate","Rotazione automatica")}</span><button class="toggle" role="switch" data-action="settings-rotate" aria-label="${t("Auto-rotate","Rotazione automatica")}" aria-checked="${state.autoRotate}"></button></div>
@@ -877,7 +943,7 @@ function vrContent() {
   return `<p>${t("Walk inside a map placed in the room. Objects keep their positions as you move; grabbing, rotating and resizing the map changes its placement explicitly.","Cammina dentro una mappa collocata nell'ambiente. Gli oggetti mantengono la posizione mentre ti muovi; presa, rotazione e ridimensionamento modificano esplicitamente la mappa.")}</p>
     <label class="xr-layout-setting" for="xr-layout">${t("Initial map layout","Disposizione iniziale della mappa")}<select id="xr-layout"><option value="room" ${spatialLayout==='room'?'selected':''}>${t("Room scale · map surrounds you","Scala ambiente · mappa intorno a te")}</option><option value="tabletop" ${spatialLayout==='tabletop'?'selected':''}>${t("Tabletop · small map in front","Mappa ridotta · davanti a te")}</option></select></label>
     <label class="xr-layout-setting" for="xr-content">${t('Map content','Contenuto della mappa')}<select id="xr-content"><option value="current" ${immersiveContent==='current'?'selected':''}>${t('Current map','Mappa attuale')}</option><option value="combined" ${immersiveContent==='combined'?'selected':''}>${t('Combined map: planets, stars and nebulae','Mappa combinata: pianeti, stelle e nebulose')}</option></select></label>
-    ${immersiveContent==='combined'?`<div class="object-layer-switches" role="group" aria-label="${t('Object categories','Categorie di oggetti')}">${objectLayerButtons()}</div><p class="combined-projection-note">${t('Solar System model plus NASA sky directions. Exoplanet markers share their host positions; sky distances use a separate display scale.','Modello del Sistema Solare e direzioni celesti NASA. Gli esopianeti condividono la posizione della stella ospite; il cielo usa una scala visiva separata.')}</p><p id="combined-load-status" role="status">${combinedLoading?t('Loading NASA catalogues…','Caricamento cataloghi NASA…'):escape(combinedError||t('All three object categories are available.','Tutte e tre le categorie di oggetti sono disponibili.'))}</p>${combinedError?`<button class="focus-button" data-action="retry-combined">${t('Retry catalogue loading','Riprova caricamento cataloghi')}</button>`:''}`:''}
+    ${immersiveContent==='combined'?`<div class="object-layer-switches" role="group" aria-label="${t('Object categories','Categorie di oggetti')}">${objectLayerButtons()}</div><p class="combined-projection-note">${t('Solar System model plus catalogue sky directions. Exoplanet markers share their host positions; sky distances use a separate display scale.','Modello del Sistema Solare e direzioni celesti di catalogo. Gli esopianeti condividono la posizione della stella ospite; il cielo usa una scala visiva separata.')}</p><p id="combined-load-status" role="status">${combinedLoading?t('Loading NASA catalogues…','Caricamento cataloghi NASA…'):escape(combinedError||t('All three object categories are available.','Tutte e tre le categorie di oggetti sono disponibili.'))}</p>${combinedError?`<button class="focus-button" data-action="retry-combined">${t('Retry catalogue loading','Riprova caricamento cataloghi')}</button>`:''}`:''}
     <div class="xr-mode-options">
       <article class="xr-mode-card"><h3>${t("DESKTOP PREVIEW","ANTEPRIMA PC")}</h3><p>${t("View the same spatial layout on your PC. Walk with W A S D, change height with Q / E and drag to look around. No headset required.","Osserva la stessa disposizione spaziale sul PC. Cammina con W A S D, cambia altezza con Q / E e trascina per guardarti intorno. Non serve un visore.")}</p><button class="focus-button" data-action="start-preview" ${universe&&contentReady?'':'disabled'}>${icon('monitor')}${t("Start desktop preview","Avvia anteprima PC")}</button></article>
       <article class="xr-mode-card"><h3>${t("META QUEST MIXED REALITY","REALTÀ MISTA META QUEST")}</h3><p>${t("See your room through passthrough, with the map fixed around you. Walk between objects and use hands or controllers to interact.","Vedi il tuo ambiente attraverso il passthrough, con la mappa fissa intorno a te. Cammina tra gli oggetti e interagisci con mani o controller.")}</p><button class="focus-button" data-action="start-mr" ${mrSupported&&universe&&contentReady?'':'disabled'}>${icon('scan')}${t("Enter mixed reality","Entra in realtà mista")}</button><small>${mrSupported?t("Passthrough session supported.","Sessione passthrough supportata."):t("Requires an immersive AR session in a compatible headset browser.","Richiede una sessione AR immersiva nel browser di un visore compatibile.")}</small></article>
@@ -914,7 +980,7 @@ function updatePreviewHud() {
   $('#preview-selection').textContent = state.scale===9&&!Object.values(state.objectLayers).some(Boolean)?t('All object categories disabled','Tutte le categorie disattivate'):state.object?.name || '';
   $('#combined-object-layers').hidden=state.scale!==9;
   const sky = state.scale===7 || state.scale===8 || state.context?.earthPerspective;
-  $('#preview-space-note').textContent = state.scale===9?t('Solar System model + projected NASA sky','Modello del Sistema Solare + cielo NASA proiettato'):sky ? t("Angular sky projection · look around and select","Proiezione celeste angolare · osserva e seleziona") : t("Map fixed in room coordinates","Mappa fissa nelle coordinate dell'ambiente");
+  $('#preview-space-note').textContent = state.scale===9?t('Solar System model + projected catalogue sky','Modello del Sistema Solare + cielo di catalogo proiettato'):sky ? t("Angular sky projection · look around and select","Proiezione celeste angolare · osserva e seleziona") : t("Map fixed in room coordinates","Mappa fissa nelle coordinate dell'ambiente");
   $('#preview-scale').querySelector('[data-context]')?.remove();
   if (state.scale>=5&&state.scale!==9) { const option=document.createElement('option');option.value=state.scale;option.textContent=currentScale().name;option.dataset.context='true';$('#preview-scale').append(option); }
   $('#preview-scale').value=state.scale;
@@ -950,11 +1016,7 @@ function startPreview() {
   $('#universe').focus();
 }
 
-document.addEventListener('change', event => {
-  if(event.target.id==='xr-content'){immersiveContent=event.target.value==='combined'?'combined':'current';refreshCombinedLoading();if(immersiveContent==='combined')prepareCombinedCatalogue().catch(()=>{});else refreshCombinedLoading();return;}
-  if(event.target.id==='xr-layout'||event.target.id==='preview-layout'){spatialLayout=event.target.value==='tabletop'?'tabletop':'room';if(universe?.preview.isActive)universe.preview.setLayout(spatialLayout);return;}
-  if(event.target.id==='preview-scale'){changeScale(event.target.value);$('#universe').focus();return;}
-  if (event.target.id !== 'language-setting' || event.target.value === getLanguage()) return;
+function rememberCurrentView() {
   try {
     sessionStorage.setItem('aether.languageView', JSON.stringify({
       scale: state.scale, objectId: state.object.id, host: state.object.host,
@@ -962,7 +1024,24 @@ document.addEventListener('change', event => {
       observer: constellationBrowser.observer, timeZone: constellationBrowser.timeZone,
       earthVisible: constellationBrowser.earthVisible, earthPerspective: state.context?.earthPerspective
     }));
-  } catch { /* Language selection remains available without session storage. */ }
+  } catch { /* Settings remain available without session storage. */ }
+}
+
+$('#modal').addEventListener('error', event => {
+  const image=event.target;
+  if(!(image instanceof HTMLImageElement)||!image.closest('.archive-image')||image.hidden)return;
+  image.hidden=true;
+  const message=document.createElement('p');message.className='archive-status';message.setAttribute('role','status');
+  message.textContent=t('Image preview unavailable. Open the original archive record.','Anteprima non disponibile. Apri la scheda originale di archivio.');
+  image.closest('.archive-image').querySelector('figcaption').prepend(message);
+},true);
+
+document.addEventListener('change', event => {
+  if(event.target.id==='xr-content'){immersiveContent=event.target.value==='combined'?'combined':'current';refreshCombinedLoading();if(immersiveContent==='combined')prepareCombinedCatalogue().catch(()=>{});else refreshCombinedLoading();return;}
+  if(event.target.id==='xr-layout'||event.target.id==='preview-layout'){spatialLayout=event.target.value==='tabletop'?'tabletop':'room';if(universe?.preview.isActive)universe.preview.setLayout(spatialLayout);return;}
+  if(event.target.id==='preview-scale'){changeScale(event.target.value);$('#universe').focus();return;}
+  if (event.target.id !== 'language-setting' || event.target.value === getLanguage()) return;
+  rememberCurrentView();
   setLanguage(event.target.value);
   location.reload();
 });
@@ -1046,6 +1125,10 @@ document.addEventListener('click', async event => {
       break;
     case 'about': openAbout(); break;
     case 'search': openSearch(); break;
+    case 'official-images': openImages(); break;
+    case 'search-official-images': searchOfficialImages(); break;
+    case 'gaia-info': openGaiaInfo(); break;
+    case 'toggle-gaia': state.gaiaDr3=!state.gaiaDr3;savePreferences();rememberCurrentView();location.reload();break;
     case 'nasa-stars': openSearch('stars'); break;
     case 'nasa-nebulae': openSearch('nebulae'); break;
     case 'retry-nasa': ensureNasaSearch().catch(() => {}); break;
@@ -1165,7 +1248,7 @@ async function restoreLanguageView() {
     if(saved.scale===9){await universe.showCombinedMap();combinedData=universe.catalogueData;const selected=universe.combinedView.getObject(saved.objectId);if(selected&&state.objectLayers[selected.combinedLayer])universe.selectObject(selected);}
     else if (saved.scale === 8) {
       const data = await ensureNasaSearch();
-      const object = data.byId.get(saved.objectId);
+      const object = data.byId.get(saved.objectId) || data.stars[0];
       if (object) await universe.showCatalogueObject(object, data);
     } else if (saved.scale >= 6) {
       constellationBrowser.timeZone = saved.timeZone || 'Europe/Rome';

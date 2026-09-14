@@ -34,9 +34,9 @@ export function celestialMeasurements(object, isModal = false) {
       : unavailable();
     rows.push(row(t('APPARENT MAGNITUDE', 'MAGNITUDINE APPARENTE'), magnitude));
   } else {
-    const magnitudeLabel = t('APPARENT MAGNITUDE', 'MAGNITUDINE APPARENTE') + ' · ' + (info.magnitudeBand || 'V') + (info.magnitudeCatalogue && info.magnitudeCatalogue !== info.nasaCatalogue ? ' (BSC)' : '');
+    const magnitudeLabel = t('APPARENT MAGNITUDE', 'MAGNITUDINE APPARENTE') + ' · ' + (info.magnitudeBand || 'V') + (info.magnitudeCatalogue === 'bsc5p' && info.nasaCatalogue !== 'bsc5p' ? ' (BSC)' : '');
     rows.push(row(magnitudeLabel, number(info.mag, 3)));
-    rows.push(row(t('SPECTRAL CLASS', 'CLASSE SPETTRALE') + (info.spectralTypeCatalogue && info.spectralTypeCatalogue !== info.nasaCatalogue ? ' · BSC' : ''), text(info.spectralType)));
+    rows.push(row(t('SPECTRAL CLASS', 'CLASSE SPETTRALE') + (info.spectralTypeCatalogue === 'bsc5p' && info.nasaCatalogue !== 'bsc5p' ? ' · BSC' : ''), text(info.spectralType)));
   }
   if (isModal) {
     if (!nebula) {
@@ -47,12 +47,13 @@ export function celestialMeasurements(object, isModal = false) {
       if (Number.isFinite(info.colorIndex)) rows.push(row(t('COLOUR INDEX · B−V', 'INDICE DI COLORE · B−V'), number(info.colorIndex, 3)));
       if (Number.isFinite(info.pmRaMasYr)) rows.push(row(t('PROPER MOTION · RA', 'MOTO PROPRIO · AR'), number(info.pmRaMasYr, 3, t('mas/yr', 'mas/anno'))));
       if (Number.isFinite(info.pmDecMasYr)) rows.push(row(t('PROPER MOTION · DEC', 'MOTO PROPRIO · DEC'), number(info.pmDecMasYr, 3, t('mas/yr', 'mas/anno'))));
-      if (Number.isFinite(info.radialVelocityKmS)) rows.push(row(t('RADIAL VELOCITY · BSC', 'VELOCITÀ RADIALE · BSC'), number(info.radialVelocityKmS, 2, 'km/s')));
+      if (Number.isFinite(info.radialVelocityKmS)) rows.push(row(t('RADIAL VELOCITY', 'VELOCIT\u00c0 RADIALE') + (info.radialVelocityCatalogue === 'gaia-dr3' ? ' \u00b7 Gaia DR3' : ' \u00b7 BSC'), number(info.radialVelocityKmS, 2, 'km/s')));
       if (info.radialVelocityNote) rows.push(row(t('RADIAL VELOCITY FLAG · BSC', 'INDICATORE VELOCITÀ RADIALE · BSC'), info.radialVelocityNote));
       if (info.magnitudeUncertainty) rows.push(row(t('MAGNITUDE UNCERTAINTY FLAG · BSC', 'INDICATORE INCERTEZZA MAGNITUDINE · BSC'), info.magnitudeUncertainty));
       if (info.bscData?.spectralType && info.spectralTypeCatalogue !== 'bsc5p' && info.bscData.spectralType !== info.spectralType) rows.push(row(t('SPECTRAL CLASS · BSC', 'CLASSE SPETTRALE · BSC'), info.bscData.spectralType));
       if (info.variableId) rows.push(row(t('VARIABLE-STAR IDENTIFIER', 'IDENTIFICATORE DI STELLA VARIABILE'), info.variableId));
       const identifiers = ['hip', 'hr', 'hd'].filter(key => Number.isFinite(info[key])).map(key => key.toUpperCase() + ' ' + info[key]);
+      if (info.gaiaData?.sourceId) identifiers.push('Gaia DR3 ' + info.gaiaData.sourceId);
       rows.push(row(t('CATALOGUE IDENTIFIERS', 'IDENTIFICATORI DI CATALOGO'), identifiers.length ? identifiers.join(' · ') : unavailable()));
     } else {
       rows.push(row(t('CLASSIFICATION', 'CLASSIFICAZIONE'), text(info.type)));
@@ -70,13 +71,36 @@ export function celestialMeasurements(object, isModal = false) {
   const provenance = object.nasaInfo
     ? `<p class="illustration-note">${escape(t('Measurements: NASA HEASARC · ', 'Misure: NASA HEASARC · ') + catalogueName(info.nasaCatalogue) + t('. Map coordinates: HYG.', '. Coordinate della mappa: HYG.'))}</p>`
     : '';
-  return `<div class="planet-measurements star-measurements">${rows.join('')}</div>${provenance}`;
+  return `<div class="planet-measurements star-measurements">${rows.join('')}</div>${provenance}${gaiaMeasurements(info, isModal)}`;
+}
+
+function gaiaMeasurements(info, isModal) {
+  const gaia=info.gaiaData;
+  if(!gaia)return '';
+  const valueWithError=(value,error,unit)=>number(value,5)+(Number.isFinite(value)&&Number.isFinite(error)?' \u00b1 '+number(error,5):'')+(Number.isFinite(value)?' '+unit:'');
+  const rows=[row('GAIA DR3 SOURCE_ID',gaia.sourceId),row(t('APPARENT MAGNITUDE \u00b7 G','MAGNITUDINE APPARENTE \u00b7 G'),number(gaia.gMag,5))];
+  if(isModal){
+    rows.push(row(t('RIGHT ASCENSION \u00b7 J2016.0','ASCENSIONE RETTA \u00b7 J2016.0'),number(gaia.raDeg,8,'\u00b0')),
+      row(t('DECLINATION \u00b7 J2016.0','DECLINAZIONE \u00b7 J2016.0'),number(gaia.decDeg,8,'\u00b0')),
+      row(t('POSITION UNCERTAINTY \u00b7 RA / DEC','INCERTEZZA POSIZIONE \u00b7 AR / DEC'),number(gaia.raErrorMas,5,'mas')+' / '+number(gaia.decErrorMas,5,'mas')),
+      row(t('PARALLAX','PARALLASSE'),valueWithError(gaia.parallaxMas,gaia.parallaxErrorMas,'mas')),
+      row(t('PROPER MOTION \u00b7 RA COS(DEC)','MOTO PROPRIO \u00b7 AR COS(DEC)'),valueWithError(gaia.pmRaMasYr,gaia.pmRaErrorMasYr,t('mas/yr','mas/anno'))),
+      row(t('PROPER MOTION \u00b7 DEC','MOTO PROPRIO \u00b7 DEC'),valueWithError(gaia.pmDecMasYr,gaia.pmDecErrorMasYr,t('mas/yr','mas/anno'))),
+      row(t('RADIAL VELOCITY','VELOCIT\u00c0 RADIALE'),valueWithError(gaia.radialVelocityKmS,gaia.radialVelocityErrorKmS,'km/s')),
+      row(t('APPARENT MAGNITUDE \u00b7 BP / RP','MAGNITUDINE APPARENTE \u00b7 BP / RP'),number(gaia.bpMag,5)+' / '+number(gaia.rpMag,5)),
+      row('BP\u2212RP',number(gaia.bpRp,5)),row('RUWE',number(gaia.ruwe,4)),
+      row(t('DUPLICATED_SOURCE FLAG','INDICATORE DUPLICATED_SOURCE'),typeof gaia.duplicatedSource==='boolean'?String(gaia.duplicatedSource):unavailable()),
+      row(t('COORDINATE FRAME','SISTEMA DI COORDINATE'),gaia.coordinateFrame),
+      row(t('ASSOCIATION','ASSOCIAZIONE'),info.gaiaMatchStatus==='official-hipparcos-match'?t('Official Gaia\u2013Hipparcos-2 association','Associazione ufficiale Gaia\u2013Hipparcos-2'):t('Additional Gaia source','Sorgente Gaia aggiuntiva')));
+    for(const match of gaia.hipMatches||[])rows.push(row('HIP '+match.hip,t('Separation: ','Separazione: ')+number(match.angularDistanceArcsec,5,'arcsec')+'; '+t('neighbours: ','vicini: ')+text(match.numberOfNeighbours)+'; xm_flag: '+text(match.xmFlag)));
+  }
+  return `<section class="gaia-measurements" aria-label="Gaia DR3"><h3>ESA GAIA DR3</h3><div class="planet-measurements">${rows.join('')}</div>${isModal?`<p class="illustration-note">${t('Native Gaia measurements at J2016.0. G/BP/RP photometry uses different passbands from V. RUWE and duplicated_source are processing-quality indicators.','Misure native Gaia a J2016.0. La fotometria G/BP/RP usa bande diverse da V. RUWE e duplicated_source sono indicatori di qualit\u00e0 del trattamento dei dati.')}</p>`:''}</section>`;
 }
 
 function sourceKey(value) {
   try {
     const url = new URL(value);
-    if (url.protocol !== 'https:' || !(url.hostname === 'nasa.gov' || url.hostname.endsWith('.nasa.gov'))) return null;
+    if (url.protocol !== 'https:' || url.username || url.password || !(url.hostname === 'nasa.gov' || url.hostname.endsWith('.nasa.gov') || ['www.cosmos.esa.int','gea.esac.esa.int'].includes(url.hostname))) return null;
     const name = url.pathname.match(/\/(hipparcos|bsc5p|ngc2000)\.html$/)?.[1];
     return name ? 'heasarc:' + name : url.href;
   } catch {return null;}
@@ -94,7 +118,7 @@ export function celestialSourceLinks(object) {
     if (!key || seen.has(key)) continue;
     seen.add(key);
     const catalogue = key.startsWith('heasarc:') ? key.slice(8) : null;
-    const label = catalogue ? 'NASA HEASARC · ' + catalogueName(catalogue) : t('NASA scientific source', 'Fonte scientifica NASA');
+    const label = new URL(source).hostname.endsWith('.esa.int') ? 'ESA Gaia DR3' : catalogue ? 'NASA HEASARC \u00b7 ' + catalogueName(catalogue) : t('NASA scientific source', 'Fonte scientifica NASA');
     links.push(`<a class="object-source" href="${escape(source)}" target="_blank" rel="noopener noreferrer">${escape(label)} ↗</a>`);
   }
   return links.join('');

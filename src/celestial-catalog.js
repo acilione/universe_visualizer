@@ -7,6 +7,9 @@ const NEBULA_SOURCE = 'https://heasarc.gsfc.nasa.gov/W3Browse/all/ngc2000.html';
 const MAS_TO_RAD = Math.PI / (180 * 3600000);
 const RAD = Math.PI / 180;
 let cataloguePromise;
+let gaiaPromise;
+let gaiaEnabled = false;
+export function setGaiaCatalogueEnabled(value) { gaiaEnabled = Boolean(value); }
 export const nasaCatalogueSources = { hipparcos: HIP_SOURCE, bsc5p: BSC_SOURCE, ngc2000: NEBULA_SOURCE };
 const number = value => Number.isFinite(value) ? value.toLocaleString(locale(), { maximumFractionDigits: 3 }) : t('Not available', 'Non disponibile');
 const expand = (snapshot, key) => snapshot[key].map(row => Object.fromEntries(snapshot.columns.map((column, i) => [column, row[i]])));
@@ -113,16 +116,21 @@ export function buildCelestialCatalogue(hipSnapshot, bscSnapshot, nebulaSnapshot
   return { stars, nebulae, objects, byId: new Map(objects.map(object => [object.id, object])), byHip: new Map(stars.filter(star => star.hip).map(star => [star.hip, star])),
     metadata: { hipparcos: hipSnapshot.metadata, bsc5p: bscSnapshot.metadata, ngc2000: nebulaSnapshot.metadata, matchedBrightStars: matched.size, starCount: stars.length, nebulaCount: nebulae.length } };
 }
-export function loadCelestialCatalog() {
-  return cataloguePromise ||= Promise.all(['nasa-hipparcos.json','nasa-stars.json','nasa-nebulae.json'].map(async file => {
+export function loadCelestialCatalog({ includeGaia = gaiaEnabled } = {}) {
+  const nasa = cataloguePromise ||= Promise.all(['nasa-hipparcos.json','nasa-stars.json','nasa-nebulae.json'].map(async file => {
     const response = await fetch((import.meta.env?.BASE_URL || '/') + 'catalog/' + file);
     if (!response.ok) throw new Error(t('NASA catalogue unavailable. Retry loading the catalogue.', 'Catalogo NASA non disponibile. Riprova a caricare il catalogo.'));
     return response.json();
   })).then(snapshots => buildCelestialCatalogue(...snapshots)).catch(error => { cataloguePromise = null; throw error; });
+  if (!includeGaia) return nasa;
+  return gaiaPromise ||= Promise.all([nasa, import('./gaia-catalog.js'), fetch((import.meta.env?.BASE_URL || '/') + 'catalog/gaia-dr3.json').then(response => {
+    if (!response.ok) throw new Error(t('Gaia DR3 snapshot unavailable. Retry or disable Gaia DR3 in Settings.', 'Snapshot Gaia DR3 non disponibile. Riprova o disattiva Gaia DR3 nelle Impostazioni.'));
+    return response.json();
+  })]).then(([data, module, snapshot]) => module.mergeGaiaCatalog(data, snapshot)).catch(error => { gaiaPromise = null; throw error; });
 }
 export function findNasaStarForObject(catalogue, object) {
   if (Number.isFinite(object.hip)) return catalogue.byHip.get(object.hip) || null;
   if (!validPosition(object)) return null;
-  const matches = catalogue.stars.filter(star => angularSeparationArcsec(star, object) <= 3);
+  const matches = catalogue.stars.filter(star => star.nasaCatalogue && angularSeparationArcsec(star, object) <= 3);
   return matches.length === 1 ? matches[0] : null;
 }

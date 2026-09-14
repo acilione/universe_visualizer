@@ -267,3 +267,25 @@ dialog[data-kind="search"]{width:min(740px,calc(100% - 32px));max-height:92dvh}
 #combined-desktop-layers button{justify-content:flex-start;padding:13px}
 @media(max-width:900px){#combined-desktop-layers{flex-direction:row;margin:0}#combined-desktop-layers button{justify-content:center;padding:10px;font-size:10px}.combined-view .left-panel{bottom:144px}}
 @media(max-width:480px){#combined-object-layers{gap:5px;margin:8px 0}.object-layer-switches button{font-size:10px;padding:8px}}
+
+/* On-demand archive observations keep their full framing and source credits. */
+dialog[data-kind="images"]{width:min(880px,calc(100vw - 32px));max-width:none}
+.archive-gallery{display:grid;gap:24px;margin:20px 0}
+.archive-image{margin:0;border:1px solid #91bdb033;border-radius:6px;overflow:hidden;background:#091117}
+.archive-image>a{display:block;background:#05090d}
+.archive-image img{display:block;width:100%;height:auto;max-height:58vh;object-fit:contain}
+.archive-image figcaption{padding:16px 20px}
+.archive-image h3{margin:0 0 8px;font-size:16px;letter-spacing:0;font-weight:500}
+.archive-image p,.archive-search-note{font-size:12px;line-height:1.7;color:#a4b1b6;overflow-wrap:anywhere}
+.archive-image figcaption>a,.archive-search-actions>a{display:inline-block;margin:6px 16px 0 0;color:#b8d7cf;font-size:12px}
+.archive-image .archive-credit{color:#d4dfdc}
+.archive-image .archive-image-type{color:#cfb783}
+.archive-search-actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.archive-search-actions>.focus-button{width:auto;flex:1 1 230px}
+.archive-status{min-height:1em;overflow-wrap:anywhere}
+.gaia-measurements{border-top:1px solid #91bdb033;margin-top:18px;padding-top:14px}
+.gaia-measurements h3{font-size:12px;letter-spacing:1px}
+.gaia-measurements strong,.gaia-audit strong{overflow-wrap:anywhere;min-width:0}
+@media(max-width:560px){dialog[data-kind="images"]{width:calc(100vw - 20px);padding:18px}.archive-image figcaption{padding:12px}.archive-image img{max-height:48vh}}
+
+.archive-image img[hidden]{display:none}

@@ -1,0 +1,139 @@
+[
+  {
+    "ids": [
+      "orion"
+    ],
+    "aliases": [
+      "M42",
+      "Messier 42",
+      "NGC 1976",
+      "Orion Nebula"
+    ],
+    "query": "Orion Nebula",
+    "image": "heic0601a",
+    "credit": "NASA, ESA, M. Robberto (Space Telescope Science Institute/ESA) and the Hubble Space Telescope Orion Treasury Project Team",
+    "title": "Orion Nebula",
+    "titleIt": "Nebulosa di Orione",
+    "note": "Color composite including Hubble ACS and ground-based exposures.",
+    "noteIt": "Composito a colori con esposizioni Hubble ACS e da terra.",
+    "band": "Optical / near-infrared",
+    "bandIt": "Ottico / vicino infrarosso"
+  },
+  {
+    "ids": [
+      "andromeda"
+    ],
+    "aliases": [
+      "M31",
+      "Messier 31",
+      "NGC 224",
+      "Andromeda Galaxy"
+    ],
+    "query": "Andromeda Galaxy",
+    "image": "heic1502a",
+    "credit": "NASA, ESA,\u00a0J. Dalcanton (University of Washington, USA), B. F. Williams (University of Washington, USA), L. C. Johnson (University of Washington, USA), the PHAT team, and R. Gendler.",
+    "title": "Andromeda Galaxy",
+    "titleIt": "Galassia di Andromeda",
+    "note": "Hubble mosaic covering part of the galactic disk.",
+    "noteIt": "Mosaico Hubble di una parte del disco galattico.",
+    "band": "Optical / near-infrared",
+    "bandIt": "Ottico / vicino infrarosso"
+  },
+  {
+    "ids": [
+      "triangulum"
+    ],
+    "aliases": [
+      "M33",
+      "Messier 33",
+      "NGC 598",
+      "Triangulum Galaxy"
+    ],
+    "query": "Triangulum Galaxy",
+    "image": "heic1901a",
+    "credit": "NASA, ESA, and M. Durbin, J. Dalcanton, and B. F. Williams (University of Washington)",
+    "title": "Triangulum Galaxy",
+    "titleIt": "Galassia del Triangolo",
+    "note": "Hubble mosaic of the center and inner spiral arms.",
+    "noteIt": "Mosaico Hubble del centro e dei bracci a spirale interni.",
+    "band": "Optical / near-infrared",
+    "bandIt": "Ottico / vicino infrarosso"
+  },
+  {
+    "ids": [],
+    "aliases": [
+      "M1",
+      "Messier 1",
+      "NGC 1952",
+      "Crab Nebula"
+    ],
+    "query": "Crab Nebula",
+    "image": "heic0515a",
+    "credit": "NASA, ESA and Allison Loll/Jeff Hester (Arizona State University). Acknowledgement: Davide De Martin (ESA/Hubble)",
+    "title": "Crab Nebula",
+    "titleIt": "Nebulosa del Granchio",
+    "note": "Hubble WFPC2 mosaic in optical emission-line filters.",
+    "noteIt": "Mosaico Hubble WFPC2 con filtri ottici a righe di emissione.",
+    "band": "Optical",
+    "bandIt": "Ottico"
+  },
+  {
+    "ids": [],
+    "aliases": [
+      "M57",
+      "Messier 57",
+      "NGC 6720",
+      "Ring Nebula"
+    ],
+    "query": "Ring Nebula",
+    "image": "heic1310a",
+    "credit": "NASA, ESA, and C. Robert O\u2019Dell (Vanderbilt University).",
+    "title": "Ring Nebula",
+    "titleIt": "Nebulosa Anello",
+    "note": "Hubble WFC3 composite in optical emission-line filters.",
+    "noteIt": "Composito Hubble WFC3 con filtri ottici a righe di emissione.",
+    "band": "Optical",
+    "bandIt": "Ottico"
+  },
+  {
+    "ids": [
+      "proxima",
+      "hip-70890"
+    ],
+    "aliases": [
+      "Proxima Centauri",
+      "HIP 70890",
+      "V645 Cen"
+    ],
+    "query": "Proxima Centauri",
+    "image": "potw1343a",
+    "credit": "ESA/Hubble & NASA",
+    "title": "Proxima Centauri",
+    "titleIt": "Proxima Centauri",
+    "note": "Unresolved stellar image; this does not resolve the stellar surface.",
+    "noteIt": "Immagine stellare non risolta; la superficie della stella non viene risolta.",
+    "band": "Optical / near-infrared",
+    "bandIt": "Ottico / vicino infrarosso"
+  },
+  {
+    "ids": [
+      "sirius",
+      "hip-32349"
+    ],
+    "aliases": [
+      "Sirius",
+      "Sirius A",
+      "Sirius B",
+      "HIP 32349"
+    ],
+    "query": "Sirius",
+    "image": "heic0516a",
+    "credit": "NASA, ESA, H. Bond (STScI), and M. Barstow (University of Leicester)",
+    "title": "Sirius",
+    "titleIt": "Sirio A e B",
+    "note": "Sirius A is overexposed to reveal Sirius B; spikes and rings come from the telescope.",
+    "noteIt": "Sirio A sovraesposta per mostrare Sirio B; raggi e anelli provengono dal telescopio.",
+    "band": "Optical / near-infrared",
+    "bandIt": "Ottico / vicino infrarosso"
+  }
+]

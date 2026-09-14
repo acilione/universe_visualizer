@@ -22,6 +22,12 @@ npm run preview -- --port 5174
 
 `dist/` può essere pubblicata su un hosting statico HTTPS. Nessun backend, account o chiave API. Dati e texture sono locali; i font esterni hanno un fallback di sistema.
 
+## Esperimento immagini ufficiali e Gaia DR3
+
+Nel branch `feat/official-images-gaia-dr3`, seleziona un oggetto e apri **Immagini d’archivio** per le osservazioni ESA/Hubble verificate o una ricerca esplicita nella raccolta NASA. Le immagini conservano inquadratura completa, crediti, bande osservative e fonti. [Copertura e archivi](OFFICIAL_IMAGES.md).
+
+**Impostazioni → Gaia DR3** attiva il sottoinsieme opzionale su tutto il cielo **G ≤ 6**, con 6.764 sorgenti ESA. **Copertura Gaia e corrispondenze**, anche nelle sezioni del catalogo, mostra 4.986 associazioni a voci NASA, 83 sorgenti aggiuntive e 1.695 voci escluse in attesa di verifica. Identificatori e misure NASA restano conservati; le misure native Gaia sono separate. [Dati e metodo](DATA_GAIA_DR3.md).
+
 ## Pianeti e zoom
 
 Clicca un oggetto collegato o la sua etichetta per entrare nella mappa dettagliata: **Gruppo Locale → Via Lattea → Sistema Solare**. Anche il Sole nella vista **Stelle vicine** apre il Sistema Solare. Basta un clic; funziona anche il doppio clic. Nell’anteprima PC e in VR/MR, la selezione apre la destinazione intorno all’osservatore mantenendone posizione e orientamento.

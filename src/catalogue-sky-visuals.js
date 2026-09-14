@@ -81,7 +81,7 @@ function nebulaPatch(object) {
   return patch;
 }
 
-export function createCatalogueSkyView({stars = [], nebulae = []}, selectedObject, {pixelRatio = 1} = {}) {
+export function createCatalogueSkyView({stars = [], nebulae = [], metadata = {}}, selectedObject, {pixelRatio = 1} = {}) {
   if (!selectedObject || !coordinatesKnown(selectedObject)) throw new RangeError(t('This catalogue object has no valid sky coordinates.', 'Questo oggetto di catalogo non ha coordinate celesti valide.'));
   const validStars = stars.filter(coordinatesKnown), validNebulae = nebulae.filter(coordinatesKnown);
   const selectedDirection = direction(selectedObject);
@@ -98,11 +98,13 @@ export function createCatalogueSkyView({stars = [], nebulae = []}, selectedObjec
   group.add(pointsFor(validStars, selectedObject.id, pixelRatio));
   group.add(pointsFor(validNebulae, selectedObject.id, pixelRatio, true));
   if (selectedObject.bodyKind === 'nebula') {const patch = nebulaPatch(selectedObject); if (patch) group.add(patch);}
+  const hasGaia = Boolean(metadata.gaiaDr3);
   const context = {
-    id: 'nasa-sky', mode: 'catalogue-sky', name: t('NASA catalogue sky', 'Cielo dei cataloghi NASA'), short: 'NASA', extent: t('Equatorial sky', 'Cielo equatoriale'),
+    id: 'nasa-sky', mode: 'catalogue-sky', name: hasGaia ? t('NASA + Gaia catalogue sky','Cielo dei cataloghi NASA + Gaia') : t('NASA catalogue sky', 'Cielo dei cataloghi NASA'), short: hasGaia ? 'NASA + Gaia' : 'NASA', extent: t('Equatorial sky', 'Cielo equatoriale'),
     metric: t('CATALOGUE OBJECTS', 'OGGETTI DI CATALOGO'), count: formatNumber(validStars.length + validNebulae.length),
     source: 'https://heasarc.gsfc.nasa.gov/W3Browse/star-catalog/hipparcos.html', description: t('Hipparcos, Bright Star Catalogue and NGC 2000.0 nebulae from NASA HEASARC.', 'Hipparcos, Bright Star Catalogue e nebulose NGC 2000.0 da NASA HEASARC.'),
-    positionNote, overview: t('Stars and nebulae', 'Stelle e nebulose'), renderedStarCount: validStars.length, catalogStarCount: stars.length, nebulaCount: validNebulae.length
+    gaiaDr3: metadata.gaiaDr3 || null, positionNote, overview: t('Stars and nebulae', 'Stelle e nebulose'), renderedStarCount: validStars.length, catalogStarCount: stars.length, nebulaCount: validNebulae.length
   };
+  if (hasGaia) context.description += t(' Includes the experimental Gaia DR3 bright-source subset from ESA.',' Include il sottoinsieme sperimentale di sorgenti luminose Gaia DR3 di ESA.');
   return {group, objects, context, lookDirection: selectedDirection, radius: RADIUS, fov: catalogueObjectFov(selectedObject)};
 }
