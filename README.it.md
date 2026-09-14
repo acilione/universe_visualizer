@@ -132,3 +132,11 @@ La verifica del riferimento terrestre e della camera usa **npm run test:earth-re
 ## Satelliti naturali
 
 Il catalogo **Pianeti e satelliti** include 28 satelliti principali di sei pianeti, compresa la Luna terrestre. Le schede mostrano raggio medio, semiasse maggiore e periodo orbitale medio da NASA/JPL. **Satelliti principali** filtra il catalogo per pianeta; **Osserva il sistema di satelliti** inquadra il pianeta con le sue lune. Ogni satellite si può selezionare e osservare da vicino anche in VR. Le orbite sono schematiche; questa è una selezione dei satelliti conosciuti. Dati e fonti: [DATA_MOONS.md](DATA_MOONS.md).
+
+## Stelle e nebulose NASA
+
+I controlli **Stelle** e **Nebulose**, anche nella ricerca e nelle sezioni del catalogo, consultano gli archivi NASA HEASARC: 118.218 voci Hipparcos, 9.096 voci stellari Bright Star Catalogue e 485 voci nebulari NGC2000. La corrispondenza fra i cataloghi stellari conserva tutti gli identificatori in 118.356 schede. Sono cataloghi completi nelle rispettive selezioni, non un elenco di tutti gli oggetti astronomici conosciuti.
+
+La ricerca comprende Rho Cygni, Scheat, Sheliak, nomi alternativi e identificatori HIP/HR/HD/NGC/IC/Messier. **Dati di catalogo** mostra coordinate, magnitudini, classi spettrali, parallassi e incertezze quando disponibili. Le voci HYG corrispondenti ricevono informazioni NASA mantenendo la provenienza delle coordinate. La vista NASA usa direzioni equatoriali su una sfera di riferimento, senza inventare profondità mancanti; le nebulose sono rappresentazioni illustrative dell’estensione angolare. Zoom, immersione e VR sono disponibili.
+
+Fonti, epoche e procedure di aggiornamento: [stelle NASA](DATA_NASA_STARS.md) e [nebulose NASA](DATA_NASA_NEBULAE.md).

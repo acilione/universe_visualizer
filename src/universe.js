@@ -11,6 +11,7 @@ import { planetCameraFraming, overviewDistance } from './planet-navigation.js';
 import { loadConstellation, loadConstellations } from './constellation-catalog.js';
 import { createConstellationView } from './constellation-visuals.js';
 import { makeEarthReference } from './earth-reference.js';
+import { createCatalogueSkyView, catalogueObjectFov } from './catalogue-sky-visuals.js';
 
 const SOLAR_OBJECTS = [...catalog.solar, ...solarMoons];
 const GOLD = 0x68cfbb;
@@ -127,7 +128,8 @@ export class Universe {
       g.add(new THREE.Mesh(new THREE.SphereGeometry(size,20,14),new THREE.MeshBasicMaterial({color:o.color})));
       const glow=new THREE.Sprite(new THREE.SpriteMaterial({map:this.glowTexture,color:o.color,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:.85}));glow.scale.setScalar(2.3);glow.material.userData.baseOpacity=.85;g.add(glow);
     }
-    const hit=new THREE.Mesh(new THREE.SphereGeometry(planetary?(o.bodyKind==='moon'?Math.max(size*1.15,.08):Math.max(size,.52)):.5,12,8),new THREE.MeshBasicMaterial({visible:false}));hit.userData.object=o;g.add(hit);if(this.index!==7||o.altitudeDeg>=0)this.targets.push(hit);this.content.add(g);
+    const catalogueHit=this.index===8?Math.max(.0005,60*Math.tan(THREE.MathUtils.degToRad(this.camera.fov))*8/Math.max(1,this.canvas.clientHeight),o.bodyKind==='nebula'&&o.angularSizeArcmin>0?60*Math.tan(THREE.MathUtils.degToRad(Math.min(o.angularSizeArcmin/60,120)/2)):0):.5;
+    const hit=new THREE.Mesh(new THREE.SphereGeometry(planetary?(o.bodyKind==='moon'?Math.max(size*1.15,.08):Math.max(size,.52)):catalogueHit,12,8),new THREE.MeshBasicMaterial({visible:false}));hit.userData.object=o;g.add(hit);if(this.index!==7||o.altitudeDeg>=0)this.targets.push(hit);this.content.add(g);
     const label=document.createElement('button');label.className='map-label'+(o.id==='solar-system'||o.id==='earth'?' home':'');label.textContent=o.name;label.setAttribute('aria-label',t(`Select ${o.name}`,`Seleziona ${o.name}`));label.addEventListener('click',()=>this.isInspectableBody(o)?this.focusObject(o):this.selectObject(o));this.labelContainer.append(label);this.labels.push({element:label,object:g,data:o});return g;
   }
   setScale(index,initial=false){
@@ -139,10 +141,10 @@ export class Universe {
     this.viewRequest++;const {objects,context}=hostView(planet);this.systemHost=planet.host;this.buildView(5,objects,context);
   }
   navigateFromXR(delta){
-    if(this.index<6){this.setScale(THREE.MathUtils.clamp((this.index===5?0:this.index)+delta,0,4));return;}
+    if(this.index<6||this.index===8){this.setScale(THREE.MathUtils.clamp((this.index===5||this.index===8?0:this.index)+delta,0,4));return;}
     const current=this.constellationData;
     loadConstellations().then(({constellations})=>{
-      if(this.constellationData!==current||this.index<6)return;
+      if(this.constellationData!==current||(this.index!==6&&this.index!==7))return;
       const ordered=[...constellations].sort((a,b)=>a.name.localeCompare(b.name,locale()));
       const index=ordered.findIndex(item=>item.id===current.figure.id);
       const figure=ordered[(index+delta+ordered.length)%ordered.length];
@@ -150,7 +152,7 @@ export class Universe {
     }).catch(error=>this.onMessage(error.message));
   }
   focusFromXR(object){
-    if(this.index<6){this.focusObject(object);return;}
+    if(this.index<6||this.index===8){this.focusObject(object);return;}
     this.showConstellation(this.constellationData.figure.id,{mode:this.index===6?'earth':'space',observer:this.constellationData.observer}).catch(error=>this.onMessage(error.message));
   }
   async showConstellation(id,options={}){
@@ -164,7 +166,14 @@ export class Universe {
     if(data.mode==='earth'&&view.context.visibleStarCount===0)this.onMessage(t("This constellation is below the horizon. Change the location or time to observe it.","Questa costellazione è sotto l’orizzonte. Cambia luogo o ora per osservarla."));
     return true;
   }
-  isSkyNavigation(){return this.index===7||(this.index===6&&this.earthPerspective);}
+  async showCatalogueObject(object,data=this.catalogueData){
+    if(this.disposed)return false;
+    const view=createCatalogueSkyView(data,object,{pixelRatio:this.renderer.getPixelRatio()});
+    this.viewRequest++;this.catalogueData=data;this.catalogueSkyView=view;this.systemHost=null;
+    this.buildView(8,view.objects,view.context,false,view.group);
+    return true;
+  }
+  isSkyNavigation(){return this.index===7||this.index===8||(this.index===6&&this.earthPerspective);}
   publishEarthState(){
     if(this.index!==6)return;
     this.viewContext={...this.viewContext,earthVisible:this.earthVisible,earthPerspective:this.earthPerspective};
@@ -226,16 +235,16 @@ export class Universe {
     this.cameraFlight=null;this.skyFlight=null;this.skyEntry=null;this.skyPointers.clear();
     this.earthPerspective=false;this.earthReference=null;this.earthMarker=null;this.earthLabel=null;
     const previousIndex=this.index;
-    if(previousIndex===7||index===7){for(const retiring of this.retiring)this.disposeGroup(retiring.group);this.retiring=[];if(this.content){this.disposeGroup(this.content);this.content=null;}}
+    if(previousIndex===7||previousIndex===8||index===7||index===8){for(const retiring of this.retiring)this.disposeGroup(retiring.group);this.retiring=[];if(this.content){this.disposeGroup(this.content);this.content=null;}}
     if(this.content)this.retiring.push({group:this.content,start:this.elapsed});
     this.index=index;this.objects=objects;this.viewContext=context;this.focusedPlanet=null;this.focusedMoonSystem=null;this.spinning=[];this.targets=[];this.labels.forEach(l=>l.element.remove());this.labels=[];
-    this.controls.enabled=index!==7&&!this.renderer.xr.isPresenting;
-    this.controls.autoRotate=index!==7&&this.autoRotate;
-    this.camera.fov=index===7?70:(this.canvas.clientWidth<700?59:44);this.camera.updateProjectionMatrix();
+    this.controls.enabled=!this.isSkyNavigation()&&!this.renderer.xr.isPresenting;
+    this.controls.autoRotate=!this.isSkyNavigation()&&this.autoRotate;
+    this.camera.fov=index===8?this.catalogueSkyView.fov:index===7?70:(this.canvas.clientWidth<700?59:44);this.camera.updateProjectionMatrix();
     this.content=new THREE.Group();this.mapRoot.add(this.content);this.content.userData.born=this.elapsed;
     this.boundsRadius=this.isPlanetaryView()?Math.max(20,...objects.map(o=>Math.max(o.orbit||0,Math.hypot(...o.position)+(o.size||0))))+2.6:23;
     if(customMap){
-      this.boundsRadius=this.constellationView.radius;
+      this.boundsRadius=index===8?this.catalogueSkyView.radius:this.constellationView.radius;
       const grid=customMap.getObjectByName('grid');if(grid)grid.visible=this.layers.grid&&!this.immersive;
       if(index===6){
         const oldOrigin=customMap.getObjectByName('solar-origin');if(oldOrigin)this.disposeGroup(oldOrigin);
@@ -249,12 +258,13 @@ export class Universe {
     for(const o of objects)this.makeMarker(o);
     if(index===6){this.makeEarthMarker();this.updateEarthVisibility();}
     this.selected=null;this.onScale(index,context);this.selectObject(objects[0]);this.setLayer('particles',this.layers.particles);
-    if(!this.renderer.xr.isPresenting)this.resetView(initial||previousIndex===7||index===7);else this.xr.recenter();
+    if(!this.renderer.xr.isPresenting)this.resetView(initial||previousIndex===7||previousIndex===8||index===7||index===8);else this.xr.recenter();
     if(initial)this.content.userData.born=-3;
   }
   setOpacity(group,opacity){group.traverse(o=>{if(!o.material)return;for(const m of Array.isArray(o.material)?o.material:[o.material]){if(m.uniforms?.uOpacity)m.uniforms.uOpacity.value=(m.userData.baseOpacity??1)*opacity;else if(m.visible!==false){if(m.userData.baseOpacity===undefined)m.userData.baseOpacity=m.opacity;m.transparent=true;m.opacity=m.userData.baseOpacity*opacity;}}});}
   disposeGroup(group){group.traverse(o=>{o.geometry?.dispose();if(o.material){for(const m of Array.isArray(o.material)?o.material:[o.material])m.dispose();}});group.removeFromParent();}
   selectObject(object){
+    if(this.index===8&&this.catalogueSkyView.objects[0].id!==object.id){this.showCatalogueObject(object).catch(error=>this.onMessage(error.message));return;}
     if(object.id==='earth-reference'){this.viewFromEarth();return;}
     if(object.bodyKind==='exoplanet')this.showSystem(object);
     if(object.bodyKind==='moon'&&this.index!==0)this.setScale(0);
@@ -262,7 +272,10 @@ export class Universe {
     if(this.focusedPlanet?.id!==object.id)this.focusedPlanet=null;
     this.selected=object;this.updateMoonOrbits();for(const l of this.labels)l.element.classList.toggle('selected',l.data.id===object.id);this.onSelect(object);this.xr?.setInfo({...object,scaleLabel:this.viewContext.name});
     if(this.selectionRing){this.selectionRing.removeFromParent();this.selectionRing.geometry.dispose();this.selectionRing.material.dispose();}
-    this.selectionRing=this.ring(this.isPlanetaryView()?(object.size||.4)*1.8:.62,.75);this.selectionRing.position.copy(vec(object.position));this.selectionRing.position.y+=.06;this.selectionRing.visible=!this.immersive&&(this.index!==7||object.altitudeDeg>=0);this.content.add(this.selectionRing);this.updateMoonOrbits();
+    const skyRadius=this.index===8?(object.bodyKind==='nebula'&&object.angularSizeArcmin>0?60*Math.tan(THREE.MathUtils.degToRad(Math.min(object.angularSizeArcmin/60,120)/2))*1.1:.16):.62;
+    this.selectionRing=this.ring(this.isPlanetaryView()?(object.size||.4)*1.8:skyRadius,.75);this.selectionRing.position.copy(vec(object.position));
+    if(this.index===8)this.selectionRing.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),vec(object.position).normalize());else this.selectionRing.position.y+=.06;
+    this.selectionRing.visible=!this.immersive&&(this.index!==7||object.altitudeDeg>=0);this.content.add(this.selectionRing);this.updateMoonOrbits();
   }
   updateMoonOrbits(){
     const parentId=this.selected?.parentId||this.selected?.id;
@@ -287,7 +300,7 @@ export class Universe {
   focusObject(object){
     if(object.id==='earth-reference'){this.viewFromEarth();return;}
     this.selectObject(object);const target=vec(object.position);
-    if(this.isSkyNavigation()){if(this.index===7&&object.altitudeDeg<0){this.onMessage(t("This star is below the horizon at the selected time.","Questa stella è sotto l’orizzonte all’ora scelta."));return;}this.lookAtSky(target);return;}
+    if(this.isSkyNavigation()){if(this.index===7&&object.altitudeDeg<0){this.onMessage(t("This star is below the horizon at the selected time.","Questa stella è sotto l’orizzonte all’ora scelta."));return;}if(this.index===8&&!this.renderer.xr.isPresenting){this.camera.fov=catalogueObjectFov(object);this.camera.updateProjectionMatrix();}this.lookAtSky(target);return;}
 
     if(this.isInspectableBody(object)){
       this.focusedPlanet=object;this.updateMoonOrbits();
@@ -312,7 +325,7 @@ export class Universe {
       this.updateEarthVisibility();this.publishEarthState();
     }
     if(this.renderer.xr.isPresenting){this.focusedPlanet=null;this.focusedMoonSystem=null;this.updateMoonOrbits();this.xr.recenter?.();return;}
-    if(this.index===7){this.cameraFlight=null;this.camera.fov=70;this.camera.updateProjectionMatrix();this.lookAtSky(this.constellationView.lookDirection,immediate);return;}
+    if(this.index===7||this.index===8){const view=this.index===8?this.catalogueSkyView:this.constellationView;this.cameraFlight=null;this.camera.fov=this.index===8?catalogueObjectFov(this.selected):70;this.camera.updateProjectionMatrix();this.lookAtSky(this.index===8?vec(this.selected.position):view.lookDirection,immediate);return;}
     if(this.index===6){
       this.controls.minDistance=.3;
       const {center,radius}=this.constellationView;
@@ -330,7 +343,7 @@ export class Universe {
   }
   zoom(factor){
     if(this.renderer.xr.isPresenting)return;
-    if(this.isSkyNavigation()){this.camera.fov=THREE.MathUtils.clamp(this.camera.fov*factor,20,100);this.camera.updateProjectionMatrix();return;}
+    if(this.isSkyNavigation()){this.camera.fov=THREE.MathUtils.clamp(this.camera.fov*factor,this.index===8?.05:20,100);this.camera.updateProjectionMatrix();return;}
     const offset=this.camera.position.clone().sub(this.controls.target);offset.setLength(THREE.MathUtils.clamp(offset.length()*factor,this.controls.minDistance,250));this.fly(this.controls.target.clone().add(offset),this.controls.target.clone());
   }
   setLayer(name,value){
@@ -350,6 +363,7 @@ export class Universe {
   setQuality(quality){
     if(this.quality===quality)return;const object=this.selected,host=this.systemHost;
     this.quality=quality;this.renderer.setPixelRatio(Math.min(devicePixelRatio,quality==='low'?1:1.75));
+    if(this.index===8){const yaw=this.skyYaw,pitch=this.skyPitch,fov=this.camera.fov;this.showCatalogueObject(object,this.catalogueData).then(()=>{if(this.index===8){this.skyYaw=yaw;this.skyPitch=pitch;this.camera.fov=fov;this.camera.updateProjectionMatrix();this.applySkyLook();}}).catch(error=>this.onMessage(error.message));this.resize();return;}
     if(this.index>=6){this.showConstellation(this.constellationData.figure.id,{mode:this.constellationData.mode,observer:this.constellationData.observer}).catch(error=>this.onMessage(error.message));this.resize();return;}
     this.buildView(this.index,this.objects,this.viewContext);this.systemHost=host;if(object)this.selectObject(object);this.resize();
   }

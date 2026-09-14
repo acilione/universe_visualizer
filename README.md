@@ -26,6 +26,7 @@ The application needs no account, API key or backend. Data and planet textures a
 
 - **Solar System:** Sun, eight planets and 28 selected major moons across six planetary systems. Earth’s Moon has a local lunar surface map; other satellite surfaces are illustrative. Planet sizes are enlarged and orbital spacing compressed for navigation.
 - **Exoplanets:** all **6,360 confirmed planets** in the NASA PSCompPars snapshot, across **4,769 host stars**. Retrieval: **10 September 2026, 23:49 UTC**. The **28 planets with unknown distance** remain searchable. Host-system orbits and exoplanet surfaces are illustrative.
+- **NASA stars and nebulae:** complete NASA HEASARC Hipparcos (118,218 entries) and Bright Star Catalogue stellar records (9,096), cross-matched into 118,356 display records, plus all 485 nebular entries in the NGC2000 archive. Names, Bayer designations and HIP/HR/HD/NGC/IC/Messier IDs are searchable. These named catalogues do not contain every star or nebula known to astronomy.
 - **Nearby stars:** curated references and a HYG subset of 156 additional stars within 25 light-years.
 - **Constellations:** **119,625 HYG v4.1 stars**, with **88 constellation figures** using Stellarium geometry. The 3D view uses a common linear distance scale. The Earth view projects sky directions for the selected location and instant.
 - **Galactic and cosmological scales:** illustrative Milky Way, Local Group and cosmic-web representations, with source references in the object panels.
@@ -35,6 +36,12 @@ English uses IAU constellation names; Italian uses localized names. Search accep
 ## Navigation
 
 Drag to orbit and scroll or pinch to zoom. Select a planet or moon to inspect its surface; the camera's minimum distance scales with the body radius. The **Planets & moons** catalogue supports name/host search, category and parent-planet filters, and pagination. A planet's **Major moons** button lists its included satellites; **View moon system** frames the planet and its moons together. Moon cards show the parent planet, mean radius, orbital semimajor axis and mean orbital period. Close moon inspection hides reference guides; the system view restores them. This is a curated selection of moons with schematic orbits, not a live ephemeris.
+
+**Stars** and **Nebulae** below the search control open the NASA catalogue filters; they are also available in **Catalogue sections** and the search dialog. Search accepts **Rho Cygni**, **Rho Cigny**, **Scheat**, **Sheliak**, **M42** and catalogue identifiers. All matching results are paginated. **Catalogue data** opens the full scientific record. Existing HYG stars receive supplementary NASA information through HIP identity or an unambiguous positional match; their map coordinates retain HYG provenance.
+
+The **NASA catalogue sky** places objects by equatorial direction on a reference sphere. Nebula clouds are illustrative angular extents, not photographs or measured three-dimensional shapes. Known distances remain in the information cards; unknown distances remain unavailable. The view supports zoom, immersive mode and VR.
+
+Hipparcos ICRS positions at J1991.25 are propagated to J2000 with tangent-vector proper motion when both components exist. Otherwise their original position epoch is shown. Positive parallaxes with known relative uncertainty at most 20% permit a labelled inverse-parallax distance estimate. Original source uncertainties, photometric bands and catalogue-specific spectral measurements are retained.
 
 In **Constellations**, choose **3D space** or **Earth surface**:
 
@@ -71,6 +78,8 @@ Simulated VR tests cover interaction and session behavior; tracking and comfort 
 
 ## Sources
 
+- [NASA star archives](DATA_NASA_STARS.md): complete Hipparcos and Bright Star snapshots, coordinate epochs and naming sources.
+- [NASA nebula archive](DATA_NASA_NEBULAE.md): the full NGC2000 nebular subset, angular sizes and NASA object information.
 - [Moon catalogue](DATA_MOONS.md): 28 selected NASA/JPL natural satellites and their measured properties.
 - [Planetary snapshot](DATA_EXOPLANETS.md): NASA archive, nullable measurements and importer.
 - [Stellar catalogues and constellation geometry](DATA_CONSTELLATIONS.md): HYG / David Nash and Stellarium, CC BY-SA 4.0, pinned revisions and checksums.
@@ -88,6 +97,7 @@ npm run build
 npm run test:browser
 npm run test:engine
 npm run test:moons
+npm run test:nasa
 npm run test:constellations
 npm run test:constellation-ui
 npm run test:earth-reference

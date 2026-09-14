@@ -6,6 +6,8 @@ import { Universe } from './universe.js';
 import { exoplanets, planetCatalogMetadata, findPlanet } from './planets.js';
 import { solarMoons, moonsForPlanet, findMoon, moonCatalogMetadata } from './moons.js';
 import { loadConstellations } from './constellation-catalog.js';
+import { loadCelestialCatalog, normalizeCelestialSearch, findNasaStarForObject } from './celestial-catalog.js';
+import { celestialMeasurements, celestialSourceLinks } from './celestial-info.js';
 import { parseCoordinate, dateInputInZone, zonedDateInputToIso } from './observer-input.js';
 
 document.documentElement.lang = getLanguage();
@@ -31,6 +33,10 @@ let tourTimer = null;
 let toastTimer = null;
 let immersionTimer = null;
 let immersionRevealTimer = null;
+const searchBrowser = { query: '', scope: 'all', page: 0, loading: false, error: '' };
+let nasaCatalogue = null;
+let nasaSearchEntries = [];
+const nasaEnrichments = new Set();
 const planetBrowser = { query: '', filter: 'all', parentId: '', page: 0 };
 const constellationBrowser = {
   query: '', mode: 'space', id: 'Ori', data: null, busy: false, earthVisible: true, timeZone: 'Europe/Rome',
@@ -89,6 +95,7 @@ $('#app').innerHTML = `
     </aside>
     <aside class="right-panel" aria-label="${t("Selected object information","Informazioni sull’oggetto selezionato")}">
       <button class="search-button" data-action="search">${icon('search')}<span>${t("Search catalogue","Cerca nel catalogo")}</span><kbd>/</kbd></button>
+      <div class="catalogue-shortcuts"><button data-action="nasa-stars">${t("Stars","Stelle")}</button><button data-action="nasa-nebulae">${t("Nebulae","Nebulose")}</button></div>
       <article class="object-card" id="object-card"></article>
       <div class="coordinates"><span>${t("J2000 · REFERENCE","J2000 · RIFERIMENTO")}</span><span>${t("ILLUSTRATIVE MAP","MAPPA ILLUSTRATIVA")}</span></div>
     </aside>
@@ -141,7 +148,7 @@ const isPlanet = object => object?.isPlanet || object?.bodyKind === 'exoplanet' 
 const isMoon = object => object?.isMoon || object?.bodyKind === 'moon';
 const number = (value, unit = '') => Number.isFinite(value) ? `${value.toLocaleString(locale(), { maximumFractionDigits: 2 })}${unit ? ' ' + unit : ''}` : t("Not available","Non disponibile");
 const currentScale = () => scales[state.scale] || {
-  id: state.scale >= 6 ? 'constellations' : 'exoplanets',
+  id: state.scale === 8 ? 'nasa-sky' : state.scale >= 6 ? 'constellations' : 'exoplanets',
   name: state.context?.name || state.object?.host || t("Exoplanet system","Sistema esoplanetario"),
   source: state.scale >= 6 ? 'https://github.com/astronexus/HYG-Database' : 'https://exoplanetarchive.ipac.caltech.edu/',
   extent: state.scale >= 6 ? t("HYG star catalogue","Catalogo stellare HYG") : t("Exoplanet system","Sistema esoplanetario"),
@@ -152,12 +159,14 @@ function objectMarkup(object, isModal = false) {
   const scale = currentScale();
   const planet = isPlanet(object);
   const moon = isMoon(object);
+  const nasa = object.nasaCatalogue || object.nasaInfo;
+  const nebula = object.bodyKind === 'nebula';
   const moons = planet ? moonsForPlanet(object.id) : [];
   const exoplanet = object.bodyKind === 'exoplanet';
   const isOverview = object.id === catalog[scale.id]?.[0]?.id || object.id === state.context?.overview?.id;
-  const catalogStar = state.scale >= 6 && Number.isFinite(object.raDeg) && Number.isFinite(object.decDeg);
+  const catalogStar = !nebula && (object.bodyKind === 'catalog-star' || state.scale >= 6 && Number.isFinite(object.raDeg) && Number.isFinite(object.decDeg));
   const canDive = Number.isInteger(object.targetScale) && scales[object.targetScale];
-  const measurements = moon ? `<div class="planet-measurements moon-measurements">
+  const measurements = nasa ? celestialMeasurements(object, isModal) : moon ? `<div class="planet-measurements moon-measurements">
     <div><span>${t("MEAN RADIUS","RAGGIO MEDIO")}</span><strong>${number(object.radiusKm, 'km')}</strong></div>
     <div><span>${t("ORBITAL SEMI-MAJOR AXIS","SEMIASSE MAGGIORE ORBITALE")}</span><strong>${number(object.semiMajorAxisKm, 'km')}</strong></div>
     <div><span>${t("MEAN ORBITAL PERIOD","PERIODO ORBITALE MEDIO")}</span><strong>${number(object.periodDays, t("days","giorni"))}</strong></div>
@@ -171,19 +180,21 @@ function objectMarkup(object, isModal = false) {
       <div><span>${t("DECLINATION · J2000","DECLINAZIONE · J2000")}</span><strong>${number(object.decDeg, '°')}</strong></div>
       ${isModal ? `<div><span>${t("APPARENT MAGNITUDE","MAGNITUDINE APPARENTE")}</span><strong>${number(object.mag)}</strong></div><div><span>${t("HIPPARCOS IDENTIFIER","IDENTIFICATORE HIPPARCOS")}</span><strong>${object.hip ? 'HIP ' + escape(object.hip) : t("Not available","Non disponibile")}</strong></div>${state.scale === 7 ? `<div><span>${t("ALTITUDE ABOVE HORIZON","ALTEZZA SULL'ORIZZONTE")}</span><strong>${number(object.altitudeDeg, '°')}</strong></div>` : ''}` : ''}
     </div>` : '';
-  return `<div class="card-top"><span>${moon ? t("MOON DATA","DATI DEL SATELLITE") : planet ? t("PLANET DATA","DATI DEL PIANETA") : isOverview ? t("CATALOGUE OVERVIEW","PANORAMICA DEL CATALOGO") : t("CELESTIAL OBJECT","OGGETTO CELESTE")}</span>${icon(planet || moon ? 'globe-2' : 'sparkles')}</div>
+  return `<div class="card-top"><span>${nebula ? t("NEBULA DATA","DATI DELLA NEBULOSA") : nasa ? t("STAR DATA","DATI STELLARI") : moon ? t("MOON DATA","DATI DEL SATELLITE") : planet ? t("PLANET DATA","DATI DEL PIANETA") : isOverview ? t("CATALOGUE OVERVIEW","PANORAMICA DEL CATALOGO") : t("CELESTIAL OBJECT","OGGETTO CELESTE")}</span>${icon(planet || moon ? 'globe-2' : 'sparkles')}</div>
     <div class="card-content${planet || moon ? ' planet-card-content' : ''}"><h2>${escape(object.name)}</h2><div class="object-type">${escape(moon ? t("Natural satellite","Satellite naturale") : object.type || t("Catalogue star","Stella da catalogo"))}${exoplanet ? ' · ' + escape(object.host) : ''}</div>
       <p class="card-description">${escape(object.detail || state.context?.description || '')}</p>
       <div class="card-stats"><span>${moon ? t("PARENT PLANET","PIANETA PRINCIPALE") : isOverview ? escape(scale.metric) : exoplanet ? t("DISTANCE FROM EARTH","DISTANZA DALLA TERRA") : t("DISTANCE / EXTENT","DISTANZA / ESTENSIONE")}</span><strong>${escape(moon ? object.parentName : isOverview ? scale.count : object.distance || t("Not available","Non disponibile"))}</strong></div>
       ${isOverview ? `<div class="card-stats"><span>${t("EXTENT","ESTENSIONE")}</span><strong>${escape(scale.extent)}</strong></div>` : ''}
       ${measurements}
-      ${catalogStar ? `<p class="illustration-note">${state.scale === 7 ? (object.altitudeDeg < 0 ? t("Below the horizon at the selected location and time.","Sotto l’orizzonte nel luogo e all’orario scelti.") : t("Sky direction at the selected location and time.","Direzione nel cielo dal luogo e all’orario scelti.")) : Number.isFinite(object.distanceLy) ? t("3D position from catalogue coordinates and distance.","Posizione 3D da coordinate e distanza di catalogo.") : t("Distance unavailable; included in the Earth sky view.","Distanza non disponibile: visibile nella vista dalla Terra.")}</p>${!isModal ? `<button class="planet-details-button" data-action="object">${t("Star data","Dati della stella")} ${icon('arrow-up-right')}</button>` : ''}` : ''}
+      ${catalogStar && !object.nasaCatalogue ? `<p class="illustration-note">${state.scale === 7 ? (object.altitudeDeg < 0 ? t("Below the horizon at the selected location and time.","Sotto l’orizzonte nel luogo e all’orario scelti.") : t("Sky direction at the selected location and time.","Direzione nel cielo dal luogo e all’orario scelti.")) : Number.isFinite(object.distanceLy) ? t("3D position from catalogue coordinates and distance.","Posizione 3D da coordinate e distanza di catalogo.") : t("Distance unavailable; included in the Earth sky view.","Distanza non disponibile: visibile nella vista dalla Terra.")}</p>${!isModal ? `<button class="planet-details-button" data-action="object">${t("Star data","Dati della stella")} ${icon('arrow-up-right')}</button>` : ''}` : ''}
+      ${object.nasaCatalogue && !isModal ? `<button class="planet-details-button" data-action="object">${t("Catalogue data","Dati di catalogo")} ${icon('arrow-up-right')}</button>` : ''}
       ${isModal && object.positionNote ? `<p class="illustration-note">${escape(object.positionNote)}</p>` : ''}
       ${exoplanet ? `<p class="illustration-note">${t("Illustrative appearance. Measurements and estimates from the NASA catalogue.","Aspetto illustrativo. Misure e stime dal catalogo NASA.")}</p>` : ''}
       ${(planet || moon) && !isModal ? `<button class="planet-details-button" data-action="object">${moon ? t("Moon data","Dati del satellite") : t("Planet data","Dati del pianeta")} ${icon('arrow-up-right')}</button>` : ''}
       ${moons.length ? `<div class="moon-system-actions"><button class="moon-catalog-button" data-action="moons" data-parent="${escape(object.id)}">${t("Major moons","Satelliti principali")} (${moons.length}) ${icon('arrow-up-right')}</button><button class="moon-system-button" data-action="moon-system" data-parent="${escape(object.id)}">${icon('orbit')}${t("View moon system","Osserva il sistema di satelliti")}</button></div>` : ''}
-      <button class="focus-button" data-action="focus">${icon(canDive ? 'arrow-right' : 'focus')}${moon ? t("Inspect moon","Osserva il satellite") : planet ? t("Inspect planet","Osserva il pianeta") : canDive ? t("Open ","Apri ") + escape(scales[object.targetScale].name) : t("Focus","Metti a fuoco")}</button>
+      <button class="focus-button" data-action="focus"${object.nasaCatalogue && (!Number.isFinite(object.raDeg) || !Number.isFinite(object.decDeg)) ? ' disabled' : ''}>${icon(canDive ? 'arrow-right' : 'focus')}${object.nasaCatalogue ? t("Locate in sky","Localizza nel cielo") : moon ? t("Inspect moon","Osserva il satellite") : planet ? t("Inspect planet","Osserva il pianeta") : canDive ? t("Open ","Apri ") + escape(scales[object.targetScale].name) : t("Focus","Metti a fuoco")}</button>
       ${moon ? `<button class="moon-parent-button" data-object="${escape(object.parentId)}" data-object-scale="0">${icon('arrow-right')}${t("Return to ","Torna a ")}${escape(object.parentName)}</button>` : ''}
+      ${nasa ? celestialSourceLinks(object) : ''}
       <a class="object-source" href="${escape(object.source || scale.source)}" target="_blank" rel="noopener noreferrer">${t("Scientific source ↗","Fonte scientifica ↗")}</a>
     </div>`;
 }
@@ -192,20 +203,33 @@ function renderObject(object) {
   if (!object || !object.name) return;
   state.object = object;
   $('#object-card').innerHTML = objectMarkup(object);
-  $('.coordinates').innerHTML = `<span>${state.scale === 7 ? t("LOCAL HORIZON","ORIZZONTE LOCALE") : state.scale === 6 ? t("J2000 · HYG DISTANCES","J2000 · DISTANZE HYG") : ['stars','local'].includes(currentScale().id) ? t("J2000 · APPROXIMATE","J2000 · APPROSSIMATA") : t("SCHEMATIC VIEW","VISTA SCHEMATICA")}</span><span>${state.scale >= 6 ? t("HYG 4.1 CATALOGUE","CATALOGO HYG 4.1") : t("COSMIC ATLAS","ATLANTE COSMICO")}</span>`;
+  $('.coordinates').innerHTML = `<span>${state.scale === 8 ? t("EQUATORIAL SKY DIRECTIONS","DIREZIONI CELESTI EQUATORIALI") : state.scale === 7 ? t("LOCAL HORIZON","ORIZZONTE LOCALE") : state.scale === 6 ? t("J2000 · HYG DISTANCES","J2000 · DISTANZE HYG") : ['stars','local'].includes(currentScale().id) ? t("J2000 · APPROXIMATE","J2000 · APPROSSIMATA") : t("SCHEMATIC VIEW","VISTA SCHEMATICA")}</span><span>${state.scale === 8 ? 'NASA HEASARC' : state.scale >= 6 ? t("HYG 4.1 CATALOGUE","CATALOGO HYG 4.1") : t("COSMIC ATLAS","ATLANTE COSMICO")}</span>`;
   if ($('#modal').open && $('#modal').dataset.kind === 'object') $('#modal-body').innerHTML = objectMarkup(object, true);
   refreshIcons();
+  enrichStellarInformation(object);
+}
+
+function enrichStellarInformation(object) {
+  if (object.nasaCatalogue || object.nasaInfo || nasaEnrichments.has(object.id) || !(object.bodyKind === 'catalog-star' || object.measured && Number.isFinite(object.raDeg))) return;
+  nasaEnrichments.add(object.id);
+  loadCelestialCatalog().then(data => {
+    const info = findNasaStarForObject(data, object);
+    if (!info) return;
+    object.nasaInfo = info;
+    if (state.object.id === object.id) renderObject(object);
+  }).catch(() => { nasaEnrichments.delete(object.id); });
 }
 
 function updateScale(index, context = null) {
   index = Number(index);
-  if (!Number.isInteger(index) || ![5, 6, 7].includes(index) && !scales[index]) return;
+  if (!Number.isInteger(index) || ![5, 6, 7, 8].includes(index) && !scales[index]) return;
   if (index !== state.scale) { clearTimeout(toastTimer); $('.toast').classList.remove('visible'); }
   state.scale = index;
   state.context = index >= 5 ? context || state.context : null;
   const scale = currentScale();
   const hostView = index === 5;
-  const constellationView = index >= 6;
+  const constellationView = index === 6 || index === 7;
+  const nasaView = index === 8;
   const detached = index >= 5;
   if (constellationView) {
     constellationBrowser.id = context?.constellationId || constellationBrowser.id;
@@ -213,12 +237,12 @@ function updateScale(index, context = null) {
     if (typeof context?.earthVisible === 'boolean') constellationBrowser.earthVisible = context.earthVisible;
     if (context?.observer) constellationBrowser.observer = { ...constellationBrowser.observer, ...context.observer };
   }
-  $('#scale-title').textContent = constellationView ? `${scale.name}.` : hostView ? `${t("Host star: ","Stella ospite: ")}${scale.name}.` : scale.title;
-  $('#scale-subtitle').textContent = constellationView ? index === 7 ? t("Local sky coordinates for the selected observer and time.","Coordinate del cielo per l’osservatore e l’istante selezionati.") : t("J2000 stellar positions and catalogue distances.","Posizioni stellari J2000 e distanze di catalogo.") : hostView ? t("Confirmed planets around the selected host star.","Pianeti confermati intorno alla stella selezionata.") : scale.subtitle;
+  $('#scale-title').textContent = nasaView ? scale.name : constellationView ? `${scale.name}.` : hostView ? `${t("Host star: ","Stella ospite: ")}${scale.name}.` : scale.title;
+  $('#scale-subtitle').textContent = nasaView ? t("NASA catalogue sky positions; radial distance is not represented.","Posizioni celesti dai cataloghi NASA; la distanza radiale non viene rappresentata.") : constellationView ? index === 7 ? t("Local sky coordinates for the selected observer and time.","Coordinate del cielo per l’osservatore e l’istante selezionati.") : t("J2000 stellar positions and catalogue distances.","Posizioni stellari J2000 e distanze di catalogo.") : hostView ? t("Confirmed planets around the selected host star.","Pianeti confermati intorno alla stella selezionata.") : scale.subtitle;
   $('#scale-readout').textContent = scale.extent;
-  $('#scale-step').textContent = constellationView ? index === 7 ? t("EARTH VIEW","DALLA TERRA") : t("CONSTELLATIONS","COSTELLAZIONI") : hostView ? t("EXOPLANETS","ESOPIANETI") : `0${index + 1} / 05`;
+  $('#scale-step').textContent = nasaView ? 'NASA HEASARC' : constellationView ? index === 7 ? t("EARTH VIEW","DALLA TERRA") : t("CONSTELLATIONS","COSTELLAZIONI") : hostView ? t("EXOPLANETS","ESOPIANETI") : `0${index + 1} / 05`;
   $('#region-name').textContent = scale.name.toLocaleUpperCase(locale());
-  $('#region-type').textContent = constellationView ? index === 7 ? t("LOCAL SKY · GEOMETRIC HORIZON","CIELO LOCALE · ORIZZONTE GEOMETRICO") : t("HYG STELLAR COORDINATES","COORDINATE STELLARI HYG") : hostView ? t("EXOPLANET SYSTEM · SCHEMATIC ORBITS","SISTEMA ESOPLANETARIO · ORBITE ILLUSTRATIVE") : index === 0 ? t("SUN, PLANETS AND MAJOR MOONS","SOLE, PIANETI E SATELLITI PRINCIPALI") : index === 4 ? t("CONCEPTUAL MODEL","RICOSTRUZIONE CONCETTUALE") : catalog[scale.id][0].type.toLocaleUpperCase(locale());
+  $('#region-type').textContent = nasaView ? t("STARS AND NEBULAE","STELLE E NEBULOSE") : constellationView ? index === 7 ? t("LOCAL SKY · GEOMETRIC HORIZON","CIELO LOCALE · ORIZZONTE GEOMETRICO") : t("HYG STELLAR COORDINATES","COORDINATE STELLARI HYG") : hostView ? t("EXOPLANET SYSTEM · SCHEMATIC ORBITS","SISTEMA ESOPLANETARIO · ORBITE ILLUSTRATIVE") : index === 0 ? t("SUN, PLANETS AND MAJOR MOONS","SOLE, PIANETI E SATELLITI PRINCIPALI") : index === 4 ? t("CONCEPTUAL MODEL","RICOSTRUZIONE CONCETTUALE") : catalog[scale.id][0].type.toLocaleUpperCase(locale());
   const slider = $('#scale-slider');
   slider.disabled = detached;
   slider.hidden = detached;
@@ -229,6 +253,7 @@ function updateScale(index, context = null) {
   $('.cosmic-return').hidden = !detached;
   $('.journey-top > span').textContent = detached ? t("Reference scale navigation","Navigazione fra scale di riferimento") : t("Reference scale navigation","Navigazione fra scale di riferimento");
   $('.app-shell').classList.toggle('constellation-view', constellationView);
+  $('.app-shell').classList.toggle('nasa-sky-view', nasaView);
   $('.app-shell').classList.toggle('earth-sky-view', index === 7);
   $('.app-shell').classList.toggle('earth-perspective-view', index === 6 && Boolean(context?.earthPerspective));
   $('#constellation-controls').hidden = !constellationView;
@@ -274,6 +299,7 @@ function changeScale(index, manual = true) {
 }
 
 function pickObject(index, object) {
+  if (index === 8 || object.nasaCatalogue) { selectNasaObject(object); return; }
   stopTour();
   closeModal();
   if (object.bodyKind === 'exoplanet') {
@@ -463,20 +489,71 @@ const catalogDate = (() => {
   return Number.isFinite(date.getTime()) ? date.toLocaleDateString(locale(), { timeZone:'Europe/Rome', day:'numeric', month:'long', year:'numeric' }) : t("date unavailable","data non disponibile");
 })();
 
-function renderSearch(query = '') {
-  const needle = normalized(query.trim());
-  const matches = searchEntries.filter(entry => entry.searchText.includes(needle));
-  const entries = matches.slice(0, 80);
-  $('#search-results').innerHTML = entries.length ? entries.map(({ object, index, scaleName }) => `<button class="search-result" data-object="${escape(object.id)}" data-object-scale="${index}"><span><strong>${escape(object.name)}</strong><small>${escape(scaleName)} · ${escape(object.type)}</small></span>${icon('arrow-up-right')}</button>`).join('') : `<p>${t("No objects found. Try “Earth”, “TRAPPIST-1” or “Andromeda”.","Nessun oggetto trovato. Prova “Terra”, “TRAPPIST-1” o “Andromeda”.")}</p>`;
-  $('#search-count').textContent = matches.length > 80 ? `${matches.length.toLocaleString(locale())}${t(" objects found · first 80 results. Refine your search to see others."," oggetti trovati · primi 80 risultati. Affina la ricerca per vedere gli altri.")}` : `${matches.length.toLocaleString(locale())}${t(matches.length === 1 ? " object found" : " objects found", matches.length === 1 ? " oggetto trovato" : " oggetti trovati")}`;
+async function ensureNasaSearch() {
+  if (nasaCatalogue) return nasaCatalogue;
+  searchBrowser.loading = true; searchBrowser.error = '';
+  try {
+    const data = await loadCelestialCatalog();
+    nasaCatalogue = data;
+    nasaSearchEntries = data.objects.map(object => ({ index: 8, object, searchText: object.searchText, scaleName: object.nasaCatalogue === 'ngc2000' ? 'NGC2000 \u00b7 NASA HEASARC' : object.nasaCatalogue === 'hipparcos' ? 'Hipparcos \u00b7 NASA HEASARC' : 'Bright Star Catalogue \u00b7 NASA HEASARC' }));
+    return data;
+  } catch (error) { searchBrowser.error = error.message; throw error; }
+  finally {
+    searchBrowser.loading = false;
+    if ($('#modal').open && $('#modal').dataset.kind === 'search') renderSearch();
+  }
+}
+function renderSearch(query = searchBrowser.query) {
+  if (query !== searchBrowser.query) { searchBrowser.query = query; searchBrowser.page = 0; }
+  const needle = normalizeCelestialSearch(query), tokens = needle.split(' ').filter(Boolean);
+  const { scope } = searchBrowser;
+  const candidates = scope === 'stars' ? nasaSearchEntries.filter(entry => entry.object.bodyKind === 'catalog-star')
+    : scope === 'nebulae' ? nasaSearchEntries.filter(entry => entry.object.bodyKind === 'nebula')
+    : scope === 'planets' ? searchEntries.filter(entry => isPlanet(entry.object) || isMoon(entry.object))
+    : [...searchEntries, ...nasaSearchEntries];
+  const matches = candidates.filter(entry => {
+    const haystack = entry.index === 8 ? entry.searchText : normalizeCelestialSearch(entry.searchText);
+    if (needle === 'sheab') return /\bscheat\b|\bsheliak\b/.test(haystack);
+    return tokens.every(token => haystack.includes(token));
+  });
+  const pageSize = 80, pageCount = Math.max(1, Math.ceil(matches.length / pageSize));
+  searchBrowser.page = Math.min(Math.max(0, searchBrowser.page), pageCount - 1);
+  const entries = matches.slice(searchBrowser.page * pageSize, (searchBrowser.page + 1) * pageSize);
+  $('#search-results').innerHTML = entries.length ? entries.map(({ object, index, scaleName }) => `<button class="search-result" data-object="${escape(object.id)}" data-object-scale="${index}"><span><strong>${escape(object.name)}</strong><small>${escape(scaleName)} \u00b7 ${escape(object.type)}</small></span>${icon('arrow-up-right')}</button>`).join('') : `<p>${searchBrowser.loading ? t('Loading NASA catalogues\u2026','Caricamento dei cataloghi NASA\u2026') : t('No objects found. Try a name or a HIP, HR, HD, NGC, IC or Messier identifier.','Nessun oggetto trovato. Prova un nome o un identificatore HIP, HR, HD, NGC, IC o Messier.')}</p>`;
+  $('#search-count').textContent = `${matches.length.toLocaleString(locale())} ${t(matches.length === 1 ? 'object found' : 'objects found', matches.length === 1 ? 'oggetto trovato' : 'oggetti trovati')}`;
+  $('#search-page').textContent = `${t('Page ','Pagina ')}${searchBrowser.page + 1}${t(' of ',' di ')}${pageCount}`;
+  $('[data-search-page="previous"]').disabled = searchBrowser.page === 0;
+  $('[data-search-page="next"]').disabled = searchBrowser.page >= pageCount - 1;
+  $('#search-status').textContent = searchBrowser.error || (searchBrowser.loading ? t('Loading complete NASA archive snapshots\u2026','Caricamento degli archivi NASA completi\u2026') : nasaCatalogue ? t('NASA HEASARC: complete Hipparcos, Bright Star and NGC2000 nebular records. Unknown measurements are preserved.','NASA HEASARC: cataloghi Hipparcos e Bright Star completi e voci nebulari NGC2000. Le misure mancanti restano non disponibili.') : '');
+  $('[data-action="retry-nasa"]').hidden = !searchBrowser.error;
+  $('#search-results').setAttribute('aria-busy', String(searchBrowser.loading));
+  document.querySelectorAll('[data-search-scope]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.searchScope === scope)));
   refreshIcons();
 }
-
-function openSearch() {
-  openModal('search', t("Search catalogue","Cerca nel catalogo"), `<label for="search-input" class="readout-title">${t("STARS, PLANETS, MOONS AND GALAXIES","STELLE, PIANETI, SATELLITI E GALASSIE")}</label><input id="search-input" class="search-input" type="search" placeholder="${t("Search by name","Cerca per nome")}" autocomplete="off" spellcheck="false" aria-controls="search-results"/><div id="search-count" class="result-count" role="status"></div><div id="search-results" class="search-results"></div>`);
+function openSearch(scope = 'all') {
+  Object.assign(searchBrowser, { scope, query: '', page: 0 });
+  openModal('search', t('Search catalogues','Cerca nei cataloghi'), `<label for="search-input" class="readout-title">${t('STARS, NEBULAE, PLANETS, MOONS AND GALAXIES','STELLE, NEBULOSE, PIANETI, SATELLITI E GALASSIE')}</label><input id="search-input" class="search-input" type="search" placeholder="${t('Name or catalogue identifier','Nome o identificatore di catalogo')}" autocomplete="off" spellcheck="false" aria-controls="search-results"/>
+    <div class="catalog-filter search-filters" role="group" aria-label="${t('Object category','Categoria di oggetto')}"><button data-search-scope="all">${t('All','Tutti')}</button><button data-search-scope="stars">${t('Stars','Stelle')}</button><button data-search-scope="nebulae">${t('Nebulae','Nebulose')}</button><button data-search-scope="planets">${t('Planets & moons','Pianeti e satelliti')}</button></div>
+    <p id="search-status" class="catalog-provenance" role="status"></p><button class="planet-details-button" data-action="retry-nasa" hidden>${t('Retry catalogue loading','Riprova a caricare il catalogo')}</button>
+    <div id="search-count" class="result-count" role="status"></div><div id="search-results" class="search-results"></div>
+    <div class="catalog-pagination"><button data-search-page="previous">${t('Previous','Precedente')}</button><span id="search-page"></span><button data-search-page="next">${t('Next','Successiva')}</button></div>`);
   renderSearch();
   $('#search-input').addEventListener('input', event => renderSearch(event.target.value));
   $('#search-input').focus();
+  ensureNasaSearch().catch(() => {});
+  renderSearch();
+}
+async function selectNasaObject(object) {
+  if (!object || !universe) return;
+  stopTour();
+  if (!Number.isFinite(object.raDeg) || !Number.isFinite(object.decDeg)) {
+    openModal('object', object.name, objectMarkup(object, true)); return;
+  }
+  try {
+    const data = await ensureNasaSearch();
+    closeModal();
+    await universe.showCatalogueObject(object, data);
+  } catch (error) { notify(error.message); }
 }
 
 function renderPlanets() {
@@ -679,7 +756,7 @@ function openCollections() {
     { scale:3, id:'andromeda', icon:'orbit', name:t("Local Group","Gruppo Locale"), subtitle:t("Milky Way, Andromeda and satellite galaxies","Via Lattea, Andromeda e galassie satelliti") },
     { scale:4, id:'laniakea', icon:'sparkles', name:t("Large-scale structure","Struttura a grande scala"), subtitle:t("Galaxy clusters and cosmic web","Ammassi galattici e rete cosmica") }
   ];
-  openModal('collections', t("Catalogue sections","Sezioni del catalogo"), `<p>${t("Browse objects by astronomical scale.","Consulta gli oggetti per scala astronomica.")}</p><div class="collection-grid">${featured.map(item => `<button class="collection-item" data-object="${item.id}" data-object-scale="${item.scale}">${icon(item.icon)}<strong>${item.name}</strong><small>${item.subtitle}</small></button>`).join('')}</div>`);
+  openModal('collections', t("Catalogue sections","Sezioni del catalogo"), `<p>${t("Browse objects by astronomical scale.","Consulta gli oggetti per scala astronomica.")}</p><div class="collection-grid"><button class="collection-item" data-action="nasa-stars">${icon('star')}<strong>${t("NASA star catalogues","Cataloghi stellari NASA")}</strong><small>Hipparcos · Bright Star Catalogue</small></button><button class="collection-item" data-action="nasa-nebulae">${icon('sparkles')}<strong>${t("Nebulae","Nebulose")}</strong><small>NGC2000 · NASA HEASARC</small></button>${featured.map(item => `<button class="collection-item" data-object="${item.id}" data-object-scale="${item.scale}">${icon(item.icon)}<strong>${item.name}</strong><small>${item.subtitle}</small></button>`).join('')}</div>`);
 }
 
 function openAbout() {
@@ -690,6 +767,7 @@ function openAbout() {
     <p>${t("Orbital distances are compressed and planet sizes enlarged. Nearby stars use approximate J2000 equatorial coordinates. The Milky Way is an illustrative model; galaxy sizes in the Local Group are enlarged.","Le distanze orbitali sono compresse e le dimensioni planetarie amplificate. Le stelle vicine usano coordinate equatoriali J2000 approssimate. La Via Lattea è una ricostruzione illustrativa; nel Gruppo Locale le dimensioni galattiche sono amplificate.")}</p>
     <p>${t("Cosmic web geometry and particle effects are generated procedurally. Cluster positions are schematic. Five reference scales are available.","La rete cosmica e le particelle decorative sono generate proceduralmente. Le posizioni dei suoi ammassi sono schematiche: non sono un catalogo osservativo. La navigazione collega cinque rappresentazioni con scale differenti.")}</p>
     <h3>${t("STELLAR CATALOGUES","CATALOGHI STELLARI")}</h3>
+    <p>${t("NASA HEASARC supplies the complete Hipparcos and Bright Star archive entries and the nebular subset of NGC2000. Search names or HIP, HR, HD, NGC, IC and Messier identifiers. The NASA sky view represents angular directions, with catalogue measurements in the object panels.","NASA HEASARC fornisce i cataloghi Hipparcos e Bright Star completi e il sottoinsieme nebulare NGC2000. Cerca nomi o identificatori HIP, HR, HD, NGC, IC e Messier. La vista NASA rappresenta direzioni angolari; le schede riportano le misure di catalogo.")}</p>
     <p>${t("The nearby-star view includes 156 stars within 25 light-years from ","La vista stellare include 156 stelle entro 25 anni luce estratte da ")}<a href="https://github.com/astronexus/HYG-Database" target="_blank" rel="noopener noreferrer">HYG 4.1 · David Nash</a>${t(", in addition to the principal reference stars. The subset retains coordinates, distances and identifiers; selection, unit conversion and display names are atlas adaptations. Data licence: ",", oltre ai riferimenti principali. Il sottoinsieme conserva coordinate, distanze e identificatori: selezione, conversione in anni luce e nomi di visualizzazione sono adattamenti dell’atlante. Dati distribuiti con licenza ")}<a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener noreferrer">CC BY-SA 4.0</a>.</p>
     <p>${t("Constellation views contain 119,625 HYG stars and all 88 constellations. The 3D view preserves measured stellar depth. The Earth view calculates sky directions and the geometric horizon for the selected location and time. HYG data: CC BY-SA 4.0.","Le viste delle costellazioni contengono 119.625 stelle HYG e tutte le 88 costellazioni. La vista 3D conserva la profondità stellare misurata. La vista terrestre calcola direzioni e orizzonte geometrico per luogo e istante selezionati. Dati HYG: CC BY-SA 4.0.")}</p>
     <p>${t('Constellation geometry: ', 'Geometria delle costellazioni: ')}<a href="https://github.com/Stellarium/stellarium/tree/master/skycultures/modern" target="_blank" rel="noopener noreferrer">Stellarium modern skyculture</a> ${t('by the Stellarium team, CC BY-SA 4.0.', 'del team Stellarium, CC BY-SA 4.0.')}</p>
@@ -788,6 +866,8 @@ document.addEventListener('click', async event => {
   }
   if (button.dataset.constellationMode) return chooseConstellationMode(button.dataset.constellationMode, button);
   if (button.dataset.constellation) return selectConstellation(button.dataset.constellation);
+  if (button.dataset.searchScope) { searchBrowser.scope = button.dataset.searchScope; searchBrowser.page = 0; renderSearch(); return; }
+  if (button.dataset.searchPage) { searchBrowser.page += button.dataset.searchPage === 'next' ? 1 : -1; renderSearch(); $('#search-results').scrollTop = 0; return; }
   if (button.dataset.catalogFilter) {
     planetBrowser.filter = button.dataset.catalogFilter;
     planetBrowser.parentId = '';
@@ -803,7 +883,7 @@ document.addEventListener('click', async event => {
   }
   if (button.dataset.object) {
     const index = Number(button.dataset.objectScale);
-    const object = index === 5 ? findPlanet(button.dataset.object) : catalog[scales[index]?.id]?.find(item => item.id === button.dataset.object) || (index === 0 ? findMoon(button.dataset.object) : null);
+    const object = index === 8 ? nasaCatalogue?.byId.get(button.dataset.object) : index === 5 ? findPlanet(button.dataset.object) : catalog[scales[index]?.id]?.find(item => item.id === button.dataset.object) || (index === 0 ? findMoon(button.dataset.object) : null);
     if (object) pickObject(index, object);
     return;
   }
@@ -845,6 +925,9 @@ document.addEventListener('click', async event => {
       break;
     case 'about': openAbout(); break;
     case 'search': openSearch(); break;
+    case 'nasa-stars': openSearch('stars'); break;
+    case 'nasa-nebulae': openSearch('nebulae'); break;
+    case 'retry-nasa': ensureNasaSearch().catch(() => {}); break;
     case 'help': openHelp(); break;
     case 'settings': openSettings(); break;
     case 'vr': openVR(); break;
@@ -939,7 +1022,11 @@ async function restoreLanguageView() {
   } catch { return; }
   if (!saved || !universe) return;
   try {
-    if (saved.scale >= 6) {
+    if (saved.scale === 8) {
+      const data = await ensureNasaSearch();
+      const object = data.byId.get(saved.objectId);
+      if (object) await universe.showCatalogueObject(object, data);
+    } else if (saved.scale >= 6) {
       constellationBrowser.timeZone = saved.timeZone || 'Europe/Rome';
       universe.setEarthVisible(saved.earthVisible !== false);
       await universe.showConstellation(saved.constellationId, { mode: saved.mode, observer: saved.observer });

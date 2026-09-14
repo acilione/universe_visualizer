@@ -11,6 +11,7 @@
     "test:browser": "node tests/browser.mjs",
     "test:engine": "node tests/engine-browser.mjs",
     "test:moons": "node tests/moons-engine.mjs && node tests/moons-ui.mjs",
+    "test:nasa": "node tests/nasa-ui.mjs",
     "test:constellations": "node tests/constellation-engine.mjs",
     "test:constellation-ui": "node tests/constellation-ui.mjs",
     "test:earth-reference": "node tests/earth-reference-engine.mjs",

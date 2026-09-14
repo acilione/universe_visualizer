@@ -191,3 +191,23 @@ dialog label.readout-title{display:block;margin-bottom:10px}
 .moon-parent-filter{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:13px 0;font-size:11px;color:#a3b6bf}
 .moon-parent-filter select{min-width:140px;background:#101b22;color:#dce5e6;border:1px solid var(--line);border-radius:4px;padding:8px 12px;font:inherit}
 .catalog-filter{flex-wrap:wrap}
+
+/* NASA archive browsing and angular catalogue views. */
+.catalogue-shortcuts{display:flex;gap:8px;margin-top:9px}
+.catalogue-shortcuts button{flex:1;padding:8px 10px;border:1px solid var(--line);border-radius:4px;font-size:10px;color:#a4bbc5;background:#96bac208}
+.catalogue-shortcuts button:hover{color:#d6eaf1;border-color:#9ac3ce66}
+dialog[data-kind="search"]{width:min(740px,calc(100% - 32px));max-height:92dvh}
+.search-filters{flex-wrap:wrap}
+.search-filters button[aria-pressed="true"]{border-color:#9fcbd274;color:#c7e7ec;background:#96c7cf0e}
+#search-status{font-size:10px;color:#8297a3;line-height:1.65;margin:12px 0 0}
+#search-results{max-height:40dvh;margin-top:9px}
+#search-results .search-result>span{min-width:0}
+#search-results .search-result strong{overflow-wrap:anywhere}
+#search-results .search-result small{line-height:1.5}
+.nasa-sky-view .center-caption{display:none}
+.nasa-sky-view .object-card h2{font-size:22px;overflow-wrap:anywhere}
+.nasa-sky-view .object-card .card-description{font-size:10px;line-height:1.65}
+.nasa-sky-view .coordinates{font-size:8px;letter-spacing:.2px;gap:8px}
+.nasa-sky-view [data-action="rotate"]{display:none}
+@media(max-width:900px){.catalogue-shortcuts{display:none}.nasa-sky-view .readout-value{font-size:12px}.nasa-sky-view .intro h1{max-width:calc(100vw - 90px)}}
+@media(max-width:560px){dialog[data-kind="search"]{padding:20px}.search-filters{gap:5px}.search-filters button{padding:8px;font-size:10px}#search-results{max-height:35dvh}}
