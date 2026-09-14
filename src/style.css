@@ -12,7 +12,8 @@
 /* Planet exploration and a completely clear immersive view. */
 .planet-browser-button{display:flex;align-items:center;gap:8px;border:1px solid #99c8d55c;background:#84bac612;padding:11px 15px;border-radius:5px;font-size:11px;color:#bddfe5;white-space:nowrap}
 .planet-browser-button:hover{border-color:#bfe5eb99;color:#e3f9fc;background:#8cbdcb20}
-.view-controls{align-items:flex-end}
+.view-controls{align-items:flex-end;pointer-events:none}
+.view-controls button{pointer-events:auto}
 .immersion-button{display:flex;align-items:center;justify-content:center;gap:8px;font-size:10px;padding:10px;background:#111a21d9;border:1px solid #a6c9d83d;border-radius:4px;color:#afc9d3;white-space:nowrap;margin-top:4px}
 .immersion-button:hover{color:#e0f5ff;border-color:#b6d9e577}
 #scale-slider{background:linear-gradient(90deg,#ac8c5d 0%,#37434a 0%)}

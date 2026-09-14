@@ -19,7 +19,8 @@
     "test:layout": "node tests/layout.mjs",
     "test:immersive": "node tests/immersive-ui.mjs",
     "test:immersive-effects": "node tests/immersive-effects-browser.mjs",
-    "test:combined": "node tests/combined-map-browser.mjs"
+    "test:combined": "node tests/combined-map-browser.mjs",
+    "test:drilldown": "node tests/drilldown-browser.mjs"
   },
   "dependencies": {
     "three": "^0.180.0",

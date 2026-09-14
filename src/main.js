@@ -1078,7 +1078,7 @@ document.addEventListener('click', async event => {
     case 'tour': toggleTour(); break;
     case 'object': openModal('object', t("Object data","Dati dell’oggetto"), objectMarkup(state.object, true)); break;
     case 'focus':
-      if (Number.isInteger(state.object.targetScale)) changeScale(state.object.targetScale);
+      if (Number.isInteger(state.object.targetScale) && scales[state.object.targetScale]) { if(universe)universe.focusObject(state.object);else changeScale(state.object.targetScale); }
       else { universe?.focusObject(state.object); notify(`${t("Focus: ","Messa a fuoco: ")}${state.object.name}.`); }
       closeModal();
       break;
@@ -1130,6 +1130,7 @@ try {
     onMessage: notify,
     onImmersiveChange: setCinematic,
     onPreviewChange,
+    onNavigate:stopTour,
     objectLayers:state.objectLayers,
     onObjectLayersChange
   });

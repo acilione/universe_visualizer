@@ -35,6 +35,8 @@ English uses IAU constellation names; Italian uses localized names. Search accep
 
 ## Navigation
 
+Click a linked object or its label to enter its detailed map: **Local Group → Milky Way → Solar System**. The Sun in **Nearby stars** also opens the Solar System. A single click is sufficient; double-clicking works too. In PC preview and VR/MR, selecting the same markers opens the destination around you and preserves your viewer pose.
+
 Drag to orbit and scroll or pinch to zoom. Select a planet or moon to inspect its surface; the camera's minimum distance scales with the body radius. The **Planets & moons** catalogue supports name/host search, category and parent-planet filters, and pagination. A planet's **Major moons** button lists its included satellites; **View moon system** frames the planet and its moons together. Moon cards show the parent planet, mean radius, orbital semimajor axis and mean orbital period. Close moon inspection hides reference guides; the system view restores them. This is a curated selection of moons with schematic orbits, not a live ephemeris.
 
 **Stars** and **Nebulae** below the search control open the NASA catalogue filters; they are also available in **Catalogue sections** and the search dialog. Search accepts **Rho Cygni**, **Rho Cigny**, **Scheat**, **Sheliak**, **M42** and catalogue identifiers. All matching results are paginated. **Catalogue data** opens the full scientific record. Existing HYG stars receive supplementary NASA information through HIP identity or an unambiguous positional match; their map coordinates retain HYG provenance.
@@ -109,6 +111,7 @@ npm run test:language
 npm run test:layout
 npm run test:immersive
 npm run test:combined
+npm run test:drilldown
 ```
 
 Browser checks require Playwright Chromium (`npx playwright install chromium` if needed). They cover layout at ten viewport sizes, both languages and explicit language persistence, planet navigation, the reported winter Orion case, immersion, and actual rendered camera transitions. Screenshots are written to `test-results/`.

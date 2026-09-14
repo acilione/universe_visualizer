@@ -50,6 +50,8 @@ The reference space is **session-local** (`local-floor`), with metre units and a
 
 Earth sky and NASA catalogue sky views are angular projections. They remain centred as a sky around the observer: walking through them would imply distances that those projections do not contain. Desktop translation is disabled for these views; looking and selecting still work. Use a spatial map level or a constellation's **3D space** view to explore a volume.
 
+Selecting a linked marker opens its detailed map within the current immersive session. For example, select **Milky Way** in the Local Group, then **Solar System** inside the Milky Way. Use a click in PC preview, a brief hand pinch, or a controller trigger in VR/MR. The destination uses the current room/tabletop layout while your viewer position and orientation stay unchanged.
+
 ## Combined map: planets, stars and nebulae
 
 In the immersive-mode chooser, set **Map content** to **Combined map**, wait for the NASA catalogue to load, then start the PC preview, VR or mixed reality. You can also choose **Combined map** from the preview's reference selector. All three object layers start enabled: **Planets**, **Stars** and **Nebulae**. Planets includes the supported natural satellites and exoplanets; the Sun belongs to Stars.

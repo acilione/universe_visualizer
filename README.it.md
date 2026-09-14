@@ -24,6 +24,8 @@ npm run preview -- --port 5174
 
 ## Pianeti e zoom
 
+Clicca un oggetto collegato o la sua etichetta per entrare nella mappa dettagliata: **Gruppo Locale → Via Lattea → Sistema Solare**. Anche il Sole nella vista **Stelle vicine** apre il Sistema Solare. Basta un clic; funziona anche il doppio clic. Nell’anteprima PC e in VR/MR, la selezione apre la destinazione intorno all’osservatore mantenendone posizione e orientamento.
+
 - Il pulsante **Pianeti** apre il catalogo completo, con ricerca per pianeta o stella ospite, filtro e paginazione.
 - Gli otto pianeti del Sistema Solare hanno superfici con texture locali e dimensioni visive amplificate. Saturno include gli anelli.
 - Selezionare un pianeta dalla mappa o dal catalogo avvia una transizione ravvicinata. Il bersaglio dello zoom e della rotazione diventa quel pianeta.
