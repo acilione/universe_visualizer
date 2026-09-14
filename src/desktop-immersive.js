@@ -9,7 +9,7 @@ const EYE_HEIGHT = 1.65;
 /** First-person desktop inspection of the same metre-scale scene used by WebXR. */
 export function createDesktopImmersive({ canvas, camera, controls, mapRoot,
   getBoundsRadius = () => 24, getPresentationMode = () => 'atlas', getTargets = () => [],
-  onSelect = () => {}, onChange = () => {}, onMessage = () => {},
+  onSelect = () => {}, onChange = () => {}, onMessage = () => {}, onMapAction = () => {},
 }) {
   const doc = canvas.ownerDocument || globalThis.document;
   const win = doc.defaultView || globalThis.window;
@@ -62,6 +62,7 @@ export function createDesktopImmersive({ canvas, camera, controls, mapRoot,
       viewerQuaternion: camera.quaternion, layout, planetarium: planetarium() });
     baseScale = placement.scale;
     applyPlacement(placement);
+    onMapAction({ type: 'reveal' });
   }
 
   function clearPointer() {
@@ -155,6 +156,7 @@ export function createDesktopImmersive({ canvas, camera, controls, mapRoot,
     const worldScale = mapRoot.getWorldScale(new THREE.Vector3()).x;
     const next = THREE.MathUtils.clamp(worldScale * factor, baseScale * .1, baseScale * 8);
     mapRoot.scale.multiplyScalar(next / worldScale); mapRoot.updateMatrixWorld(true);
+    if (Math.abs(next - worldScale) > 1e-12) onMapAction({ type: 'adjust', points: [mapRoot.getWorldPosition(new THREE.Vector3())] });
     return true;
   }
   function rotateMap(radians) {
@@ -163,6 +165,7 @@ export function createDesktopImmersive({ canvas, camera, controls, mapRoot,
     const worldQuaternion = mapRoot.getWorldQuaternion(new THREE.Quaternion()).premultiply(rotation);
     if (mapRoot.parent) worldQuaternion.premultiply(mapRoot.parent.getWorldQuaternion(new THREE.Quaternion()).invert());
     mapRoot.quaternion.copy(worldQuaternion); mapRoot.updateMatrixWorld(true);
+    if (radians !== 0) onMapAction({ type: 'adjust', points: [mapRoot.getWorldPosition(new THREE.Vector3())] });
     return true;
   }
   function lookAtObject(object) {
@@ -179,6 +182,7 @@ export function createDesktopImmersive({ canvas, camera, controls, mapRoot,
     look.setFromQuaternion(camera.quaternion, 'YXZ');
     yaw = look.y; pitch = THREE.MathUtils.clamp(look.x, -Math.PI / 2 + .01, Math.PI / 2 - .01);
     applyCamera();
+    onMapAction({ type: 'focus', object });
     return true;
   }
   async function lockPointer() {

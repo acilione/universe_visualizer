@@ -20,7 +20,7 @@ const SCALE_NAMES = [['Solar System','Sistema Solare'],['Nearby stars','Stelle v
  * onScale receives -1/+1; mapRoot transforms must be left to this module in VR.
  * XRInputSource.targetRaySpace works for both hands and handheld controllers.
  */
-export function createXR({ renderer, scene, camera, controls, mapRoot, getTargets, getBoundsRadius = () => 30, getEnvironment = () => [], onSelect, onFocus, onScale, getScale, getPresentationMode = () => 'atlas', onSessionEnd, onImmersiveChange, onMessage = () => {} }) {
+export function createXR({ renderer, scene, camera, controls, mapRoot, getTargets, getBoundsRadius = () => 30, getEnvironment = () => [], onSelect, onFocus, onScale, getScale, getPresentationMode = () => 'atlas', onSessionEnd, onImmersiveChange, onMessage = () => {}, onMapAction = () => {} }) {
   renderer.xr.enabled = true;
   renderer.xr.setReferenceSpaceType('local-floor');
   const raycaster = new THREE.Raycaster();
@@ -63,6 +63,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   let snapshot = null;
   let recenterPending = false;
   let gesture = null;
+  let mapGrabPoints = null;
   let baseScale = 0.04;
   let hoverButton = -1;
   let panelDirty = true;
@@ -209,6 +210,26 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     if (!input.press.hit?.panel) focusState = null;
   }
 
+  // Feedback follows the whole grab, including transitions between one and two
+  // hands. Points are independent world-space snapshots for the map renderer.
+  function endMapGrab() {
+    if (!mapGrabPoints) return;
+    const points = mapGrabPoints;
+    mapGrabPoints = null;
+    onMapAction({ type: 'grab-end', points });
+  }
+
+  function updateMapGrab(poses) {
+    const starting = !mapGrabPoints;
+    mapGrabPoints = poses.map(pose => pose.position.clone());
+    if (starting) onMapAction({ type: 'grab-start', points: mapGrabPoints.map(point => point.clone()) });
+    onMapAction({ type: 'grab-move', points: mapGrabPoints.map(point => point.clone()) });
+  }
+
+  function endReleasedMapGrab() {
+    if (!inputs.some(input => input.press?.manipulated && !input.press.hit?.panel && inputPose(input))) endMapGrab();
+  }
+
   function endInput(input) {
     const press = input.press;
     if (!press) return;
@@ -224,12 +245,14 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     }
     input.press = null;
     gesture = null;
+    endReleasedMapGrab();
   }
 
   function cancelInput(input) {
     input.press = null;
     input.pinching = false;
     gesture = null;
+    endReleasedMapGrab();
   }
 
   for (let i = 0; i < 2; i++) {
@@ -285,6 +308,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   }
 
   function placeOverview() {
+    endMapGrab();
     gesture = null;
     focusState = null;
     const viewer = renderer.xr.getCamera();
@@ -298,6 +322,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     applyTransform(placement);
     positionPanel();
     recenterPending = false;
+    onMapAction({ type: 'reveal' });
   }
 
   /** A floor-space origin reset changes coordinates, not the physical map pose. */
@@ -408,6 +433,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       object, extent, radius, destination, fromCenter, fromScale: mapRoot.scale.x,
       quaternion: mapRoot.quaternion.clone(), elapsed: 0, duration: 0.85,
     };
+    onMapAction({ type: 'focus', object });
     return true;
   }
 
@@ -670,6 +696,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
         gesture = { mode: 'dual', root: rootTransform(), first: poses[0].position, second: poses[1].position };
       }
       applyTransform(dualGripTransform(gesture.root, gesture.first, gesture.second, poses[0].position, poses[1].position, baseScale * 0.3, baseScale * 4));
+      updateMapGrab(poses);
     } else if (grabbing.length === 1) {
       const input = grabbing[0];
       const press = input.press;
@@ -681,9 +708,13 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
           gesture = { mode: 'single', input, root: rootTransform(), pose };
         }
         applyTransform(singleGripTransform(gesture.root, gesture.pose, pose));
+        updateMapGrab([pose]);
+      } else {
+        endMapGrab();
       }
     } else {
       gesture = null;
+      endMapGrab();
     }
     if (nextHover !== hoverButton) { hoverButton = nextHover; panelDirty = true; }
     const value = getScale?.();

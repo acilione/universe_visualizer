@@ -17,7 +17,8 @@
     "test:earth-reference": "node tests/earth-reference-engine.mjs",
     "test:language": "node tests/language.mjs",
     "test:layout": "node tests/layout.mjs",
-    "test:immersive": "node tests/immersive-ui.mjs"
+    "test:immersive": "node tests/immersive-ui.mjs",
+    "test:immersive-effects": "node tests/immersive-effects-browser.mjs"
   },
   "dependencies": {
     "three": "^0.180.0",

@@ -52,6 +52,7 @@ function createHarness(t, initialMode = 'planetarium') {
   mapRoot.add(star, opposite);
   scene.add(mapRoot);
   const selected = [];
+  const mapActions = [];
   const scaleActions = [];
   const focusActions = [];
   const ended = [];
@@ -62,6 +63,7 @@ function createHarness(t, initialMode = 'planetarium') {
     getTargets: () => [star, opposite], getBoundsRadius: () => 60, getPresentationMode: () => mode, getScale: () => scale,
     onSelect: value => selected.push(value), onScale: sign => scaleActions.push(sign), onFocus: value => focusActions.push(value), onMessage: message => messages.push(message),
     onSessionEnd: event => ended.push({ ...event, controlsEnabled: controls.enabled }),
+    onMapAction: event => mapActions.push(event),
   });
   const setMode = next => { mode = next; scale = next === 'planetarium' ? 7 : 6; };
   const connect = (index = 0, hand = false) => controllers[index].dispatchEvent({ type: 'connected', data: hand ? { hand: {} } : {} });
@@ -74,7 +76,7 @@ function createHarness(t, initialMode = 'planetarium') {
       else delete globalThis[key];
     }
   });
-  return { xr, mapRoot, camera, viewer, controls, controllers, grips, hands, selected, scaleActions, focusActions, ended, messages, text, object, session, setMode, connect };
+  return { xr, mapRoot, camera, viewer, controls, controllers, grips, hands, selected, scaleActions, focusActions, ended, messages, text, object, session, setMode, connect, mapActions, manager };
 }
 
 const identity = () => new THREE.Quaternion();
@@ -221,4 +223,74 @@ test('VR uses English by default and renders Italian only after an explicit lang
   assert.ok(h.text.includes('ESCI VR'));
   assert.match(h.messages.at(-1), /VR attiva/);
   assert.ok(!h.text.includes('3D SPACE'));
+});
+
+
+test('VR reveal waits for tracked placement and does not repeat while the viewer walks', async t => {
+  const h = createHarness(t, 'atlas');
+  let tracked = false;
+  h.manager.getFrame = () => ({ getViewerPose: () => tracked ? {} : null });
+  h.manager.getReferenceSpace = () => new THREE.EventDispatcher();
+  await h.xr.enter();
+  h.xr.update();
+  assert.equal(h.mapActions.length, 0);
+  tracked = true; h.xr.update();
+  assert.deepEqual(h.mapActions.map(event => event.type), ['reveal']);
+  h.viewer.position.x += 1; h.xr.update(); h.xr.update();
+  assert.equal(h.mapActions.length, 1);
+  h.xr.recenter();
+  assert.equal(h.mapActions.length, 1);
+  h.xr.update();
+  assert.deepEqual(h.mapActions.map(event => event.type), ['reveal', 'reveal']);
+});
+
+test('controller feedback keeps one grab lifecycle through single and dual hand transitions', async t => {
+  const h = createHarness(t, 'atlas');
+  h.connect(0); h.connect(1);
+  await h.xr.enter(); h.xr.update(); h.mapActions.length = 0;
+  h.grips[0].position.x -= .2; h.grips[1].position.x += .2;
+  h.controllers[0].dispatchEvent({ type: 'squeezestart' }); h.xr.update();
+  const first = h.mapActions.find(event => event.type === 'grab-start');
+  assert.equal(first.points.length, 1);
+  assert.deepEqual(first.points[0].toArray(), h.grips[0].getWorldPosition(new THREE.Vector3()).toArray());
+  const firstPoint = first.points[0].toArray();
+  h.grips[0].position.x -= .1; h.xr.update();
+  h.controllers[1].dispatchEvent({ type: 'squeezestart' }); h.xr.update();
+  assert.equal(h.mapActions.at(-1).points.length, 2);
+  h.controllers[0].dispatchEvent({ type: 'squeezeend' }); h.xr.update();
+  assert.equal(h.mapActions.at(-1).points.length, 1);
+  h.controllers[1].dispatchEvent({ type: 'squeezeend' });
+  assert.equal(h.mapActions.filter(event => event.type === 'grab-start').length, 1);
+  assert.equal(h.mapActions.filter(event => event.type === 'grab-end').length, 1);
+  assert.equal(h.mapActions.at(-1).type, 'grab-end');
+  assert.deepEqual(first.points[0].toArray(), firstPoint, 'previous feedback snapshots remain independent');
+  h.xr.update(); assert.equal(h.mapActions.at(-1).type, 'grab-end');
+});
+
+test('hand tracking loss and session exit clear feedback while planetarium grips remain silent', async t => {
+  const h = createHarness(t, 'atlas');
+  h.connect(0, true);
+  await h.xr.enter(); h.xr.update(); h.mapActions.length = 0;
+  const joints = h.hands[0].joints;
+  joints['thumb-tip'].position.x = -.005; joints['index-finger-tip'].position.x = .005;
+  h.xr.update();
+  assert.equal(h.mapActions.length, 0, 'brief pinch does not start map manipulation');
+  h.hands[0].position.x += .04; h.xr.update();
+  assert.equal(h.mapActions[0].type, 'grab-start');
+  assert.deepEqual(h.mapActions[0].points[0].toArray(), h.hands[0].getWorldPosition(new THREE.Vector3()).toArray());
+  joints.wrist.visible = false; h.xr.update();
+  assert.equal(h.mapActions.at(-1).type, 'grab-end');
+  h.controllers[0].dispatchEvent({ type: 'disconnected' }); h.connect(0);
+  h.controllers[0].dispatchEvent({ type: 'squeezestart' }); h.xr.update();
+  assert.equal(h.mapActions.at(-1).type, 'grab-move');
+  h.setMode('planetarium'); h.xr.update();
+  assert.equal(h.mapActions.filter(event => event.type === 'grab-end').length, 2);
+  h.mapActions.length = 0;
+  h.controllers[0].dispatchEvent({ type: 'squeezestart' }); h.grips[0].position.x += .5; h.xr.update();
+  h.controllers[0].dispatchEvent({ type: 'squeezeend' });
+  assert.equal(h.mapActions.length, 0);
+  h.setMode('atlas'); h.xr.update();
+  h.controllers[0].dispatchEvent({ type: 'squeezestart' }); h.xr.update();
+  await h.session.end();
+  assert.equal(h.mapActions.at(-1).type, 'grab-end');
 });

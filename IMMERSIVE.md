@@ -50,6 +50,14 @@ The reference space is **session-local** (`local-floor`), with metre units and a
 
 Earth sky and NASA catalogue sky views are angular projections. They remain centred as a sky around the observer: walking through them would imply distances that those projections do not contain. Desktop translation is disabled for these views; looking and selecting still work. Use a spatial map level or a constellation's **3D space** view to explore a volume.
 
+## Animated map projection
+
+PC preview, VR and mixed reality share a gradual map opening: luminous arcs expand through the surrounding reference grid as the map becomes visible. Fine cyan lines and amber particles provide depth cues inside spatial views. Selecting an object produces a local pulse; manipulating the map adds light near the hands or controllers. The effects do not change catalogue coordinates or move the viewer.
+
+Use **Replay opening** in the PC preview controls to run the opening again without changing the map placement. **Reset placement** also replays it when the map is placed again. The existing **Particle effects** layer controls the additional holographic effects. Lower rendering quality reduces their particle count. The browser's reduced-motion preference replaces animated effects with a static presentation.
+
+Angular sky views keep effects on the sky projection and omit the surrounding particle volume, since those views do not supply physical distances. In mixed reality the effects remain transparent over passthrough.
+
 ## Open the atlas securely in a headset
 
 WebXR sessions require a secure browser context. A plain `http://<PC-LAN-address>:5173` address is insufficient.
@@ -81,6 +89,7 @@ Run the automated checks with the development server available:
 ```sh
 npm test
 npm run test:immersive
+npm run test:immersive-effects
 npm run build
 ```
 

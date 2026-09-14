@@ -30,18 +30,18 @@ function fixture() {
   const root = new THREE.Group(); root.position.set(2, 3, 4); root.rotation.set(.1, .3, .2); root.scale.setScalar(1.4);
   const scene = new THREE.Scene(); scene.add(root);
   const controls = { enabled: true, autoRotate: true, target: new THREE.Vector3(1, 2, 3) };
-  const changes = [], selected = [], messages = [], targets = [];
+  const changes = [], selected = [], messages = [], targets = [], mapActions = [];
   let mode = 'atlas';
   const preview = createDesktopImmersive({ canvas, camera, controls, mapRoot: root, getBoundsRadius: () => 30,
     getPresentationMode: () => mode, getTargets: () => targets,
-    onSelect: object => selected.push(object), onChange: (active, state) => changes.push({ active, ...state }), onMessage: message => messages.push(message),
+    onSelect: object => selected.push(object), onChange: (active, state) => changes.push({ active, ...state }), onMessage: message => messages.push(message), onMapAction: event => mapActions.push(event),
   });
   const addTarget = (position, id = 'target') => {
     const mesh = new THREE.Mesh(new THREE.SphereGeometry(.6, 12, 8), new THREE.MeshBasicMaterial());
     mesh.position.copy(position); mesh.userData.object = { id, name: id, position: position.toArray() };
     root.add(mesh); targets.push(mesh); return mesh;
   };
-  return { preview, camera, controls, root, scene, doc, win, canvas, changes, selected, messages, targets, addTarget,
+  return { preview, camera, controls, root, scene, doc, win, canvas, changes, selected, messages, targets, mapActions, addTarget,
     setMode(value) { mode = value; }, dispose() { preview.dispose(); targets.forEach(target => { target.geometry.dispose(); target.material.dispose(); }); },
   };
 }
@@ -203,5 +203,28 @@ test('pointer lock denial retains usable drag controls', async () => {
     assert.equal(await f.preview.lockPointer(), false); assert.equal(f.messages.length, 1);
     f.canvas.fire('pointerdown'); f.canvas.fire('pointermove', { clientX: 450 }); f.canvas.fire('pointerup', { clientX: 450 });
     assert.notEqual(f.camera.quaternion.y, 0); assert.equal(f.preview.isActive, true);
+  } finally { f.dispose(); }
+});
+
+
+test('desktop animation events follow placement and explicit map changes, not viewer movement', () => {
+  const f = fixture();
+  try {
+    f.preview.enter();
+    assert.deepEqual(f.mapActions.map(event => event.type), ['reveal']);
+    f.doc.fire('keydown', { code: 'KeyW' }); f.preview.update(.1);
+    f.canvas.fire('pointerdown'); f.canvas.fire('pointermove', { clientX: 430 }); f.canvas.fire('pointerup', { clientX: 430 });
+    assert.equal(f.mapActions.length, 1);
+    f.preview.scaleMap(1); f.preview.rotateMap(0); f.preview.scaleMap(NaN);
+    assert.equal(f.mapActions.length, 1);
+    f.preview.scaleMap(1.2); f.preview.rotateMap(.1);
+    assert.deepEqual(f.mapActions.slice(1).map(event => event.type), ['adjust', 'adjust']);
+    assert.deepEqual(f.mapActions.at(-1).points[0].toArray(), f.root.getWorldPosition(new THREE.Vector3()).toArray());
+    f.preview.recenter(); f.preview.onViewChanged();
+    assert.deepEqual(f.mapActions.slice(3).map(event => event.type), ['reveal', 'reveal']);
+    f.setMode('planetarium'); f.preview.onViewChanged();
+    const count = f.mapActions.length;
+    f.preview.scaleMap(2); f.preview.rotateMap(.5); f.preview.exit();
+    assert.equal(f.mapActions.length, count);
   } finally { f.dispose(); }
 });
