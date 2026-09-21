@@ -5,3 +5,4 @@ test-results/
 *Zone.Identifier
 __pycache__/
 *.pyc
+/treasure_planet_map_video.mp4
