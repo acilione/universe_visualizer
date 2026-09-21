@@ -24,7 +24,7 @@ The application needs no account, API key or backend. Data and planet textures a
 
 ## Official imagery and Gaia DR3 experiment
 
-On `feat/official-images-gaia-dr3`, select an object and open **Archive images** for verified ESA/Hubble observations or an explicit NASA Image Library search. Images retain their full framing, credits, wavelengths and source links. [Archive sources and coverage](OFFICIAL_IMAGES.md).
+Select an object and open **Archive images** for verified ESA/Hubble observations or an explicit NASA Image Library search. Images retain their full framing, credits, wavelengths and source links. [Archive sources and coverage](OFFICIAL_IMAGES.md).
 
 Open **Settings → Gaia DR3** to enable the optional all-sky **G ≤ 6** subset (6,764 ESA sources). **Gaia coverage and cross-matches**, also available in Catalogue sections, reports **4,986 NASA associations**, **83 additional sources** and **1,695 withheld records**. NASA values and IDs remain intact; native Gaia measurements are shown separately. This is a bounded DR3 experiment. [Data, matching policy and reproduction](DATA_GAIA_DR3.md).
 

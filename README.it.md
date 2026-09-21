@@ -24,7 +24,7 @@ npm run preview -- --port 5174
 
 ## Esperimento immagini ufficiali e Gaia DR3
 
-Nel branch `feat/official-images-gaia-dr3`, seleziona un oggetto e apri **Immagini d’archivio** per le osservazioni ESA/Hubble verificate o una ricerca esplicita nella raccolta NASA. Le immagini conservano inquadratura completa, crediti, bande osservative e fonti. [Copertura e archivi](OFFICIAL_IMAGES.md).
+Seleziona un oggetto e apri **Immagini d’archivio** per le osservazioni ESA/Hubble verificate o una ricerca esplicita nella raccolta NASA. Le immagini conservano inquadratura completa, crediti, bande osservative e fonti. [Copertura e archivi](OFFICIAL_IMAGES.md).
 
 **Impostazioni → Gaia DR3** attiva il sottoinsieme opzionale su tutto il cielo **G ≤ 6**, con 6.764 sorgenti ESA. **Copertura Gaia e corrispondenze**, anche nelle sezioni del catalogo, mostra 4.986 associazioni a voci NASA, 83 sorgenti aggiuntive e 1.695 voci escluse in attesa di verifica. Identificatori e misure NASA restano conservati; le misure native Gaia sono separate. [Dati e metodo](DATA_GAIA_DR3.md).
 
