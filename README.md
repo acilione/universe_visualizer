@@ -123,5 +123,3 @@ npm run audit:gaia
 ```
 
 Browser checks require Playwright Chromium (`npx playwright install chromium` if needed). They cover layout at ten viewport sizes, both languages and explicit language persistence, planet navigation, the reported winter Orion case, immersion, and actual rendered camera transitions. Screenshots are written to `test-results/`.
-
-The local reference video is `treasure_planet_map_video.mp4`. Git author: `acilione <antoninocilione96@gmail.com>`. Generated builds, dependencies and test screenshots are excluded from version control.
