@@ -2,7 +2,7 @@
 
 An interactive astronomical atlas with five reference scales, 3D constellations, an Earth sky view, and WebXR support. **English is the default language.** Choose **Settings → Interface language → Italiano** to use Italian. The language choice is saved, and the current map is restored when the interface reloads.
 
-[Documentazione italiana](README.it.md)
+[Open the atlas](https://acilione.github.io/universe_visualizer/) · [Documentazione italiana](README.it.md)
 
 ## Run locally
 

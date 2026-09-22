@@ -1,3 +1,4 @@
+import { announceReady, announceFailure } from './embed.js';
 import { getLanguage, setLanguage, t, locale } from './i18n.js';
 import './style.css';
 import { createIcons, Orbit, Search, Glasses, Maximize2, Minimize2, Plus, Minus, RotateCcw, Move, MousePointer2, Hand, Play, Pause, Volume2, VolumeX, Settings2, CircleHelp, X, ArrowUpRight, ArrowRight, Focus, Sparkles, Grid3X3, Tags, Layers, Info, Globe2, Star, Telescope, Check, ExternalLink } from 'lucide';
@@ -74,7 +75,7 @@ $('#app').innerHTML = `
     <div class="vignette" aria-hidden="true"></div>
     <div class="labels" id="map-labels" aria-label="${t("Celestial objects on the map","Oggetti celesti sulla mappa")}"></div>
     <header class="topbar">
-      <a class="brand" href="#esplora" aria-label="${t("Æther, cosmic atlas","Æther, atlante cosmico")}"><img src="/favicon.svg" alt=""/><div><div class="brand-word">ÆTHER</div><div class="brand-sub">${t("COSMIC ATLAS","ATLANTE COSMICO")}</div></div></a>
+      <a class="brand" href="#esplora" aria-label="${t("Æther, cosmic atlas","Æther, atlante cosmico")}"><img src="${import.meta.env.BASE_URL}favicon.svg" alt=""/><div><div class="brand-word">ÆTHER</div><div class="brand-sub">${t("COSMIC ATLAS","ATLANTE COSMICO")}</div></div></a>
       <nav class="topnav" aria-label="${t("Main navigation","Navigazione principale")}">
         <button class="active" data-action="explore" aria-current="page">${t("Explore","Esplora")}</button>
         <button data-action="collections">${t("Catalogue sections","Sezioni del catalogo")}</button>
@@ -161,7 +162,7 @@ $('#app').innerHTML = `
     <button id="preview-restore" data-action="preview-clean" title="${t("Show controls","Mostra comandi")}" aria-label="${t("Show preview controls","Mostra comandi anteprima")}" hidden>${icon('minimize-2')}</button>
     <span class="preview-reticle" aria-hidden="true"></span>
     <div class="toast" role="status" aria-live="polite"></div>
-    <div class="loading" role="status"><img src="/favicon.svg" alt=""/><span>${t("LOADING CATALOGUES","CARICAMENTO CATALOGHI")}</span></div>
+    <div class="loading" role="status"><img src="${import.meta.env.BASE_URL}favicon.svg" alt=""/><span>${t("LOADING CATALOGUES","CARICAMENTO CATALOGHI")}</span></div>
   </main>
   <dialog id="modal" aria-labelledby="modal-title"><div class="dialog-head"><h2 id="modal-title"></h2><button data-action="close" aria-label="${t("Close dialog","Chiudi finestra")}">${icon('x')}</button></div><div id="modal-body"></div></dialog>
 `;
@@ -1221,6 +1222,7 @@ try {
   universe.setAutoRotate(state.autoRotate);
   universe.setQuality(state.quality);
 } catch (error) {
+  announceFailure();
   console.error('Aether renderer:', error);
   $('#renderer-status').textContent = t("CATALOGUE AVAILABLE","CATALOGO DISPONIBILE");
   const fallback = document.createElement('div');
@@ -1232,6 +1234,7 @@ try {
 }
 requestAnimationFrame(() => requestAnimationFrame(() => {
   $('.loading').classList.add('done');
+  if (universe) announceReady();
   setTimeout(() => $('.loading')?.remove(), 650);
 }));
 checkVR();
