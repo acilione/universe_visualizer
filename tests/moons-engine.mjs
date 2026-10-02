@@ -1,6 +1,7 @@
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
+const officialSurfaces = JSON.parse(await readFile(new URL('../src/official-surfaces.json', import.meta.url), 'utf8'));
 await mkdir('test-results', { recursive: true });
 const browser = await chromium.launch({ headless:true, args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'] });
 try {
@@ -17,7 +18,7 @@ try {
   }));
   assert.ok(rendered.length>=28);
   for(const moon of rendered){assert.deepEqual(moon.position,moon.expected);assert.ok(moon.hasSurface);assert.ok(moon.hitRadius>=moon.size&&moon.hitRadius<0.4);}
-  assert.match(rendered.find(m=>m.id==='moon').texture,/2k_moon.jpg$/);
+  assert.ok(rendered.find(m=>m.id==='moon').texture.endsWith('/textures/'+officialSurfaces.moon.map),'Moon uses the archived NASA surface map');
   await page.evaluate(()=>atlas.focusMoonSystem('earth'));
   await page.waitForFunction(()=>!atlas.cameraFlight);
   const system=await page.evaluate(()=>{

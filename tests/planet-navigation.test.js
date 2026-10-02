@@ -51,3 +51,16 @@ test('missing astronomical measurements remain unknown in the mapped catalog',()
  assert.ok(trappist);
  assert.equal(planetsForHost(trappist.host).length,7);
 });
+
+test('explicit visual bounds frame extended rings and never reduce the surface safety radius',()=>{
+ for(const dimensions of [{width:380,height:800,fov:59},{width:1440,height:960,fov:44}]){
+  const radius=.65, ringRadius=radius*2.01;
+  const frame=planetCameraFraming(radius,{...dimensions,visualRadius:ringRadius});
+  assert.ok(frame.extent>ringRadius);
+  assert.ok(frame.focusDistance>planetCameraFraming(radius,dimensions).focusDistance);
+  assert.ok(frame.minDistance>radius);
+  const malformed=planetCameraFraming(radius,{...dimensions,visualRadius:NaN});
+  assert.deepEqual(malformed,planetCameraFraming(radius,dimensions));
+  assert.ok(planetCameraFraming(radius,{...dimensions,visualRadius:.01}).extent>=radius);
+ }
+});

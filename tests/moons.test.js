@@ -58,7 +58,7 @@ test('schematic moon positions are centered on their planets and clear the displ
     assert.equal(offset[1], 0);
     assert.equal(satellite.orbitInclinationRad, 0);
     assert.ok(satellite.phase >= 0 && satellite.phase < Math.PI * 2);
-    const planetExtent = parent.size * (parent.id === 'saturn' ? 2.5 : 1);
+    const planetExtent = parent.size * (parent.id === 'saturn' ? 2.5 : parent.id === 'uranus' ? 2.1 : 1);
     assert.ok(satellite.orbitRadius > planetExtent + satellite.size + 0.2, satellite.id);
     assert.ok(satellite.orbitRadius < 6.5, 'moon systems must remain compact enough for navigation');
   }

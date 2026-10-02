@@ -1,7 +1,7 @@
 /** Camera distances remain outside the selected sphere, including on narrow screens. */
-export function planetCameraFraming(radius, {fov=44,width=1440,height=960,rings=false,immersive=false}={}) {
+export function planetCameraFraming(radius, {fov=44,width=1440,height=960,rings=false,visualRadius=null,immersive=false}={}) {
   if (!Number.isFinite(radius)||radius<=0) throw new RangeError('Planet radius must be positive');
-  const extent=radius*(rings?2.4:1.08);
+  const extent=Number.isFinite(visualRadius)&&visualRadius>0?Math.max(radius,visualRadius)*1.04:radius*(rings?2.4:1.08);
   const aspect=Math.max(.1,width/Math.max(1,height));
   const safeWidth=immersive?width*.94:width>900?Math.max(width*.35,width-600):width*.9;
   const safeHeight=immersive?height*.88:Math.max(height*.45,height-290);

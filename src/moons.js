@@ -63,9 +63,9 @@ function phaseFor(id) {
 
 export const solarMoons = Object.entries(records).flatMap(([parentId, moons]) => {
   const parent = catalog.solar.find(body => body.id === parentId);
-  // Saturn's visible rings end at 2.32 planet radii. Reserve 2.5 radii
-  // regardless of ring tilt; successive display lanes also clear adjacent moons.
-  let previousRadius = parent.size * (parentId === 'saturn' ? 2.5 : 1) + 0.35;
+  // Reserve the full Saturn and Uranus ring extents at any tilt.
+  // Successive schematic display lanes also clear adjacent moons.
+  let previousRadius = parent.size * (parentId === 'saturn' ? 2.5 : parentId === 'uranus' ? 2.1 : 1) + 0.35;
   let previousSize = 0;
   return moons.map(([id, englishName, italianName, radiusKm, semiMajorAxisKm, periodDays, color, retrograde = false]) => {
     const size = 0.05 + 0.14 * Math.sqrt(radiusKm / 2631.2);

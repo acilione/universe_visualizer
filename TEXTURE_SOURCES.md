@@ -1,5 +1,9 @@
 # Planet and moon texture credits
 
+The current renderer prefers official NASA spacecraft imagery and visualization assets, with measured NASA/JPL reference shapes. Full per-body provenance, processing, bands and coverage are documented in [REALISTIC_SURFACES.md](REALISTIC_SURFACES.md) and `src/official-surfaces.json`. Body data panels expose these sources.
+
+## Legacy illustration textures
+
 The 12 files below are redistributed from **Solar System Scope / INOVE**, “Solar Textures”:
 https://www.solarsystemscope.com/textures/
 
@@ -23,11 +27,11 @@ License and source page verified on 11 September 2026. Credit is also displayed 
 | `2k_neptune.jpg` | https://www.solarsystemscope.com/textures/download/2k_neptune.jpg |
 | `2k_sun.jpg` | https://www.solarsystemscope.com/textures/download/2k_sun.jpg |
 
-These source images are included unchanged. The renderer wraps them around spheres, adds lighting, thin atmospheric rims and a separate cloud layer for Earth, and maps the Saturn ring image radially onto ring geometry. All maps are loaded from this project's server; there is no runtime hotlink or texture-service dependency.
+These source images remain included unchanged for any fallback illustrations. Official maps take priority. Texture assets load from this project's server; there is no runtime hotlink or texture-service dependency. Saturn and Uranus rings use separately sourced radial geometry, and surfaces receive illumination from the displayed Sun.
 
 Solar System Scope describes these maps as derived from NASA imagery and elevation data. Their colors have been adjusted for illustration; incompletely mapped regions can include invented terrain. Venus uses its visible cloud atmosphere. These are visual maps, not live observations. Planet sizes, distances and axial orientations in the atlas are adapted for legibility and do not constitute an ephemeris.
 
-Earth's Moon uses the local Solar System Scope lunar map. Other natural satellites use subdued deterministic procedural surfaces based on their catalogue display color. These surfaces are illustrative and do not represent measured terrain. Satellite shapes are displayed as spheres for legibility; small irregular moons do not have reconstructed shape models. No atmospheric glow is added to satellite bodies.
+Earth's Moon uses NASA LRO surface color and measured elevation. Other moons use the official maps or visualization meshes listed in the coverage manifest. Bodies without mapped terrain retain a neutral surface with NASA/JPL reference semiaxes. Missing imagery is not replaced with invented craters. Titan shows its opaque atmospheric haze.
 
 Exoplanets use an original, deterministic procedural shader based on their catalog radius and equilibrium temperature when available. Their colors, clouds and terrain are **artistic illustrations, not observed surface features or evidence of habitability**. Most exoplanets do not have directly resolved surfaces.
 

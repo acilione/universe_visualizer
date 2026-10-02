@@ -289,3 +289,5 @@ dialog[data-kind="images"]{width:min(880px,calc(100vw - 32px));max-width:none}
 @media(max-width:560px){dialog[data-kind="images"]{width:calc(100vw - 20px);padding:18px}.archive-image figcaption{padding:12px}.archive-image img{max-height:48vh}}
 
 .archive-image img[hidden]{display:none}
+
+.appearance-summary{font-size:10px;line-height:1.6;color:#a1b8b9;margin:12px 0}.appearance-data{margin-top:24px;border-top:1px solid var(--line);padding-top:14px}.appearance-data h3{font-size:12px;letter-spacing:1px}.appearance-data p{font-size:12px;line-height:1.8;overflow-wrap:anywhere}.appearance-data .appearance-credit{color:#b7c3c8}.appearance-data strong{overflow-wrap:anywhere;min-width:0}

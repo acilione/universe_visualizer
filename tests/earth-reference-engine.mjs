@@ -1,5 +1,7 @@
 import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+const officialSurfaces = JSON.parse(await readFile(new URL('../src/official-surfaces.json', import.meta.url), 'utf8'));
 
 const browser = await chromium.launch({ headless: true, args: [
   '--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader',
@@ -40,16 +42,16 @@ try {
     const earth = atlas.content.getObjectByName('earth-reference');
     return earth.position.length() === 0 && earth.userData.radius === .65;
   }), 'the visible Earth is centered at the stellar catalogue origin');
-  await page.waitForFunction(() => {
+  await page.waitForFunction(map => {
     let loaded = false;
     atlas.content.getObjectByName('earth-reference').traverse(object => {
       for (const material of object.material ? (Array.isArray(object.material) ? object.material : [object.material]) : []) {
         const image = material.map?.image;
-        if (image?.width > 0 && String(image.currentSrc || image.src).includes('earth_daymap')) loaded = true;
+        if (image?.width > 0 && String(image.currentSrc || image.src).endsWith('/textures/' + map)) loaded = true;
       }
     });
     return loaded;
-  });
+  }, officialSurfaces.earth.map);
   await page.screenshot({ path: 'test-results/earth-reference-orbit.png' });
   await page.evaluate(() => atlas.setEarthVisible(false));
   assert.equal((await snapshot(page)).earthShown, false);
@@ -127,7 +129,7 @@ try {
   await page.waitForFunction(() => !atlas.cameraFlight);
   assert.equal(await page.evaluate(() => atlas.index), 0);
   assert.equal(await page.evaluate(() => atlas.controls.enabled), true);
-  assert.equal(await page.evaluate(() => atlas.targets.length), 9);
+  assert.equal(await page.evaluate(() => atlas.targets.length), await page.evaluate(() => catalog.solar.length + solarMoons.length));
   assert.ok(await page.evaluate(() => atlas.camera.position.length() > 20));
   await page.evaluate(() => atlas.dispose());
   await page.close();

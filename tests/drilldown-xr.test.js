@@ -41,6 +41,8 @@ function createHarness(t) {
     canvas: { clientWidth: 1280, clientHeight: 720 }, renderer: { xr: manager },
     controls: { enabled: true, target: new THREE.Vector3(), autoRotate: false },
     mapRoot: new THREE.Group(), content: new THREE.Group(), sky: new THREE.Group(),
+    bodyVisuals: new Map(), sunLight: new THREE.PointLight(0xffffff, 3.2, 0, 0),
+    bodyWorldPosition: new THREE.Vector3(), lightWorldPosition: new THREE.Vector3(), bodyLightDirection: new THREE.Vector3(),
     skyPointers: new Map(), retiring: [], labels: [], targets: [], layers: { labels: true, grid: true, particles: true },
     autoRotate: false, quality: 'low', immersive: false, reducedMotion: true,
     effects: { configure() {}, select() {} },
@@ -59,7 +61,7 @@ function createHarness(t) {
   });
   engine.camera.position.set(0, 27, 41);
   engine.scene.add(engine.mapRoot);
-  engine.mapRoot.add(engine.content);
+  engine.mapRoot.add(engine.content, engine.sunLight);
   const solarSystem = catalog.galaxy.find(object => object.id === 'solar-system');
   engine.makeMarker(solarSystem);
   engine.xr = createXR({

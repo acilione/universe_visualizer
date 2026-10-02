@@ -220,7 +220,7 @@ export function createCombinedMap({catalogue = {}, planets = [], exoplanets = []
   for (const object of solar) {
     const body = new THREE.Group(); body.position.fromArray(object.position); body.userData.object = object;
     const visual = planetVisual(object); body.add(visual);
-    const radius = object.bodyKind === 'moon' ? Math.max((object.size || .1) * 1.15, .08) : Math.max(object.size || .5, .52);
+    const radius = object.bodyKind === 'moon' ? Math.max((visual.userData.bodyRadius || object.size || .1) * 1.15, .08) : Math.max(visual.userData.visualRadius || object.size || .5, .52);
     const hit = new THREE.Mesh(new THREE.SphereGeometry(radius, 12, 8), new THREE.MeshBasicMaterial({visible: false}));
     hit.name = `combined-target-${object.id}`; hit.userData.object = object;
     // Three.js does not inspect ancestor visibility during a direct target raycast.

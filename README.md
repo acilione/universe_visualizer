@@ -28,9 +28,19 @@ Select an object and open **Archive images** for verified ESA/Hubble observation
 
 Open **Settings → Gaia DR3** to enable the optional all-sky **G ≤ 6** subset (6,764 ESA sources). **Gaia coverage and cross-matches**, also available in Catalogue sections, reports **4,986 NASA associations**, **83 additional sources** and **1,695 withheld records**. NASA values and IDs remain intact; native Gaia measurements are shown separately. This is a bounded DR3 experiment. [Data, matching policy and reproduction](DATA_GAIA_DR3.md).
 
+## Celestial-body rendering
+
+Solar System bodies use official NASA surface maps and spacecraft visualization assets where available. The Moon combines LRO color imagery with measured lunar elevation. Phobos, Hyperion and Mimas use original NASA 3D meshes. NASA/JPL reference semiaxes reproduce planetary flattening and the proportions of other moons. Saturn and Uranus have separate ring systems with measured radial boundaries. Saturn uses NASA’s registered ring texture and casts shadows between its globe and rings.
+
+Object data identifies the appearance source, observing bands, image coverage and shape measurements. Unmapped regions and illustrative reconstructions remain identified. Venus and Titan show their opaque cloud or haze layers; exoplanet surfaces remain illustrations because surface maps are unavailable.
+
+Illumination follows the Sun in map coordinates, including when the map is moved or scaled in VR. Inspection starts on the illuminated side. Display exposure is normalized across the compressed Solar System; this is not a simulation of apparent brightness at physical distances. Planet spin uses measured rotation periods at 600 simulated seconds per second. Moon orientations remain fixed with the schematic orbits. **Space** pauses auto-rotation.
+
+[Sources, processing and coverage](REALISTIC_SURFACES.md) · [Texture credits](TEXTURE_SOURCES.md).
+
 ## Catalogues and reference frames
 
-- **Solar System:** Sun, eight planets and 28 selected major moons across six planetary systems. Earth’s Moon has a local lunar surface map; other satellite surfaces are illustrative. Planet sizes are enlarged and orbital spacing compressed for navigation.
+- **Solar System:** Sun, eight planets and 28 selected major moons across six planetary systems. Planet and moon appearances use locally bundled spacecraft maps where available and measured reference shapes. Planet sizes are enlarged and orbital spacing compressed for navigation.
 - **Exoplanets:** all **6,360 confirmed planets** in the NASA PSCompPars snapshot, across **4,769 host stars**. Retrieval: **10 September 2026, 23:49 UTC**. The **28 planets with unknown distance** remain searchable. Host-system orbits and exoplanet surfaces are illustrative.
 - **NASA stars and nebulae:** complete NASA HEASARC Hipparcos (118,218 entries) and Bright Star Catalogue stellar records (9,096), cross-matched into 118,356 display records, plus all 485 nebular entries in the NGC2000 archive. Names, Bayer designations and HIP/HR/HD/NGC/IC/Messier IDs are searchable. These named catalogues do not contain every star or nebula known to astronomy.
 - **Nearby stars:** curated references and a HYG subset of 156 additional stars within 25 light-years.
@@ -119,6 +129,7 @@ npm run test:immersive
 npm run test:combined
 npm run test:drilldown
 npm run test:experiments
+npm run test:realism
 npm run audit:gaia
 ```
 

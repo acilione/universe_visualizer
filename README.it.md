@@ -28,6 +28,16 @@ Seleziona un oggetto e apri **Immagini d’archivio** per le osservazioni ESA/Hu
 
 **Impostazioni → Gaia DR3** attiva il sottoinsieme opzionale su tutto il cielo **G ≤ 6**, con 6.764 sorgenti ESA. **Copertura Gaia e corrispondenze**, anche nelle sezioni del catalogo, mostra 4.986 associazioni a voci NASA, 83 sorgenti aggiuntive e 1.695 voci escluse in attesa di verifica. Identificatori e misure NASA restano conservati; le misure native Gaia sono separate. [Dati e metodo](DATA_GAIA_DR3.md).
 
+## Aspetto dei corpi celesti
+
+Fobos, Iperione e Mimas usano i modelli 3D originali NASA.
+
+Pianeti e satelliti usano mappe e prodotti di visualizzazione NASA dove disponibili. La Luna combina immagini LRO e altimetria misurata. I semiassi NASA/JPL riproducono lo schiacciamento dei pianeti e le proporzioni dei satelliti irregolari; Saturno e Urano includono anelli con raggi documentati.
+
+Le schede indicano fonte delle immagini, bande osservative, copertura e dati di forma. Venere e Titano mostrano gli strati opachi di nubi e foschia; le superfici degli esopianeti restano illustrative. La luce segue il Sole anche quando si sposta la mappa in VR. Le rotazioni planetarie rispettano i periodi misurati con tempo accelerato; le orientazioni delle lune restano fisse nelle orbite schematiche.
+
+[Fonti e copertura](REALISTIC_SURFACES.md) · [Crediti delle texture](TEXTURE_SOURCES.md).
+
 ## Pianeti e zoom
 
 Clicca un oggetto collegato o la sua etichetta per entrare nella mappa dettagliata: **Gruppo Locale → Via Lattea → Sistema Solare**. Anche il Sole nella vista **Stelle vicine** apre il Sistema Solare. Basta un clic; funziona anche il doppio clic. Nell’anteprima PC e in VR/MR, la selezione apre la destinazione intorno all’osservatore mantenendone posizione e orientamento.
@@ -101,7 +111,7 @@ Le mani sono fornite dal visore, non da una webcam desktop. I test simulati non 
 “Tutti i pianeti” indica gli **otto pianeti del Sistema Solare più tutte le righe della tabella NASA `pscomppars` alla data di importazione**. Il conteggio è verificato prima e dopo il download. Candidati non confermati, lune, pianeti nani e oggetti non ancora presenti nell’archivio non sono inclusi. Non è un censimento di pianeti non osservati.
 
 - [DATA_EXOPLANETS.md](DATA_EXOPLANETS.md): snapshot NASA, proprietà, null, aggiornamento e riconoscimenti. Massa da catalogo può essere `Msini` o stimata; temperatura di equilibrio non è temperatura superficiale. Le superfici esoplanetarie sono procedurali e illustrative.
-- [TEXTURE_SOURCES.md](TEXTURE_SOURCES.md): texture Solar System Scope, CC BY 4.0, provenienza e interventi artistici. Le texture sono mappe composte, non immagini live.
+- [TEXTURE_SOURCES.md](TEXTURE_SOURCES.md): mappe NASA, crediti e texture illustrative precedenti Solar System Scope (CC BY 4.0). Le texture sono mappe composte, non immagini live.
 - [DATA_SOURCES.md](DATA_SOURCES.md): stelle vicine HYG v4.1 di David Nash, CC BY-SA 4.0, coordinate J2000 e fonti delle schede curate.
 - [DATA_CONSTELLATIONS.md](DATA_CONSTELLATIONS.md): catalogo stellare completo e figure delle 88 costellazioni, HYG e Stellarium, CC BY-SA 4.0.
 
@@ -131,10 +141,6 @@ npm run test:browser
 
 Serve Chromium di Playwright (`npx playwright install chromium` se assente). `TEST_URL` può indicare un server diverso. Screenshot in `test-results/`. Test: completezza dello snapshot, coordinate, zoom, appartenenza ai sistemi, valori sconosciuti, presa delle mani, raycasting, sessione VR e navigazione desktop/mobile.
 
-## Git
-
-Il commit iniziale richiesto è `b09f3da`, con autore `acilione <antoninocilione96@gmail.com>`. Il video fornito è incluso come riferimento locale in quel commit. Dipendenze, build e output dei test sono esclusi da Git.
-
 La verifica del renderer e dello zoom usa anche `npm run test:engine` con il server di sviluppo attivo su porta 5173 (oppure `ENGINE_TEST_URL`).
 
 La verifica delle costellazioni nel renderer usa `npm run test:constellations` con il server di sviluppo su porta 5173. Include proiezione del cielo, stelle sotto l?orizzonte, trascinamento, zoom, distanze ignote e ritorno ai pianeti. `npm run test:constellation-ui` verifica la navigazione desktop/mobile sull?anteprima di produzione (porta 5174).
@@ -149,6 +155,6 @@ Il catalogo **Pianeti e satelliti** include 28 satelliti principali di sei piane
 
 I controlli **Stelle** e **Nebulose**, anche nella ricerca e nelle sezioni del catalogo, consultano gli archivi NASA HEASARC: 118.218 voci Hipparcos, 9.096 voci stellari Bright Star Catalogue e 485 voci nebulari NGC2000. La corrispondenza fra i cataloghi stellari conserva tutti gli identificatori in 118.356 schede. Sono cataloghi completi nelle rispettive selezioni, non un elenco di tutti gli oggetti astronomici conosciuti.
 
-La ricerca comprende Rho Cygni, Scheat, Sheliak, nomi alternativi e identificatori HIP/HR/HD/NGC/IC/Messier. **Dati di catalogo** mostra coordinate, magnitudini, classi spettrali, parallassi e incertezze quando disponibili. Le voci HYG corrispondenti ricevono informazioni NASA mantenendo la provenienza delle coordinate. La vista NASA usa direzioni equatoriali su una sfera di riferimento, senza inventare profondità mancanti; le nebulose sono rappresentazioni illustrative dell’estensione angolare. Zoom, immersione e VR sono disponibili.
+La ricerca accetta nomi, denominazioni alternative e identificatori di catalogo. **Dati di catalogo** mostra coordinate, magnitudini, classi spettrali, parallassi e incertezze quando disponibili. Le voci HYG corrispondenti ricevono informazioni NASA mantenendo la provenienza delle coordinate. La vista NASA usa direzioni equatoriali su una sfera di riferimento, senza inventare profondità mancanti; le nebulose sono rappresentazioni illustrative dell’estensione angolare. Zoom, immersione e VR sono disponibili.
 
 Fonti, epoche e procedure di aggiornamento: [stelle NASA](DATA_NASA_STARS.md) e [nebulose NASA](DATA_NASA_NEBULAE.md).

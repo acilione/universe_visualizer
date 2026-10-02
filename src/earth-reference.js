@@ -24,7 +24,9 @@ export function makeEarthReference() {
     if (child.name === 'planet-surface') {
       // No physical Sun is rendered at the origin in this view. Keep the shared
       // day map readable from every angle without introducing a scene light.
-      child.material.emissiveIntensity = 0.55;
+      child.material.emissiveMap = child.material.map;
+      child.material.emissive?.set('#ffffff');
+      child.material.emissiveIntensity = 0.8;
       child.material.roughness = 1;
     }
     if (child.name === 'earth-clouds') child.material.emissiveIntensity = 0.35;
