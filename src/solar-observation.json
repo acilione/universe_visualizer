@@ -1,0 +1,28 @@
+{
+  "sourceUrl": "https://sdo.gsfc.nasa.gov/data/",
+  "assetUrl": "https://sdo.gsfc.nasa.gov/assets/img/browse/2026/09/21/20260921_151038_1024_HMII.jpg",
+  "sourceSha256": "757c05ab92222de8a736ca0d66c300ae14560038fcc220aa35364724bb9ac194",
+  "referenceMap": "official/sun-hmi-20260921.jpg",
+  "map": "official/sun-hmi-contrast.png",
+  "observationDateUtc": "2026-09-21T15:10:38Z",
+  "imageCaptionTimeTai": "2026-09-21T15:11:15 TAI",
+  "credit": "NASA/SDO and the HMI science team",
+  "band": "HMI continuum intensity near 617.3 nm; grayscale display",
+  "bandIt": "Intensit\u00e0 del continuo HMI vicino a 617,3 nm; visualizzazione in scala di grigi",
+  "projection": "Orthographic visible hemisphere in source-image coordinates; no far-side reconstruction",
+  "diskCenterPx": [
+    511.5,
+    511.5
+  ],
+  "diskRadiusPx": 470,
+  "diskRadiusUv": 0.458984375,
+  "contrastEncoding": "Red channel / 128 gives relative display intensity after radial-median normalization; alpha marks retained observed pixels.",
+  "coverage": "Central 96 percent of the apparent disk radius; approximately one observed hemisphere. Solar north and Carrington longitude are not registered.",
+  "retrievedOn": "2026-10-02",
+  "mapSha256": "a5edb3e6ddfec70f595a8b7b7cdc405a7c53840b80f9e62119c857d880d5861d",
+  "width": 1024,
+  "height": 1024,
+  "bytes": 507112,
+  "validPixels": 639572,
+  "processing": "Radial-median normalization of archived grayscale browse image; observed disk only; no inpainting, generative detail or geographic filling."
+}

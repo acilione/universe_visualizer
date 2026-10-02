@@ -30,13 +30,13 @@ Open **Settings → Gaia DR3** to enable the optional all-sky **G ≤ 6** subset
 
 ## Celestial-body rendering
 
-Solar System bodies use official NASA surface maps and spacecraft visualization assets where available. The Moon combines LRO color imagery with measured lunar elevation. Phobos, Hyperion and Mimas use original NASA 3D meshes. NASA/JPL reference semiaxes reproduce planetary flattening and the proportions of other moons. Saturn and Uranus have separate ring systems with measured radial boundaries. Saturn uses NASA’s registered ring texture and casts shadows between its globe and rings.
+Solar System bodies use official NASA surface maps and spacecraft visualization assets where available. The Moon combines LRO color imagery with measured lunar elevation. Ten moons use NASA 3D or NASA PDS shape models, including measured Cassini geometry for Janus and Epimetheus. The Sun uses a dated SDO/HMI observation for visible sunspot detail on its observed hemisphere. NASA/JPL reference semiaxes reproduce planetary flattening and the proportions of other moons. Saturn and Uranus have separate ring systems with measured radial boundaries. Saturn uses NASA’s registered ring texture and casts shadows between its globe and rings.
 
 Object data identifies the appearance source, observing bands, image coverage and shape measurements. Unmapped regions and illustrative reconstructions remain identified. Venus and Titan show their opaque cloud or haze layers; exoplanet surfaces remain illustrations because surface maps are unavailable.
 
-Illumination follows the Sun in map coordinates, including when the map is moved or scaled in VR. Inspection starts on the illuminated side. Display exposure is normalized across the compressed Solar System; this is not a simulation of apparent brightness at physical distances. Planet spin uses measured rotation periods at 600 simulated seconds per second. Moon orientations remain fixed with the schematic orbits. **Space** pauses auto-rotation.
+Illumination follows the Sun in map coordinates, including when the map is moved or scaled in VR. Inspection starts on the illuminated side and favors the photographed hemisphere where coverage is incomplete. Solar inspection starts on the hemisphere captured by SDO. Display exposure is normalized across the compressed Solar System; this is not a simulation of apparent brightness at physical distances. Planet spin uses measured rotation periods at 600 simulated seconds per second. Moon orientations remain fixed with the schematic orbits. **Space** pauses auto-rotation.
 
-[Sources, processing and coverage](REALISTIC_SURFACES.md) · [Texture credits](TEXTURE_SOURCES.md).
+[Body-by-body NASA comparison](BODY_APPEARANCE_AUDIT.md) · [Sources, processing and coverage](REALISTIC_SURFACES.md) · [Texture credits](TEXTURE_SOURCES.md).
 
 ## Catalogues and reference frames
 

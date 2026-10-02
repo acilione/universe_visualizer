@@ -1,0 +1,878 @@
+{
+  "sun": {
+    "name": "Sun",
+    "reference": {
+      "title": "SDO HMI continuum intensity, 21 September 2026",
+      "url": "https://sdo.gsfc.nasa.gov/data/",
+      "imageUrl": "https://sdo.gsfc.nasa.gov/assets/img/browse/2026/09/21/20260921_151038_1024_HMII.jpg",
+      "archiveId": "20260921_151038_1024_HMII",
+      "credit": "NASA/SDO and the HMI science team",
+      "band": "HMI continuum intensity near 617.3 nm; grayscale display",
+      "observationDate": "2026-09-21T15:10:38Z"
+    },
+    "features": [
+      "White visible-light photosphere",
+      "Observed sunspots and darkening toward the apparent limb"
+    ],
+    "finding": "White is appropriate in visible light, but the previous shader had no observed surface detail. Orange and gold solar displays use assigned colours.",
+    "action": "Project the dated grayscale HMI observation onto its observed hemisphere, remove baked radial shading and apply observer-dependent limb shading. Enable close inspection.",
+    "limitations": "A single-band browse image is not a calibrated RGB or radiance map. Display exposure and limb law are modelled; orientation is schematic. The unobserved hemisphere and cropped outer limb remain smooth; activity is historical.",
+    "status": "corrected",
+    "references": [
+      {
+        "url": "https://svs.gsfc.nasa.gov/vis/a010000/a013800/a013859/script_31299_00.html",
+        "title": "NASA explanation of solar image colours"
+      },
+      {
+        "url": "https://sdo.gsfc.nasa.gov/data/channels.php",
+        "title": "SDO observing channels"
+      }
+    ]
+  },
+  "mercury": {
+    "name": "Mercury",
+    "reference": {
+      "title": "Mercury’s True Color is in the Eye of the Beholder",
+      "url": "https://science.nasa.gov/photojournal/mercurys-true-color-is-in-the-eye-of-the-beholder/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/photojournal/pia/pia11/pia11364/PIA11364.jpg/jcr:content/renditions/cq5dam.web.1280.1280.jpeg",
+      "archiveId": "PIA11364",
+      "credit": "NASA / Johns Hopkins University Applied Physics Laboratory / Arizona State University / Carnegie Institution of Washington",
+      "band": "430 nm grayscale and 480/560/630 nm colour composites, displayed with several stretches"
+    },
+    "features": [
+      "Densely cratered terrain",
+      "Muted grey-brown surface and brighter rays"
+    ],
+    "finding": "The existing map reproduces the cratered, near-grey surface class. The comparison panels demonstrate that processing strongly changes apparent colour.",
+    "action": "Retain the official map and restrained surface palette.",
+    "limitations": "The visualization map is not radiometrically calibrated. Different contrast stretches in the reference are not different physical surface colours.",
+    "status": "verified",
+    "validation": "NASA reference photograph, source map and four rendered longitude views inspected. Comparison assesses recognizable morphology and colour class, not photometric equivalence."
+  },
+  "venus": {
+    "name": "Venus",
+    "reference": {
+      "title": "Venus from Mariner 10",
+      "url": "https://science.nasa.gov/photojournal/venus-from-mariner-10/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/photojournal/pia/pia23/pia23791/figures/PIA23791_fig1_thumb.jpg/jcr:content/renditions/cq5dam.web.1280.1280.jpeg",
+      "archiveId": "PIA23791",
+      "credit": "NASA / JPL-Caltech; processing by Kevin M. Gill",
+      "band": "Orange and ultraviolet filters with synthesized green; false-colour composite"
+    },
+    "features": [
+      "Opaque, mostly pale cloud cover",
+      "Subtle cloud markings; no visible rocky surface"
+    ],
+    "finding": "The previous yellow, high-contrast bands overstated the cloud contrast compared with the ordinary-contrast NASA view.",
+    "action": "Reduce cloud contrast to 15 percent and use a pale cream display tone while retaining the source pattern.",
+    "limitations": "This is a representative display correction, not calibrated natural colour or current weather. Mariner 10 did not acquire a complete visible RGB set.",
+    "status": "corrected",
+    "validation": "NASA reference photograph, source map and four rendered longitude views inspected. Comparison assesses recognizable morphology and colour class, not photometric equivalence."
+  },
+  "earth": {
+    "name": "Earth",
+    "reference": {
+      "title": "NASA Captures EPIC Earth Image",
+      "url": "https://www.nasa.gov/image-article/nasa-captures-epic-earth-image/",
+      "imageUrl": "https://www.nasa.gov/wp-content/uploads/2023/03/187_1003705_americas_dxm.png",
+      "archiveId": "DSCOVR EPIC 2015-07-06",
+      "credit": "NASA / DSCOVR EPIC team",
+      "band": "Red, green and blue filtered exposures"
+    },
+    "features": [
+      "Blue oceans and continental land patterns",
+      "Bright white clouds and polar ice"
+    ],
+    "finding": "Blue Marble land/ocean geography and a separate archived cloud map reproduce the observed visual components.",
+    "action": "Retain the observed surface mosaic and separate cloud layer.",
+    "limitations": "The surface and cloud composites combine different dates. Cloud opacity and atmosphere are display models, not a reconstruction of the comparison image’s weather.",
+    "status": "verified",
+    "validation": "NASA reference photograph, source map and four rendered longitude views inspected. Comparison assesses recognizable morphology and colour class, not photometric equivalence."
+  },
+  "mars": {
+    "name": "Mars",
+    "reference": {
+      "title": "Global Color Views of Mars",
+      "url": "https://science.nasa.gov/photojournal/global-color-views-of-mars/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/photojournal/pia/pia00/pia00407/PIA00407.jpg/jcr:content/renditions/cq5dam.web.1280.1280.jpeg",
+      "archiveId": "PIA00407",
+      "credit": "NASA / JPL / USGS",
+      "band": "Viking red and violet mosaics with synthesized green"
+    },
+    "features": [
+      "Reddish dusty terrain",
+      "Dark regional markings and polar caps"
+    ],
+    "finding": "The map preserves dark albedo regions, polar ice and the characteristic dust colour.",
+    "action": "Retain the NASA map and directional solar illumination.",
+    "limitations": "The comparison is a processed global composite with contrast adjustments and some interpolated coverage; it is not an instantaneous calibrated RGB observation.",
+    "status": "verified",
+    "validation": "NASA reference photograph, source map and four rendered longitude views inspected. Comparison assesses recognizable morphology and colour class, not photometric equivalence."
+  },
+  "jupiter": {
+    "name": "Jupiter",
+    "reference": {
+      "title": "Cassini Jupiter Portrait",
+      "url": "https://science.nasa.gov/photojournal/cassini-jupiter-portrait/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/photojournal/pia/pia04/pia04866/PIA04866.jpg/jcr:content/renditions/cq5dam.web.1280.1280.jpeg",
+      "archiveId": "PIA04866",
+      "credit": "NASA / JPL / Space Science Institute",
+      "band": "Red, green and blue filtered mosaic"
+    },
+    "features": [
+      "Alternating light zones and brown belts",
+      "Great Red Spot and smaller atmospheric vortices"
+    ],
+    "finding": "The Cassini-based cylindrical map preserves the major belts and observed storms in all longitude views.",
+    "action": "Retain the observed cylindrical map.",
+    "limitations": "The map dates to December 2000 and differs in time from the reference portrait. Atmospheric features evolve; neither is current weather.",
+    "status": "verified",
+    "validation": "NASA reference photograph, source map and four rendered longitude views inspected. Comparison assesses recognizable morphology and colour class, not photometric equivalence."
+  },
+  "saturn": {
+    "name": "Saturn",
+    "reference": {
+      "title": "The Greatest Saturn Portrait ... Yet",
+      "url": "https://science.nasa.gov/photojournal/the-greatest-saturn-portrait-yet/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/photojournal/pia/pia06/pia06193/PIA06193.jpg/jcr:content/renditions/cq5dam.web.1280.1280.jpeg",
+      "archiveId": "PIA06193",
+      "credit": "NASA / JPL / Space Science Institute",
+      "band": "True-colour red, green and blue filtered mosaic"
+    },
+    "features": [
+      "Oblate globe with subtle atmospheric bands",
+      "Ring divisions, thin outer ring and mutual shadows"
+    ],
+    "finding": "The radial ring texture preserves the principal divisions. Analytic lighting supplies planet-on-ring and ring-on-planet shadows.",
+    "action": "Retain the registered ring texture, measured radii and directional shadows.",
+    "limitations": "Atmospheric hue varies with season; the map does not recreate the 2004 illumination. Ring alpha is a display quantity rather than measured optical depth.",
+    "status": "verified",
+    "validation": "NASA reference photograph, source map and four rendered longitude views inspected. Comparison assesses recognizable morphology and colour class, not photometric equivalence."
+  },
+  "uranus": {
+    "name": "Uranus",
+    "reference": {
+      "title": "Uranus: True and False Color",
+      "url": "https://www.nasa.gov/image-article/uranus-true-false-color/",
+      "imageUrl": "https://www.nasa.gov/wp-content/uploads/2023/03/511483main_pia00032-43_full.jpg",
+      "archiveId": "PIA00032",
+      "credit": "NASA / JPL",
+      "band": "Left: blue/green/orange approximately visible; right: strongly enhanced ultraviolet/violet/orange"
+    },
+    "features": [
+      "Pale blue-green, low-contrast cloud globe",
+      "No bright false-colour polar patch in ordinary visible light"
+    ],
+    "finding": "The restrained cyan atmosphere is consistent with the left, approximately visible-colour image.",
+    "action": "Retain the muted cloud appearance and faint rings.",
+    "limitations": "The false-colour panel is not used as a natural-colour target. Cloud detail and ring brightness remain illustrative rather than calibrated.",
+    "status": "verified",
+    "validation": "NASA reference photograph, source map and four rendered longitude views inspected. Comparison assesses recognizable morphology and colour class, not photometric equivalence."
+  },
+  "neptune": {
+    "name": "Neptune",
+    "reference": {
+      "title": "Neptune Full Disk View",
+      "url": "https://science.nasa.gov/photojournal/neptune-full-disk-view/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/photojournal/pia/pia01/pia01492/PIA01492.jpg/jcr:content/renditions/cq5dam.web.1280.1280.jpeg",
+      "archiveId": "PIA01492",
+      "credit": "NASA / JPL",
+      "band": "Voyager green/orange composite with processed display colour"
+    },
+    "features": [
+      "Cloud bands and bright companions to historical dark storms",
+      "Pale blue-green visible colour after later reassessment"
+    ],
+    "finding": "The source map preserves Voyager-era cloud morphology. Its intense blue was already reduced to a representative pale blue-green consistent with NASA’s revised description.",
+    "action": "Retain the pale display correction and historical cloud map.",
+    "limitations": "This is not a new spectrophotometric reconstruction. The 1989 Great Dark Spot is historical; the enhanced blue archive image is not a literal natural-colour target.",
+    "status": "verified",
+    "validation": "NASA reference photograph, source map and four rendered longitude views inspected. Comparison assesses recognizable morphology and colour class, not photometric equivalence.",
+    "references": [
+      {
+        "url": "https://science.nasa.gov/neptune/neptune-facts/",
+        "title": "NASA Neptune facts: revised colour and historical storms"
+      }
+    ]
+  },
+  "moon": {
+    "name": "Moon",
+    "features": [
+      "Dark basaltic maria against brighter highlands",
+      "Impact craters and bright ejecta rays"
+    ],
+    "finding": "The LROC mosaic preserves the near-side maria and the densely cratered far side in the four longitude views. Separate LOLA elevation data supplies physical-scale surface-normal shading, instead of treating dark maria as depressions.",
+    "action": "Retain the NASA LROC/LOLA products and the physical elevation scale.",
+    "limitations": "The colour mosaic is adjusted for visual presentation, with lower-resolution monochrome polar fill and small repaired dropouts. Relief affects shading, not the ellipsoidal silhouette; lighting and rotational phase are schematic.",
+    "status": "verified",
+    "reference": {
+      "title": "CGI Moon Kit",
+      "url": "https://svs.gsfc.nasa.gov/4720/",
+      "imageUrl": "https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/lroc_color_2k.jpg",
+      "archiveId": "SVS 4720",
+      "credit": "NASA SVS; LRO/LROC and LOLA teams",
+      "band": "LROC WAC visible composite; exposure and white balance adapted for display"
+    },
+    "validation": "Official archive image, source map and four rendered longitude views inspected; comparisons assess recognizable structure and colour class, not photometric equivalence."
+  },
+  "phobos": {
+    "name": "Phobos",
+    "features": [
+      "Strongly irregular outline",
+      "Large Stickney impact depression",
+      "Grooves and smaller craters"
+    ],
+    "finding": "The native NASA mesh and its original UV atlas retain the irregular outline and resolved crater structure. The renderer uses a dark, nearly neutral surface rather than interpreting the enhanced red/infrared reference as naked-eye colour.",
+    "action": "Keep the native mesh, original texture coordinates and diffuse, nonmetallic material.",
+    "limitations": "The NASA visualization mesh is not a certified terrain model. Some source lighting remains baked into the texture. The reference uses enhanced colour and does not establish absolute reflectance.",
+    "status": "verified",
+    "reference": {
+      "title": "Martian Moon Phobos",
+      "url": "https://science.nasa.gov/resource/martian-moon-phobos/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/09/p/i/a/1/PIA10368_1280.jpg/jcr:content/renditions/cq5dam.web.1280.1280.jpeg",
+      "archiveId": "PIA10368",
+      "credit": "NASA/JPL-Caltech/University of Arizona",
+      "band": "HiRISE blue-green, red and near-infrared; enhanced colour"
+    },
+    "validation": "Official archive image, source map and four rendered longitude views inspected; comparisons assess recognizable structure and colour class, not photometric equivalence."
+  },
+  "io": {
+    "name": "Io",
+    "features": [
+      "Yellow and pale sulphur-rich plains",
+      "Dark volcanic centres",
+      "Local red and brown deposits"
+    ],
+    "finding": "The rendered longitude views show the observed mottled pale-yellow surface and dark volcanic features. The surface is illuminated by the Sun rather than glowing orange.",
+    "action": "Retain the spacecraft-derived map and restrained diffuse shading.",
+    "limitations": "The Galileo reference approximates human-visible colour using filters extending into near-infrared. Volcanic deposits change with time; the model is not a current activity map or a reflectance calibration.",
+    "status": "verified",
+    "reference": {
+      "title": "Global image of Io (true color)",
+      "url": "https://science.nasa.gov/photojournal/global-image-of-io-true-color/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/photojournal/pia/pia02/pia02308/PIA02308.jpg/jcr:content/renditions/cq5dam.web.1280.1280.jpeg",
+      "archiveId": "PIA02308",
+      "credit": "NASA/JPL/University of Arizona",
+      "band": "Galileo near-infrared, green and violet; approximately human-visible colours"
+    },
+    "validation": "Official archive image, source map and four rendered longitude views inspected; comparisons assess recognizable structure and colour class, not photometric equivalence."
+  },
+  "europa": {
+    "name": "Europa",
+    "features": [
+      "Pale icy background",
+      "Brown intersecting fractures",
+      "Dark disrupted terrain"
+    ],
+    "finding": "The model preserves the dark fracture network on pale ice. Its muted colour is compared with the approximate-natural-colour left panel, not the strongly enhanced right panel.",
+    "action": "Keep the mapped fractures and neutral ice appearance; do not import false-colour blues or oranges as natural surface colour.",
+    "limitations": "The source is a global visualization mosaic, not a dated complete observation. Fine fracture relief and subsurface structures are not represented in geometry.",
+    "status": "verified",
+    "reference": {
+      "title": "Natural and False Color Views of Europa",
+      "url": "https://europa.nasa.gov/resources/91/natural-and-false-color-views-of-europa/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/missions/europa-clipper/images/PIA00502.jpg/jcr:content/renditions/cq5dam.web.1280.1280.jpeg",
+      "archiveId": "PIA00502",
+      "credit": "NASA/JPL/DLR",
+      "band": "Left: approximate natural colour; right: false-colour violet/green/infrared"
+    },
+    "validation": "Official archive image, source map and four rendered longitude views inspected; comparisons assess recognizable structure and colour class, not photometric equivalence."
+  },
+  "ganymede": {
+    "name": "Ganymede",
+    "features": [
+      "Older dark terrain",
+      "Brighter grooved terrain",
+      "Bright impact-crater rays"
+    ],
+    "finding": "The four rendered longitudes preserve the contrast between dark blocks, brighter grooved regions and ray craters seen in Galileo images.",
+    "action": "Retain the observed terrain pattern and subdued brown-grey colour.",
+    "limitations": "Brightness depends on display lighting and exposure; it is not calibrated against this single Galileo frame. The reference ellipsoid does not reproduce local relief.",
+    "status": "verified",
+    "reference": {
+      "title": "Ganymede Color Global",
+      "url": "https://science.nasa.gov/photojournal/ganymede-color-global/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/photojournal/pia/pia00/pia00716/PIA00716.jpg/jcr:content/renditions/cq5dam.web.1280.1280.jpeg",
+      "archiveId": "PIA00716",
+      "credit": "NASA/JPL",
+      "band": "Galileo natural-colour composite"
+    },
+    "validation": "Official archive image, source map and four rendered longitude views inspected; comparisons assess recognizable structure and colour class, not photometric equivalence."
+  },
+  "callisto": {
+    "name": "Callisto",
+    "features": [
+      "Dark heavily cratered surface",
+      "Numerous bright impact scars",
+      "Large concentric impact-basin structure"
+    ],
+    "finding": "Rendered views retain the dense bright-crater pattern against a much darker background. Surface colour is somewhat warmer than the reference image, without changing the recognizable geography.",
+    "action": "Retain the source map; avoid an unsupported colour correction from one differently processed hemisphere.",
+    "limitations": "The archive reference covers one observed hemisphere, not every longitude. The educational map is not a calibrated spectral-reflectance product, and crater relief is not separately resolved.",
+    "status": "verified",
+    "reference": {
+      "title": "Global Callisto in Color",
+      "url": "https://science.nasa.gov/resource/global-callisto-in-color/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/09/p/i/a/0/PIA03456.jpg/jcr:content/renditions/cq5dam.web.1280.1280.jpeg",
+      "archiveId": "PIA03456",
+      "credit": "NASA/JPL/DLR",
+      "band": "Galileo global colour observation; not a complete all-longitude map"
+    },
+    "validation": "Official archive image, source map and four rendered longitude views inspected; comparisons assess recognizable structure and colour class, not photometric equivalence."
+  },
+  "mimas": {
+    "name": "Mimas",
+    "features": [
+      "Herschel impact basin with central structure",
+      "Dense small-crater coverage",
+      "Slightly nonspherical outline"
+    ],
+    "finding": "The native NASA mesh preserves a cratered irregular surface and the original UV atlas. Herschel is not face-on in every catalogue phase; its position changes with the viewing angle rather than following the camera.",
+    "action": "Keep the native geometry and neutral visible appearance. Compare the basin with the monochrome archive mosaic, not the blue-green enhanced-colour image.",
+    "limitations": "The educational mesh is not a calibrated Cassini terrain product. Baked source shadows and limited mesh resolution prevent exact reproduction of Herschel under arbitrary illumination.",
+    "status": "limited",
+    "reference": {
+      "title": "Examining Herschel Crater",
+      "url": "https://science.nasa.gov/photojournal/examining-herschel-crater/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/photojournal/pia/pia12/pia12568/PIA12568.jpg",
+      "archiveId": "PIA12568",
+      "credit": "NASA/JPL/Space Science Institute",
+      "band": "Cassini visible-light monochrome mosaic"
+    },
+    "references": [
+      {
+        "title": "Color Near Herschel Crater",
+        "url": "https://science.nasa.gov/resource/color-near-herschel-crater/",
+        "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/09/p/i/PIA12572.jpg/jcr:content/renditions/cq5dam.web.1280.1280.jpeg",
+        "archiveId": "PIA12572",
+        "credit": "NASA/JPL/SSI",
+        "band": "Clear-filter detail plus ultraviolet, green and infrared; false colour"
+      }
+    ],
+    "validation": "Official archive image, source map and four rendered longitude views inspected; comparisons assess recognizable structure and colour class, not photometric equivalence."
+  },
+  "enceladus": {
+    "name": "Enceladus",
+    "features": [
+      "Bright icy surface",
+      "Fractured young terrain",
+      "South-polar tiger-stripe region"
+    ],
+    "finding": "The mapped fracture pattern is retained, but at the shared scene exposure Enceladus appears greyer than its bright natural-colour reference. The prominent blue fractures in the detailed archive composite are enhanced colour, not a natural blue surface.",
+    "action": "Keep geographic detail and record the unresolved absolute-brightness limitation; do not calibrate reflectance from differently exposed photographs.",
+    "limitations": "The source visualization texture is not calibrated relative to other moons. Plumes, small-scale relief and time-dependent activity are not modelled; the UV/infrared reference is used only for terrain-pattern comparison.",
+    "status": "limited",
+    "reference": {
+      "title": "Fresh Features on Enceladus (False color)",
+      "url": "https://science.nasa.gov/photojournal/fresh-features-on-enceladus-false-color/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/photojournal/pia/pia07/pia07708/PIA07708.jpg/jcr:content/renditions/cq5dam.web.1280.1280.jpeg",
+      "archiveId": "PIA07708",
+      "credit": "NASA/JPL/Space Science Institute",
+      "band": "Cassini ultraviolet, green and infrared; enhanced colour, blue fractures not natural visible colour"
+    },
+    "references": [
+      {
+        "title": "A Tale of Two Moons",
+        "url": "https://science.nasa.gov/photojournal/a-tale-of-two-moons/",
+        "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/photojournal/pia/pia07/pia07787/PIA07787.jpg/jcr:content/renditions/cq5dam.web.1280.1280.jpeg",
+        "archiveId": "PIA07787",
+        "credit": "NASA/JPL/Space Science Institute",
+        "band": "Cassini red, green and blue natural-colour comparison of Enceladus and Titan"
+      }
+    ],
+    "validation": "Official archive image, source map and four rendered longitude views inspected; comparisons assess recognizable structure and colour class, not photometric equivalence."
+  },
+  "tethys": {
+    "name": "Tethys",
+    "features": [
+      "Heavily cratered neutral icy surface",
+      "Large impact-basin terrain",
+      "Long grooves and chasm systems"
+    ],
+    "finding": "The rendered views preserve the predominantly neutral cratered surface, darker equatorial region and large impact features rather than assigning strong false colours.",
+    "action": "Retain the mapped surface and compare its broad terrain pattern with Cassini natural-colour imagery.",
+    "limitations": "Source-image shading remains in the albedo texture. Small crater relief is not in the reference-ellipsoid geometry, and brightness is not photometrically calibrated.",
+    "status": "verified",
+    "reference": {
+      "title": "Battered and Grooved",
+      "url": "https://science.nasa.gov/photojournal/battered-and-grooved/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/photojournal/pia/pia06/pia06140/PIA06140.jpg/jcr:content/renditions/cq5dam.web.1280.1280.jpeg",
+      "archiveId": "PIA06140",
+      "credit": "NASA/JPL/Space Science Institute",
+      "band": "Cassini red, green and blue natural-colour mosaic"
+    },
+    "validation": "Official archive image, source map and four rendered longitude views inspected; comparisons assess recognizable structure and colour class, not photometric equivalence."
+  },
+  "dione": {
+    "name": "Dione",
+    "features": [
+      "Bright wispy fracture systems",
+      "Darker trailing-hemisphere terrain",
+      "Impact-cratered plains"
+    ],
+    "finding": "The bright branching wisps stand out against darker terrain in the rendered trailing-side views, consistent with the near-full-phase Cassini reference.",
+    "action": "Retain the mapped fracture geography; use the visible monochrome reference for structure rather than inferring colour from mixed-filter imagery.",
+    "limitations": "The visualization texture has a slight colour cast and baked shading; neither is a calibrated material measurement. Canyons are visible in the image but are not explicitly modelled as 3D relief.",
+    "status": "verified",
+    "reference": {
+      "title": "Wispy Marble",
+      "url": "https://science.nasa.gov/photojournal/wispy-marble/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/photojournal/pia/pia12/pia12553/PIA12553.jpg/jcr:content/renditions/cq5dam.web.1280.1280.jpeg",
+      "archiveId": "PIA12553",
+      "credit": "NASA/JPL/Space Science Institute",
+      "band": "Cassini visible-light monochrome; near-full phase"
+    },
+    "references": [
+      {
+        "title": "Dione and Saturn",
+        "url": "https://science.nasa.gov/resource/dione-and-saturn/",
+        "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/09/p/PIA06155.jpg/jcr:content/renditions/cq5dam.web.1280.1280.jpeg",
+        "archiveId": "PIA06155",
+        "credit": "NASA/JPL/Space Science Institute",
+        "band": "Archive-labelled natural-colour view; caption filter description inconsistent, not a calibration reference"
+      }
+    ],
+    "validation": "Official archive image, source map and four rendered longitude views inspected; comparisons assess recognizable structure and colour class, not photometric equivalence."
+  },
+  "rhea": {
+    "name": "Rhea",
+    "features": [
+      "Dense overlapping impact craters",
+      "Nearly neutral icy terrain",
+      "Subtle brighter fractures and rays"
+    ],
+    "finding": "The runtime surface remains grey and heavily cratered, consistent with the natural-colour left panel of the Cassini comparison. The enhanced blue/green right panel is not treated as visible colour.",
+    "action": "Keep the restrained map colour and observed crater pattern.",
+    "limitations": "Image contrast and scene exposure differ from the archive frame. Source shading is baked into the map, and fine-scale relief remains a texture feature.",
+    "status": "verified",
+    "reference": {
+      "title": "Color Across Rhea",
+      "url": "https://science.nasa.gov/photojournal/color-across-rhea/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/photojournal/pia/pia08/pia08871/PIA08871.jpg/jcr:content/renditions/cq5dam.web.1280.1280.jpeg",
+      "archiveId": "PIA08871",
+      "credit": "NASA/JPL/Space Science Institute",
+      "band": "Left: RGB natural colour; right: enhanced ultraviolet/green/infrared"
+    },
+    "validation": "Official archive image, source map and four rendered longitude views inspected; comparisons assess recognizable structure and colour class, not photometric equivalence."
+  },
+  "titan": {
+    "name": "Titan",
+    "features": [
+      "Opaque orange-gold atmospheric haze",
+      "Smooth visible cloud envelope",
+      "Surface hidden in ordinary visible light"
+    ],
+    "finding": "The visible globe is smooth and gold, as in the Cassini RGB reference; no radar or infrared terrain is presented through the haze.",
+    "action": "Retain the opaque cloud reconstruction and subdued atmospheric limb.",
+    "limitations": "The haze map and limb scattering are approximations, not a dated weather reconstruction or a radiative-transfer model. Surface geography requires a separate non-visible observing mode.",
+    "status": "verified",
+    "reference": {
+      "title": "Titan in Natural Color",
+      "url": "https://science.nasa.gov/photojournal/titan-in-natural-color/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/photojournal/pia/pia06/pia06081/PIA06081.jpg/jcr:content/renditions/cq5dam.web.1280.1280.jpeg",
+      "archiveId": "PIA06081",
+      "credit": "NASA/JPL/Space Science Institute",
+      "band": "Cassini red, green and blue natural colour"
+    },
+    "validation": "Official archive image, source map and four rendered longitude views inspected; comparisons assess recognizable structure and colour class, not photometric equivalence."
+  },
+  "hyperion": {
+    "name": "Hyperion",
+    "features": [
+      "Irregular elongated shape",
+      "Dense sponge-like impact texture",
+      "Dark crater floors"
+    ],
+    "finding": "The native mesh reproduces the irregular silhouette and crater-dominated structure. Its grey/olive display colour is less reddish than the natural appearance described by the Cassini archive caption.",
+    "action": "Keep the real source geometry and flag the colour uncertainty. Do not tune against the enhanced-colour reference as if it were calibrated RGB.",
+    "limitations": "The reference deliberately suppresses red and enhances other colours. The visualization texture includes baked shadows, and the mesh is not a calibrated elevation product.",
+    "status": "limited",
+    "reference": {
+      "title": "Saturn’s Battered Moon Hyperion",
+      "url": "https://science.nasa.gov/resource/saturns-battered-moon-hyperion/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/09/p/i/a/0/PIA07740.jpg/jcr:content/renditions/cq5dam.web.1280.1280.jpeg",
+      "archiveId": "PIA07740",
+      "credit": "NASA/JPL-Caltech/Space Science Institute",
+      "band": "Infrared, green and ultraviolet; red suppressed and other colours enhanced"
+    },
+    "validation": "Official archive image, source map and four rendered longitude views inspected; comparisons assess recognizable structure and colour class, not photometric equivalence."
+  },
+  "iapetus": {
+    "name": "Iapetus",
+    "features": [
+      "Strong dark/bright hemispheric contrast",
+      "Heavily cratered bright terrain",
+      "Equatorial ridge known from resolved Cassini images"
+    ],
+    "finding": "The map reproduces the striking dark/bright contrast. The current ellipsoid does not reproduce the equatorial ridge silhouette; the inspected NASA visualization mesh is also effectively spherical and cannot supply that missing relief.",
+    "action": "Retain the observed albedo pattern and explicitly mark the absent ridge geometry instead of inventing a ridge.",
+    "limitations": "The comparison mosaic uses expanded wavelengths and exaggerates brown tones. Local terrain, including the ridge, is not resolved in the displayed shape.",
+    "status": "limited",
+    "reference": {
+      "title": "The Other Side of Iapetus",
+      "url": "https://science.nasa.gov/photojournal/the-other-side-of-iapetus/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/photojournal/pia/pia08/pia08384/PIA08384.jpg/jcr:content/renditions/cq5dam.web.1280.1280.jpeg",
+      "archiveId": "PIA08384",
+      "credit": "NASA/JPL/Space Science Institute",
+      "band": "Expanded-wavelength false-colour mosaic; browns exaggerated relative to natural colour"
+    },
+    "validation": "Official archive image, source map and four rendered longitude views inspected; comparisons assess recognizable structure and colour class, not photometric equivalence."
+  },
+  "ariel": {
+    "name": "Ariel",
+    "features": [
+      "Cratered southern terrain",
+      "Long intersecting valleys and faults",
+      "Smooth material within some valleys"
+    ],
+    "finding": "Mapped southern terrain contains the observed crater-and-valley pattern. The northern initial audit views expose extensive uniform fill because Voyager did not image that hemisphere in comparable detail.",
+    "action": "Favor the photographed southern hemisphere when first focusing the moon; preserve unobserved areas as unspecified coverage rather than synthesizing terrain.",
+    "limitations": "The clear-filter reference does not calibrate natural colour. Unmapped areas must not be interpreted as smooth real terrain; cliffs and canyon walls are not resolved in the ellipsoid.",
+    "status": "limited",
+    "reference": {
+      "title": "Ariel’s Densely Pitted Surface",
+      "url": "https://science.nasa.gov/photojournal/ariels-densely-pitted-surface/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/photojournal/pia/pia01/pia01534/PIA01534.jpg/jcr:content/renditions/cq5dam.web.1280.1280.jpeg",
+      "archiveId": "PIA01534",
+      "credit": "NASA/JPL",
+      "band": "Voyager 2 clear-filter mosaic"
+    },
+    "validation": "Official archive image, source map and four rendered longitude views inspected; comparisons assess recognizable structure and colour class, not photometric equivalence."
+  },
+  "umbriel": {
+    "name": "Umbriel",
+    "features": [
+      "Dark cratered surface",
+      "Bright-ringed Wunda crater",
+      "Limited resolved southern-hemisphere coverage"
+    ],
+    "finding": "The mapped hemisphere retains crater detail and the contrasting bright-ring feature. Northern views are predominantly uniform because photographic coverage is incomplete.",
+    "action": "Favor the observed southern hemisphere at initial focus while retaining an explicit coverage limitation.",
+    "limitations": "Uniform northern fill is unknown terrain, not an observation of a smooth surface. The visualization is not an absolute-reflectance calibration, and its geometry remains an ellipsoid.",
+    "status": "limited",
+    "reference": {
+      "title": "Umbriel",
+      "url": "https://science.nasa.gov/uranus/moons/umbriel/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/07/PIA00040_umbriel.jpg/jcr:content/renditions/cq5dam.web.1280.1280.jpeg",
+      "archiveId": "PIA00040",
+      "credit": "NASA/JPL",
+      "band": "Voyager 2 resolved southern-hemisphere observation"
+    },
+    "validation": "Official archive image, source map and four rendered longitude views inspected; comparisons assess recognizable structure and colour class, not photometric equivalence."
+  },
+  "titania": {
+    "name": "Titania",
+    "features": [
+      "Impact craters",
+      "Long fault valleys",
+      "Bright ejecta around some impacts"
+    ],
+    "finding": "The southern map carries the recognizable crater-and-fault pattern; the default northern audit views obscure much of it behind a uniform unobserved region.",
+    "action": "Start focused inspection toward the observed southern hemisphere and preserve missing coverage.",
+    "limitations": "The highest-resolution reference is a clear-filter mosaic, so the display map colour is not a measured true-colour result. Fault depth and northern terrain are not resolved.",
+    "status": "limited",
+    "reference": {
+      "title": "Titania - Highest Resolution Voyager Picture",
+      "url": "https://science.nasa.gov/photojournal/titania-highest-resolution-voyager-picture/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/photojournal/pia/pia00/pia00039/PIA00039.jpg/jcr:content/renditions/cq5dam.web.1280.1280.jpeg",
+      "archiveId": "PIA00039",
+      "credit": "NASA/JPL",
+      "band": "Voyager 2 clear-filter mosaic"
+    },
+    "validation": "Official archive image, source map and four rendered longitude views inspected; comparisons assess recognizable structure and colour class, not photometric equivalence."
+  },
+  "oberon": {
+    "name": "Oberon",
+    "features": [
+      "Large craters with bright rays",
+      "Dark material on some crater floors",
+      "Irregular relief visible at the photographed limb"
+    ],
+    "finding": "Mapped terrain preserves bright ray craters and darker crater floors. The northern uniform region hides much of the observed terrain from the initial northern audit angle.",
+    "action": "Favor the observed southern terrain in the initial inspection view and retain the original coverage boundary.",
+    "limitations": "Voyager colour uses violet, clear and green filters. The ellipsoid does not recreate individual limb mountains, and unmapped northern terrain is deliberately unspecified.",
+    "status": "limited",
+    "reference": {
+      "title": "Oberon at Voyager Closest Approach",
+      "url": "https://science.nasa.gov/photojournal/oberon-at-voyager-closest-approach/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/photojournal/pia/pia00/pia00034/PIA00034.jpg/jcr:content/renditions/cq5dam.web.1280.1280.jpeg",
+      "archiveId": "PIA00034",
+      "credit": "NASA/JPL",
+      "band": "Voyager 2 violet, clear and green colour reconstruction"
+    },
+    "validation": "Official archive image, source map and four rendered longitude views inspected; comparisons assess recognizable structure and colour class, not photometric equivalence."
+  },
+  "miranda": {
+    "name": "Miranda",
+    "features": [
+      "Angular banded coronae and chevron terrain",
+      "Large scarps",
+      "Adjacent cratered plains"
+    ],
+    "finding": "The distinctive banded terrain exists in the southern map but is mostly hidden by the initial northern viewpoint, which shows a large featureless coverage fill.",
+    "action": "Favor the photographed southern hemisphere for initial inspection without rotating or fabricating geographic data.",
+    "limitations": "Voyager coverage is incomplete and partly monochrome. Dramatic scarps are represented in the texture, not explicit 3D cliff geometry; uniform fill is not known smooth terrain.",
+    "status": "limited",
+    "reference": {
+      "title": "Miranda - High Resolution Mosaic",
+      "url": "https://science.nasa.gov/photojournal/miranda-high-resolution-mosaic/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/photojournal/pia/pia00/pia00043/PIA00043.jpg/jcr:content/renditions/cq5dam.web.1280.1280.jpeg",
+      "archiveId": "PIA00043",
+      "credit": "NASA/JPL",
+      "band": "Voyager 2 clear-filter mosaic"
+    },
+    "validation": "Official archive image, source map and four rendered longitude views inspected; comparisons assess recognizable structure and colour class, not photometric equivalence."
+  },
+  "triton": {
+    "name": "Triton",
+    "features": [
+      "Bright southern frost region",
+      "Dark streaks",
+      "Mottled cantaloupe-like terrain"
+    ],
+    "finding": "The mapped southern terrain retains the major frost-cap and mottled surface patterns. A northern viewpoint shows extensive uniform fill outside the useful Voyager coverage.",
+    "action": "Favor the observed southern hemisphere when focusing, and keep the coverage gap visible rather than inventing the unobserved side.",
+    "limitations": "The reference assigns orange, violet and ultraviolet data to RGB and is not natural-colour calibration. Northern coverage is incomplete; the current texture is not a seasonally updated frost map.",
+    "status": "limited",
+    "reference": {
+      "title": "Global Color Mosaic of Triton",
+      "url": "https://science.nasa.gov/resource/global-color-mosaic-of-triton/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/09/c/ColorMosaicTriton1200w.jpg/jcr:content/renditions/cq5dam.web.1280.1280.jpeg",
+      "archiveId": "PIA00317",
+      "credit": "NASA/JPL/USGS",
+      "band": "Voyager 2 orange, violet and ultraviolet assigned to RGB; synthetic colour"
+    },
+    "validation": "Official archive image, source map and four rendered longitude views inspected; comparisons assess recognizable structure and colour class, not photometric equivalence."
+  },
+  "janus": {
+    "name": "Janus",
+    "reference": {
+      "title": "Janus' Craters",
+      "url": "https://science.nasa.gov/photojournal/janus-craters/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/07/PIA14607.jpg",
+      "archiveId": "PIA14607",
+      "credit": "NASA/JPL-Caltech/Space Science Institute",
+      "band": "Visible-light monochrome; 272 m/pixel",
+      "observationDate": "2012-03-27"
+    },
+    "features": [
+      "Angular, irregular limb with broad depressions.",
+      "Large overlapping crater bowls and much finer cratering visible in the photograph.",
+      "One illuminated hemisphere; grayscale photograph cannot establish RGB color."
+    ],
+    "finding": "The previous smooth ellipsoid missed the characteristic outline and major depressions. Six runtime angles of the replacement show the measured broad crater forms. Small impacts in PIA14607 remain unresolved.",
+    "action": "Replace ellipsoid with Peter Thomas Cassini ISS PDS plate mesh (13,381 vertices, 26,758 triangles); use approximate neutral gray, no fabricated texture.",
+    "limitations": "PDS radii uncertain by 0.3-1.3 km, especially sub-Saturn. Small crater morphology is not reliable; no global albedo map was located. Shape-derived shading is not photographic small-scale terrain.",
+    "status": "corrected",
+    "geometrySource": {
+      "url": "https://sbnarchive.psi.edu/pds4/cassini/saturn_satellite_shape_models_V1_0/document/janus_document.pdf",
+      "assetUrl": "https://sbnarchive.psi.edu/pds4/cassini/saturn_satellite_shape_models_V1_0/data/janus_30k_plt.tab",
+      "credit": "Peter Thomas / Cassini ISS / NASA Planetary Data System",
+      "vertexCount": 13381,
+      "triangleCount": 26758
+    }
+  },
+  "epimetheus": {
+    "name": "Epimetheus",
+    "reference": {
+      "title": "Examining Epimetheus",
+      "url": "https://science.nasa.gov/photojournal/examining-epimetheus/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/07/PIA17208.jpg",
+      "archiveId": "PIA17208",
+      "credit": "NASA/JPL-Caltech/Space Science Institute",
+      "band": "Green polarized-light monochrome; 212 m/pixel",
+      "observationDate": "2015-12-06"
+    },
+    "features": [
+      "Irregular elongated outline and flattened southern region.",
+      "Soft-edged crater depressions with much smaller impacts in the photograph.",
+      "Green-filter polarized photograph is not a true-color view."
+    ],
+    "finding": "The previous ellipsoid missed flattened and indented regions. Six runtime angles of the measured mesh recover the large-scale outline; fine photographic cratering remains absent.",
+    "action": "Replace ellipsoid with Peter Thomas Cassini ISS PDS plate mesh (13,915 vertices, 27,826 triangles); preserve real major relief and approximate neutral gray.",
+    "limitations": "PDS radii uncertain by 0.15-0.3 km, especially south pole. Small crater morphology is unreliable and no global photographic albedo map was located. Neutral tint is not calibrated RGB.",
+    "status": "corrected",
+    "geometrySource": {
+      "url": "https://sbnarchive.psi.edu/pds4/cassini/saturn_satellite_shape_models_V1_0/document/epimetheus_document.pdf",
+      "assetUrl": "https://sbnarchive.psi.edu/pds4/cassini/saturn_satellite_shape_models_V1_0/data/epimetheus_30k_plt.tab",
+      "credit": "Peter Thomas / Cassini ISS / NASA Planetary Data System",
+      "vertexCount": 13915,
+      "triangleCount": 27826
+    }
+  },
+  "deimos": {
+    "name": "Deimos",
+    "reference": {
+      "title": "Deimos observed by HiRISE",
+      "url": "https://science.nasa.gov/mars/moons/deimos/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/solar/internal_resources/435/Deimos732X520-1.jpg",
+      "archiveId": "NASA Deimos overview / HiRISE 2009-02-21",
+      "credit": "NASA/JPL-Caltech/University of Arizona",
+      "band": "Enhanced color, not natural RGB",
+      "observationDate": "2009-02-21"
+    },
+    "features": [
+      "Rounded irregular outline, subdued small craters and smooth regolith.",
+      "Surface lacks the strong Phobos groove network.",
+      "HiRISE color is enhanced and cannot be copied as natural reflectance."
+    ],
+    "finding": "The previous neutral ellipsoid omitted the observed irregular silhouette and markings. The native NASA model and six runtime views recover both, including smoother regolith regions.",
+    "action": "Use original NASA GLB mesh and UV atlas (16,649 vertices, 32,512 triangles), retaining native UV orientation and a non-metallic surface.",
+    "limitations": "NASA visualization mesh is not asserted to be a measured DTM. The texture preserves baked illumination, uneven coverage and some stretching; it cannot reproduce every HiRISE viewing angle.",
+    "status": "corrected",
+    "geometrySource": {
+      "url": "https://science.nasa.gov/resource/deimos-mars-moon-3d-model/",
+      "assetUrl": "https://assets.science.nasa.gov/content/dam/science/psd/mars/resources/gltf_files/24879_Deimos_1_1000.glb",
+      "credit": "NASA/JPL-Caltech",
+      "vertexCount": 16649,
+      "triangleCount": 32512
+    }
+  },
+  "amalthea": {
+    "name": "Amalthea",
+    "reference": {
+      "title": "Galileo's First Image of Amalthea",
+      "url": "https://science.nasa.gov/photojournal/galileos-first-image-of-amalthea/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/photojournal/pia/pia01/pia01072/PIA01072.jpg",
+      "archiveId": "PIA01072",
+      "credit": "NASA/JPL/Ames Research Center",
+      "band": "Galileo SSI monochrome",
+      "observationDate": "1996-09-07"
+    },
+    "features": [
+      "Low-resolution Jupiter-facing end shows the broad Pan depression.",
+      "Bright south-polar Gaea feature; elongated shape is clearer in other Galileo viewing directions.",
+      "Fine terrain is unresolved in this photograph."
+    ],
+    "finding": "The previous ellipsoid omitted observed deviations from a smooth shape. The archival radial grid provides an elongated irregular body and broad depressions; uniform tint does not reproduce the bright Gaea patch.",
+    "action": "Import Philip Stooke NASA PDS Voyager radial grid at its original 5-degree sampling (2,522 vertices, 5,040 triangles). Keep approximate reddish tint and disclose missing albedo detail.",
+    "limitations": "Voyager-only model predates Galileo. PDS cautions Stooke depressions may be exaggerated and coordinates are offset from center of figure. Color and unresolved surface detail remain approximate.",
+    "status": "corrected",
+    "geometrySource": {
+      "url": "https://sbnarchive.psi.edu/pds4/non_mission/small_bodies.stooke.shape-models/data/j5amalthea.xml",
+      "assetUrl": "https://sbnarchive.psi.edu/pds4/non_mission/small_bodies.stooke.shape-models/data/j5amalthea.tab",
+      "credit": "Philip Stooke / Voyager ISS / NASA Planetary Data System",
+      "vertexCount": 2522,
+      "triangleCount": 5040
+    },
+    "references": [
+      {
+        "title": "Four Galileo Views of Amalthea",
+        "url": "https://www.jpl.nasa.gov/images/pia01074-four-galileo-views-of-amalthea/",
+        "archiveId": "PIA01074",
+        "credit": "NASA/JPL/Ames Research Center",
+        "band": "Galileo SSI monochrome"
+      }
+    ]
+  },
+  "phoebe": {
+    "name": "Phoebe",
+    "reference": {
+      "title": "Phoebe Cassini flyby mosaic",
+      "url": "https://science.nasa.gov/saturn/moons/phoebe/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/07/phoebe.jpg",
+      "archiveId": "NASA Phoebe overview / Cassini 2004-06-11",
+      "credit": "NASA/JPL",
+      "band": "Monochrome spacecraft mosaic; contrast enhanced",
+      "observationDate": "2004-06-11"
+    },
+    "features": [
+      "Irregular near-spherical silhouette and large deep impact basins.",
+      "Bright crater walls contrast with dark interiors; heavily cratered surface.",
+      "Photography and relative albedo both require exposure/coverage qualifications."
+    ],
+    "finding": "The previous neutral ellipsoid missed both large impact basins and real brightness variations. Six runtime views of the scientific DTM and registered relative-albedo map recover these features within documented coverage.",
+    "action": "Import 2023 Gaskell/Weirich NASA PDS shape, retaining every second original ICQ grid point; register the relative-albedo product in the source body frame. Mask author-marked suspect coverage to uniform gray.",
+    "limitations": "Source Q=128 grid is 1.195 km; retained display grid is about 2.39 km. Polar topography is less constrained. Relative albedo is not absolute reflectance; conservative coverage mask follows the author assessment, with about 53% of the cylindrical raster retained.",
+    "status": "corrected",
+    "geometrySource": {
+      "url": "https://sbn.psi.edu/pds/resource/weirichphoebeshape.html",
+      "assetUrl": "https://sbnarchive.psi.edu/pds4/cassini/satellite-phoebe.cassini.shape-models-maps_V1_0/data/phoebe_128_o.obj",
+      "credit": "Robert Gaskell / John Weirich et al. / Cassini ISS / NASA Planetary Data System",
+      "vertexCount": 24736,
+      "triangleCount": 49152
+    },
+    "references": [
+      {
+        "title": "Phoebe SPC shape model quality assessment",
+        "url": "https://sbnarchive.psi.edu/pds4/cassini/satellite-phoebe.cassini.shape-models-maps_V1_0/document/phoebeshapeassessment.pdf",
+        "credit": "John R. Weirich / NASA PDS",
+        "band": "Scientific data quality assessment"
+      }
+    ]
+  },
+  "larissa": {
+    "name": "Larissa",
+    "reference": {
+      "title": "Two Voyager 2 views of Larissa",
+      "url": "https://science.nasa.gov/neptune/moons/larissa/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/07/Larissa_732X520.jpg",
+      "archiveId": "NASA Larissa overview / Voyager 2",
+      "credit": "NASA/JPL",
+      "band": "Voyager 2 monochrome",
+      "observationDate": "1989"
+    },
+    "features": [
+      "Only coarse irregular outline and large brightness patches are distinguishable.",
+      "No basis for a global finely cratered photographic surface."
+    ],
+    "finding": "The smooth ellipsoid was too regular, but data do not justify a detailed global replacement. The archival low-resolution shape improves the observed side while remaining explicitly weakly constrained.",
+    "action": "Use the original 5-degree NASA PDS Stooke grid, without adding detail. Identify the result as limited because the fit uses a single image.",
+    "limitations": "PDS explicitly states the model is very poorly constrained and fit to only one image, primarily for estimating feature positions. The unseen side, albedo distribution and fine relief remain unknown.",
+    "status": "limited",
+    "geometrySource": {
+      "url": "https://sbnarchive.psi.edu/pds4/non_mission/small_bodies.stooke.shape-models/data/n7larissa.xml",
+      "assetUrl": "https://sbnarchive.psi.edu/pds4/non_mission/small_bodies.stooke.shape-models/data/n7larissa.tab",
+      "credit": "Philip Stooke / Voyager ISS / NASA Planetary Data System",
+      "vertexCount": 2522,
+      "triangleCount": 5040
+    }
+  },
+  "proteus": {
+    "name": "Proteus",
+    "reference": {
+      "title": "Proteus observed by Voyager 2",
+      "url": "https://science.nasa.gov/neptune/moons/proteus/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/07/Proteus732X520.jpg",
+      "archiveId": "NASA Proteus overview / Voyager 2",
+      "credit": "NASA/JPL",
+      "band": "Voyager 2 monochrome; 8 km/pixel",
+      "observationDate": "1989"
+    },
+    "features": [
+      "Coarse box-like silhouette and broad depressions.",
+      "Voyager image has limited resolution and does not support high-frequency terrain."
+    ],
+    "finding": "The smooth ellipsoid missed the box-like outline. The archival radial grid reproduces broad shape deviations visible across six runtime angles, without imaginary fine craters.",
+    "action": "Use the original 5-degree NASA PDS Stooke grid and approximate neutral surface material; do not invent a global photographic map.",
+    "limitations": "5-degree Voyager grid gives broad shape only; archive cautions about faceting and exaggerated depression depths. No calibrated global visible albedo map is provided.",
+    "status": "corrected",
+    "geometrySource": {
+      "url": "https://sbnarchive.psi.edu/pds4/non_mission/small_bodies.stooke.shape-models/data/n8proteus.xml",
+      "assetUrl": "https://sbnarchive.psi.edu/pds4/non_mission/small_bodies.stooke.shape-models/data/n8proteus.tab",
+      "credit": "Philip Stooke / Voyager ISS / NASA Planetary Data System",
+      "vertexCount": 2522,
+      "triangleCount": 5040
+    }
+  },
+  "nereid": {
+    "name": "Nereid",
+    "reference": {
+      "title": "Nereid",
+      "url": "https://science.nasa.gov/resource/nereid/",
+      "imageUrl": "https://assets.science.nasa.gov/content/dam/science/psd/solar/2023/09/p/i/a/0/PIA00054.jpg",
+      "archiveId": "PIA00054",
+      "credit": "NASA/JPL",
+      "band": "Voyager 2 monochrome; 43 km/pixel",
+      "observationDate": "1989-08-24"
+    },
+    "features": [
+      "Tiny pixelated disk with only gross brightness and outline information.",
+      "No resolved terrain pattern suitable for a surface texture."
+    ],
+    "finding": "The archive does not resolve a reusable surface map or a detailed shape. Adding invented craters would reduce scientific fidelity.",
+    "action": "Keep a plainly approximate smooth body and expose the official observation and unresolved-surface limitation.",
+    "limitations": "Voyager reference resolves only 43 km per pixel at a distance of 4.7 million km. The displayed globe is a size-based approximation, not an observed detailed surface.",
+    "status": "limited"
+  }
+}

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import officialSurfaces from './official-surfaces.json' with { type: 'json' };
+import { solarObservation, solarPhotosphereAppearance, createSolarPhotosphere } from './solar-photosphere.js';
 import { BODY_SHAPES, BODY_SHAPE_SOURCE, bodyShapeScale, SATURN_RINGS, URANUS_RINGS, SATURN_RING_SOURCE, URANUS_RING_SOURCE } from './body-shape-data.js';
 
 // Legacy maps remain clearly identified fallbacks, never described as official
@@ -10,7 +11,7 @@ const FALLBACK_MAPS = {
   jupiter: '2k_jupiter.jpg', saturn: '2k_saturn.jpg',
 };
 const ATMOSPHERES = {
-  venus: ['#e9d6b7', .16, 1.012], earth: ['#77baff', .42, 1.018],
+  venus: ['#e3e0d8', .10, 1.012], earth: ['#77baff', .42, 1.018],
   mars: ['#d8b19a', .085, 1.009], jupiter: ['#ded3bd', .10, 1.008],
   saturn: ['#e1d6bc', .10, 1.009], uranus: ['#bbdedb', .16, 1.012],
   neptune: ['#afd1df', .16, 1.012], titan: ['#a1b6d2', .18, 1.038],
@@ -50,14 +51,15 @@ export function getBodyAppearance(object) {
     shapeNote: shape ? 'NASA/JPL reference ellipsoid; terrain relief is not modelled. Orientation and body sizes are schematic.' : 'Display sphere; shape is not resolved.',
     shapeNoteIt: shape ? 'Ellissoide di riferimento NASA/JPL; rilievo del terreno non modellato. Orientamento e dimensioni dei corpi schematici.' : 'Sfera di visualizzazione; forma non risolta.',
   };
-  if (object.id === 'sun' || object.bodyKind === 'star') return {
+  if (object.id === 'sun') return { ...base, ...solarPhotosphereAppearance() };
+  if (object.bodyKind === 'star') return {
     ...base, kind: 'illustrative-photosphere', classification: 'illustrative',
     sourceUrl: 'https://science.nasa.gov/sun/facts/', credit: 'Photosphere shading model',
     band: 'Visible-light approximation', bandIt: 'Approssimazione della luce visibile',
-    note: object.id === 'sun' ? 'White photosphere with modelled limb darkening. Granulation is illustrative; no dated sunspot map or extreme-ultraviolet image is used.' : 'Unresolved stellar photosphere. Colour uses measured stellar temperature when available, otherwise neutral white; surface detail is illustrative.',
-    noteIt: object.id === 'sun' ? 'Fotosfera bianca con oscuramento al bordo modellato. Granulazione illustrativa; nessuna mappa datata delle macchie solari o immagine ultravioletta.' : 'Fotosfera stellare non risolta. Colore dalla temperatura stellare misurata, se disponibile, altrimenti bianco neutro; dettagli illustrativi.',
+    note: 'Unresolved stellar photosphere. Colour uses measured stellar temperature when available, otherwise neutral white; surface detail is illustrative.',
+    noteIt: 'Fotosfera stellare non risolta. Colore dalla temperatura stellare misurata, se disponibile, altrimenti bianco neutro; dettagli illustrativi.',
   };
-  if (observed?.map && (object.id !== 'titan' || observed.kind === 'cloud-reconstruction')) return {
+  if ((observed?.map || observed?.model) && (object.id !== 'titan' || observed.kind === 'cloud-reconstruction')) return {
     ...base, ...observed, classification: observed.kind === 'observed-mosaic' ? 'observed' : 'reconstructed',
     ...(observed.ringMap ? { ringCredit: observed.ringMapCredit, ringSourceUrl: observed.ringMapSourceUrl, ringNote: observed.ringMapNote, ringNoteIt: observed.ringMapNoteIt } : {}),
     ...(observed.bumpMap ? {
@@ -65,9 +67,9 @@ export function getBodyAppearance(object) {
       shapeNoteIt: 'Ellissoide di riferimento NASA/JPL con ombreggiatura delle normali da dati altimetrici alla scala fisica; il profilo resta ellissoidale. Orientamento e dimensioni visuali schematici.',
     } : {}),
     ...(observed.model ? {
-      shape: 'official-3d-model', shapeSource: observed.sourceUrl,
-      shapeNote: 'NASA 3D visualization geometry and original texture coordinates; scaled to the displayed body radius. A reference ellipsoid is shown while the model loads. This is not a calibrated terrain-elevation product.',
-      shapeNoteIt: 'Geometria di visualizzazione 3D NASA con coordinate texture originali, scalata al raggio visualizzato. Durante il caricamento viene mostrato un ellissoide di riferimento. Non è un prodotto altimetrico calibrato.',
+      shape: observed.kind === 'measured-shape' ? 'measured-3d-model' : 'official-3d-model', shapeSource: observed.sourceUrl,
+      shapeNote: observed.kind === 'measured-shape' ? observed.shapeNote || 'Observation-derived shape mesh archived by NASA PDS, scaled to the displayed body radius. Surface tone is approximate; a reference ellipsoid is shown while the mesh loads.' : 'NASA 3D visualization geometry and original texture coordinates; scaled to the displayed body radius. A reference ellipsoid is shown while the model loads. This is not a calibrated terrain-elevation product.',
+      shapeNoteIt: observed.kind === 'measured-shape' ? observed.shapeNoteIt || 'Forma 3D da osservazioni archiviata nel NASA PDS, scalata al raggio visualizzato. Colore superficiale approssimativo; ellissoide di riferimento durante il caricamento.' : 'Geometria di visualizzazione 3D NASA con coordinate texture originali, scalata al raggio visualizzato. Durante il caricamento viene mostrato un ellissoide di riferimento. Non è un prodotto altimetrico calibrato.',
     } : {}),
   };
   if (object.id === 'titan') return {
@@ -297,6 +299,23 @@ function addNeptuneDisplayHue(material) {
   material.customProgramCacheKey = () => 'nasa-neptune-display-hue-v1';
 }
 
+// NASA PIA23791 describes mostly white sulfuric-acid clouds. The existing
+// visualization map supplies only a subdued cloud pattern; this display colour
+// adjustment does not turn its orange/UV-derived pattern into calibrated RGB.
+function addVenusDisplayClouds(material) {
+  material.userData.colorAdjustment = 'pale-cloud-visible-approximation';
+  material.onBeforeCompile = shader => {
+    shader.uniforms.uVenusDisplayHue = { value: new THREE.Color('#e7e3da') };
+    shader.fragmentShader = 'uniform vec3 uVenusDisplayHue;\n' + shader.fragmentShader;
+    shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+      float venusLuminance = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+      // Mean linear-sRGB luminance of the unmodified NASA visualization map.
+      float venusCloudContrast = mix(1.0, venusLuminance / 0.80537588, 0.15);
+      diffuseColor.rgb = uVenusDisplayHue * venusCloudContrast;`);
+  };
+  material.customProgramCacheKey = () => 'nasa-venus-visible-clouds-v1';
+}
+
 // A photosphere is luminous, with limb darkening. This small-scale modulation is
 // explicitly illustrative granulation, never a fabricated observation/sunspot map.
 function stellarMaterial(object) {
@@ -489,8 +508,10 @@ function attachOfficialModel(group, mesh, appearance, radius) {
     const geometry = createOfficialBodyGeometry(data, radius);
     mesh.geometry.dispose();
     mesh.geometry = geometry;
-    mesh.material.map = texture(appearance.map, true, appearance.flipY !== false);
-    mesh.material.color.set('#ffffff');
+    if (appearance.map) {
+      mesh.material.map = texture(appearance.map, true, appearance.flipY !== false);
+      mesh.material.color.set('#ffffff');
+    }
     mesh.material.needsUpdate = true;
     group.userData.modelLoadStatus = 'ready';
     return true;
@@ -530,12 +551,13 @@ export function createPlanetVisual(object) {
   });
 
   let material;
-  if (star) material = stellarMaterial(object);
+  if (object.id === 'sun') material = createSolarPhotosphere(texture(solarObservation.map, false));
+  else if (star) material = stellarMaterial(object);
   else if (!shape && !moon) material = exoplanetMaterial(object);
   else {
     const map = appearance.map && !appearance.model ? texture(appearance.map, true, appearance.flipY !== false) : null;
     material = new THREE.MeshStandardMaterial({
-      map, color: map ? '#ffffff' : NEUTRAL_COLORS[object.id] || object.color || '#aaa7a2',
+      map, color: map ? '#ffffff' : appearance.surfaceColor || NEUTRAL_COLORS[object.id] || object.color || '#aaa7a2',
       roughness: object.id === 'earth' ? .9 : 1, metalness: 0,
       emissive: '#000000', emissiveIntensity: 0,
     });
@@ -552,6 +574,7 @@ export function createPlanetVisual(object) {
   material.userData.baseOpacity = 1;
   if (object.id === 'saturn') addSaturnRingShadow(material, radius);
   if (object.id === 'neptune' && material.map) addNeptuneDisplayHue(material);
+  if (object.id === 'venus' && material.map) addVenusDisplayClouds(material);
   const mesh = new THREE.Mesh(ellipsoidGeometry(radius, object.id, moon ? 64 : 96), material);
   mesh.name = 'planet-surface';
   surface.add(mesh);

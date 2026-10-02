@@ -30,13 +30,13 @@ Seleziona un oggetto e apri **Immagini d’archivio** per le osservazioni ESA/Hu
 
 ## Aspetto dei corpi celesti
 
-Fobos, Iperione e Mimas usano i modelli 3D originali NASA.
+Dieci satelliti usano modelli 3D NASA o prodotti scientifici NASA PDS, inclusa la geometria di Giano ed Epimeteo ricavata da Cassini. Il Sole mostra le macchie di un’osservazione SDO/HMI datata, solo sull’emisfero osservato. La fotosfera visibile resta bianca; le immagini solari arancioni usano colori assegnati.
 
 Pianeti e satelliti usano mappe e prodotti di visualizzazione NASA dove disponibili. La Luna combina immagini LRO e altimetria misurata. I semiassi NASA/JPL riproducono lo schiacciamento dei pianeti e le proporzioni dei satelliti irregolari; Saturno e Urano includono anelli con raggi documentati.
 
 Le schede indicano fonte delle immagini, bande osservative, copertura e dati di forma. Venere e Titano mostrano gli strati opachi di nubi e foschia; le superfici degli esopianeti restano illustrative. La luce segue il Sole anche quando si sposta la mappa in VR. Le rotazioni planetarie rispettano i periodi misurati con tempo accelerato; le orientazioni delle lune restano fisse nelle orbite schematiche.
 
-[Fonti e copertura](REALISTIC_SURFACES.md) · [Crediti delle texture](TEXTURE_SOURCES.md).
+[Confronto con immagini NASA per ciascun corpo](BODY_APPEARANCE_AUDIT.md) · [Fonti e copertura](REALISTIC_SURFACES.md) · [Crediti delle texture](TEXTURE_SOURCES.md).
 
 ## Pianeti e zoom
 

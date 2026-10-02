@@ -1,6 +1,6 @@
 # Planet and moon texture credits
 
-The current renderer prefers official NASA spacecraft imagery and visualization assets, with measured NASA/JPL reference shapes. Full per-body provenance, processing, bands and coverage are documented in [REALISTIC_SURFACES.md](REALISTIC_SURFACES.md) and `src/official-surfaces.json`. Body data panels expose these sources.
+The current renderer prefers official NASA spacecraft imagery and visualization assets, with measured NASA/JPL reference shapes. Full per-body provenance, processing, bands and coverage are documented in [REALISTIC_SURFACES.md](REALISTIC_SURFACES.md) and `src/official-surfaces.json`. Body data panels expose these sources and an individually reviewed NASA reference photograph. The [body appearance audit](BODY_APPEARANCE_AUDIT.md) covers all 37 individually rendered Solar System bodies. The Sun uses a dated, grayscale SDO/HMI observation on the observed hemisphere; white represents visible light, while the brightness and limb law are display models. Scientific PDS shape products supplement the NASA visualization meshes.
 
 ## Legacy illustration textures
 

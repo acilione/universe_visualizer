@@ -114,14 +114,14 @@ try {
   assert.ok(phase.day > 20 && phase.day > phase.night * 2.5, 'The observed lunar map has a bright illuminated side and a substantially dark night side');
   checkpoint('GPU phase contrast follows the Solar System light direction');
 
-  for (const id of ['earth', 'moon', 'io', 'saturn', 'uranus', 'titan']) {
+  for (const id of ['sun', 'earth', 'moon', 'io', 'saturn', 'uranus', 'titan', 'janus']) {
     await page.evaluate(id => atlas.focusObject([...catalog.solar, ...solarMoons].find(object => object.id === id)), id);
     await page.waitForFunction(() => !atlas.cameraFlight);
     await page.screenshot({ path: 'test-results/realism-' + id + '-desktop.png' });
   }
   for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
     await page.setViewportSize(viewport);
-    for (const id of ['saturn', 'uranus', 'phobos']) {
+    for (const id of ['sun', 'saturn', 'uranus', 'janus', 'phobos']) {
       await page.evaluate(id => atlas.focusObject([...catalog.solar, ...solarMoons].find(object => object.id === id)), id);
       await page.waitForFunction(() => !atlas.cameraFlight);
       const framing = await page.evaluate(id => {
@@ -141,14 +141,14 @@ try {
     }
   }
   await page.screenshot({ path: 'test-results/realism-phobos-mobile.png' });
-  checkpoint('Saturn and Uranus rings and irregular moon geometry remain completely framed on desktop and mobile');
+  checkpoint('Sun, Saturn and Uranus rings, Janus and irregular moon geometry remain framed on desktop and mobile');
 
   const xr = await page.evaluate(() => {
     const pose = [...atlas.camera.position.toArray(), ...atlas.camera.quaternion.toArray()];
     const focus = atlas.xr.focusObject, calls = [];
     atlas.renderer.xr.isPresenting = true;
     atlas.xr.focusObject = (object, extent) => calls.push({ id: object.id, extent });
-    for (const id of ['saturn', 'uranus', 'phobos']) atlas.focusFromXR([...catalog.solar, ...solarMoons].find(object => object.id === id));
+    for (const id of ['sun', 'saturn', 'uranus', 'janus', 'phobos']) atlas.focusFromXR([...catalog.solar, ...solarMoons].find(object => object.id === id));
     atlas.renderer.xr.isPresenting = false; atlas.xr.focusObject = focus;
     return { pose, after: [...atlas.camera.position.toArray(), ...atlas.camera.quaternion.toArray()], calls };
   });

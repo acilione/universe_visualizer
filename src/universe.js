@@ -130,7 +130,7 @@ export class Universe {
     }g.add(this.particleCloud(p,c,s,.85));return g;
   }
   isPlanet(object){return object?.bodyKind==='exoplanet'||object?.bodyKind==='planet';}
-  isInspectableBody(object){return this.isPlanet(object)||object?.bodyKind==='moon';}
+  isInspectableBody(object){return this.isPlanet(object)||object?.bodyKind==='moon'||object?.id==='sun';}
   isPlanetaryView(){return this.index===0||this.index===5;}
   makeMarker(o){
     const g=new THREE.Group();g.position.copy(vec(o.position));g.userData.object=o;
@@ -357,11 +357,12 @@ export class Universe {
   updateMoonOrbits(){
     const parentId=this.selected?.parentId||this.selected?.id;
     const inspectingMoon=this.focusedPlanet?.bodyKind==='moon'&&this.focusedPlanet.id===this.selected?.id;
+    const inspectingBody=this.isInspectableBody(this.focusedPlanet)&&this.focusedPlanet?.id===this.selected?.id;
     const visible=this.layers.grid&&!this.immersive&&!inspectingMoon;
     if(this.isPlanetaryView())for(const name of ['grid','orbits']){const guide=this.content?.getObjectByName(name);if(guide)guide.visible=visible;}
     if(this.index===9){const guide=this.content?.getObjectByName('combined-solar-orbits');if(guide)guide.visible=visible;}
     this.content?.traverse(node=>{if(node.userData.moonParentId)node.visible=visible&&node.userData.moonParentId===parentId;});
-    if(this.selectionRing)this.selectionRing.visible=!this.immersive&&!inspectingMoon&&(this.index!==7||this.selected?.altitudeDeg>=0)&&(this.index!==9||this.objectLayers[this.selected?.combinedLayer]);
+    if(this.selectionRing)this.selectionRing.visible=!this.immersive&&!inspectingBody&&(this.index!==7||this.selected?.altitudeDeg>=0)&&(this.index!==9||this.objectLayers[this.selected?.combinedLayer]);
   }
   focusMoonSystem(parent){
     if(typeof parent==='string')parent=catalog.solar.find(object=>object.id===parent);
@@ -398,6 +399,22 @@ export class Universe {
       const direction=this.sunLight.position.clone().sub(target);
       if(direction.lengthSq()<1e-12)direction.set(.1,.28,1);
       direction.normalize().applyAxisAngle(new THREE.Vector3(0,1,0),.45);direction.y+=.24;direction.normalize();
+      const latitude=visual?.userData.appearance?.inspectionLatitudeDeg;
+      if(Number.isFinite(latitude)){
+        // Voyager imaged the southern hemispheres of these moons. Start where
+        // data exist, while retaining the light-facing azimuth and free orbit.
+        const pole=new THREE.Vector3(0,1,0).applyQuaternion(visual.getObjectByName('body-axis')?.quaternion||new THREE.Quaternion());
+        direction.addScaledVector(pole,-direction.dot(pole));
+        if(direction.lengthSq()<1e-12)direction.set(0,0,1);
+        const radians=THREE.MathUtils.degToRad(THREE.MathUtils.clamp(latitude,-80,80));
+        direction.normalize().multiplyScalar(Math.cos(radians)).addScaledVector(pole,Math.sin(radians));
+      }
+      if(object.id==='sun'){
+        // The dated SDO hemisphere rotates with the photosphere, not the camera.
+        direction.set(0,0,1);
+        if(visual?.userData.surface)direction.applyQuaternion(visual.userData.surface.quaternion);
+        const axis=visual?.getObjectByName('body-axis');if(axis)direction.applyQuaternion(axis.quaternion);
+      }
       this.fly(target.clone().addScaledVector(direction,framing.focusDistance),target);return;
     }
     if(this.renderer.xr.isPresenting){if(this.isPlanetaryView()||this.index===9)this.xr.focusObject?.(object,object.size||.5);return;}

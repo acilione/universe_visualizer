@@ -1,9 +1,11 @@
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { createPlanetVisual, getBodyAppearance, updatePlanetVisualLighting, stellarColor, disposePlanetTextures, createOfficialBodyGeometry } from '../src/planet-visuals.js';
 import { BODY_SHAPES, BODY_SHAPE_SOURCE, SATURN_RINGS, URANUS_RINGS } from '../src/body-shape-data.js';
 import officialSurfaces from '../src/official-surfaces.json' with { type: 'json' };
+import { solarObservation } from '../src/solar-photosphere.js';
 
 const close = (actual, expected, tolerance = 1e-6) => assert.ok(Math.abs(actual - expected) < tolerance, `${actual} != ${expected}`);
 const make = (id, extra = {}) => createPlanetVisual({ id, size: 1, bodyKind: 'planet', ...extra });
@@ -54,12 +56,12 @@ test('planet and moon albedo maps do not become fake height or emissive light', 
   }
 });
 
-test('unmapped moons are diffuse reference ellipsoids, not fabricated exoplanet terrain', () => {
-  const visual = make('deimos', { bodyKind: 'moon', color: '#b7a798' });
+test('unresolved moons are diffuse reference ellipsoids, not fabricated exoplanet terrain', () => {
+  const visual = make('nereid', { bodyKind: 'moon', color: '#b7a798' });
   try {
     const material = surface(visual).material;
     assert.equal(material.type, 'MeshStandardMaterial');
-    if (!officialSurfaces.deimos?.map) {
+    if (!officialSurfaces.nereid?.map) {
       assert.equal(material.map, null);
       assert.equal(visual.userData.appearance.kind, 'unmapped-body');
       assert.match(visual.userData.appearance.note, /avoids inventing/);
@@ -68,18 +70,21 @@ test('unmapped moons are diffuse reference ellipsoids, not fabricated exoplanet 
   } finally { dispose(visual); }
 });
 
-test('stellar surfaces are white by default, never inherit orange solar imagery or planetary temperatures', () => {
+test('Sun uses its dated visible-light observation while unresolved stars stay temperature-based', () => {
   const sun = make('sun', { bodyKind: 'star' });
   const unknown = make('host-test', { bodyKind: 'star', temperatureK: 300 });
   const redStar = make('host-cool', { bodyKind: 'star', stellarTemperatureK: 3200 });
   try {
-    assert.equal(surface(sun).material.uniforms.uColor.value.getHex(), 0xffffff);
+    assert.equal(surface(sun).material.uniforms.uSolarObservation.value.name, solarObservation.map);
+    assert.equal(surface(sun).material.uniforms.uSolarObservation.value.colorSpace, THREE.NoColorSpace);
+    assert.equal(surface(sun).material.userData.observationDateUtc, solarObservation.observationDateUtc);
     assert.equal(surface(unknown).material.uniforms.uColor.value.getHex(), 0xffffff);
     assert.equal(surface(unknown).material.userData.temperatureK, null);
     assert.equal(surface(unknown).material.map, undefined);
     assert.equal(surface(redStar).material.userData.temperatureK, 3200);
     assert.notEqual(surface(redStar).material.uniforms.uColor.value.getHex(), 0xffffff);
-    assert.match(getBodyAppearance({ id: 'sun' }).note, /no dated sunspot map/);
+    assert.equal(getBodyAppearance({ id: 'sun' }).kind, 'observed-hemisphere');
+    assert.match(getBodyAppearance({ id: 'sun' }).note, /not live solar activity/);
     assert.equal(stellarColor(NaN).getHex(), 0xffffff);
   } finally { [sun, unknown, redStar].forEach(dispose); }
 });
@@ -241,5 +246,44 @@ test('Saturn original NASA radial mapping preserves the outer F ring within focu
       assert.equal(uniforms.uColor.value.getHex(), 0xffffff, 'do not tint the original observed texture twice');
     }
     assert.equal(visual.userData.appearance.ringSourceUrl, source.ringMapSourceUrl);
+  } finally { dispose(visual); }
+});
+
+
+test('scientific meshes without albedo maps retain approximate diffuse colour and measured topology', () => {
+  for (const id of ['janus', 'epimetheus', 'amalthea', 'larissa', 'proteus']) {
+    const source = officialSurfaces[id];
+    const visual = make(id, { bodyKind: 'moon', color: '#b7a798' });
+    const data = JSON.parse(readFileSync(new URL(`../public/models/${source.model}`, import.meta.url), 'utf8'));
+    const geometry = createOfficialBodyGeometry(data);
+    try {
+      assert.equal(visual.userData.appearance.shape, 'measured-3d-model');
+      assert.equal(visual.userData.appearance.shapeNote, source.shapeNote, 'preserve archive-specific uncertainty and coverage');
+      assert.equal(surface(visual).material.map, null);
+      assert.equal(surface(visual).material.color.getHex(), new THREE.Color(source.surfaceColor || '#b7a798').getHex());
+      assert.equal(surface(visual).material.emissiveIntensity, 0);
+      assert.equal(geometry.index.count, source.triangleCount * 3);
+      assert.equal(geometry.attributes.position.count, source.vertexCount);
+      close(geometry.boundingSphere.radius, 1, 1e-6);
+      const radii = [];
+      const position = geometry.attributes.position;
+      for (let i = 0; i < position.count; i++) radii.push(Math.hypot(position.getX(i), position.getY(i), position.getZ(i)));
+      assert.ok(Math.max(...radii) - Math.min(...radii) > .1, 'observed irregular silhouette must survive normalization');
+    } finally { geometry.dispose(); dispose(visual); }
+  }
+});
+
+test('Venus cloud display suppresses false-colour yellow bands while retaining subtle source variation', () => {
+  const visual = make('venus');
+  try {
+    const material = surface(visual).material;
+    const shader = { vertexShader: THREE.ShaderLib.standard.vertexShader, fragmentShader: THREE.ShaderLib.standard.fragmentShader, uniforms: {} };
+    material.onBeforeCompile(shader);
+    assert.equal(material.map.name, officialSurfaces.venus.map);
+    assert.equal(shader.uniforms.uVenusDisplayHue.value.getHex(), 0xe7e3da);
+    assert.match(shader.fragmentShader, /uVenusDisplayHue;\n#define STANDARD/);
+    assert.match(shader.fragmentShader, /mix\(1.0, venusLuminance \/ 0.80537588, 0.15\)/);
+    assert.equal(material.customProgramCacheKey(), 'nasa-venus-visible-clouds-v1');
+    assert.equal(material.emissiveIntensity, 0);
   } finally { dispose(visual); }
 });
