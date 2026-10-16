@@ -22,10 +22,16 @@ try {
   });
   const tick = async (seconds, engine = true) => page.evaluate(({ seconds, engine }) => {
     const steps = Math.max(1, Math.ceil(seconds * 60));
-    for (let index = 0; index < steps; index++) {
-      if (engine) atlas.animate(window.animationTime += seconds * 1000 / steps);
-      else atlas.effects.update(seconds / steps);
-    }
+    // Advance CPU state deterministically; only the final frame is inspected.
+    // Avoid hundreds of redundant software-GPU renders between assertions.
+    const render = atlas.renderer.render;
+    if (engine) atlas.renderer.render = () => {};
+    try {
+      for (let index = 0; index < steps; index++) {
+        if (engine) atlas.animate(window.animationTime += seconds * 1000 / steps);
+        else atlas.effects.update(seconds / steps);
+      }
+    } finally { atlas.renderer.render = render; }
     atlas.scene.updateMatrixWorld(true);
     atlas.renderer.render(atlas.scene, atlas.camera);
   }, { seconds, engine });
@@ -204,6 +210,8 @@ try {
   await page.locator('[data-action="vr"]').first().click();
   await page.locator('[data-action="start-preview"]').click();
   await expect(page.locator('.app-shell')).toHaveClass(/preview-active/);
+  await expect(page.locator('.app-shell')).toHaveClass(/preview-clean/);
+  await page.locator('#preview-restore').click();
   const replayButton = page.getByRole('button', { name: 'Replay map opening', exact: true });
   await replayButton.scrollIntoViewIfNeeded();
   await expect(replayButton).toBeInViewport();

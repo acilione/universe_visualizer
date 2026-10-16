@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Vector3, Quaternion } from 'three';
-import { singleGripTransform, dualGripTransform, isSelectionGesture } from '../src/xr-math.js';
+import { singleGripTransform, dualGripTransform, isSelectionGesture, isTravelGesture, isClosedHand, createHeldGesture } from '../src/xr-math.js';
 
 const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} ≠ ${expected}`);
 const pose = (position, quaternion = new Quaternion()) => ({ position, quaternion });
@@ -93,7 +93,8 @@ async function withXRHarness(run, requestError = null, options = {}) {
   mapRoot.add(new THREE.Mesh(new THREE.SphereGeometry(10), new THREE.MeshBasicMaterial()));
   scene.add(mapRoot);
   const controls = { enabled: true, target: new THREE.Vector3(0, 1, 2) };
-  const messages = [], selected = [], targets = [], scaleDeltas = [], focused = [], immersiveChanges = [], endedStates = [];
+  const messages = [], selected = [], targets = [], scaleDeltas = [], focused = [], immersiveChanges = [], endedStates = [], traveled = [];
+  let backRequests = 0;
   const environment = new THREE.Group();
   scene.add(environment);
   scene.background = new THREE.Color(0x152025);
@@ -101,8 +102,8 @@ async function withXRHarness(run, requestError = null, options = {}) {
   let clearAlpha = 0.8;
   const clearColor = new THREE.Color(0x123456);
   const renderer = { xr, getClearColor: color => color.copy(clearColor), getClearAlpha: () => clearAlpha, setClearColor(color, alpha) { clearColor.set(color); clearAlpha = alpha; } };
-  const app = createXR({ renderer, scene, camera, controls, mapRoot, getTargets: () => targets, getScale: () => scale, getBoundsRadius: () => 10, getEnvironment: () => [environment], onSelect: object => selected.push(object), onFocus: object => focused.push(object), onImmersiveChange: value => immersiveChanges.push(value), onScale: delta => scaleDeltas.push(delta), onSessionEnd: details => endedStates.push({ ...details, presenting: xr.isPresenting, cameraPosition: camera.position.toArray() }), onMessage: message => messages.push(message) });
-  try { await run({ app, session, xr, endedStates, renderer, environment, referenceSpace, requestArguments, getReferenceSpaceType: () => referenceSpaceType, setScale: value => { scale = value; }, scene, camera, controls, mapRoot, messages, controllers, hands, targets, selected, focused, immersiveChanges, scaleDeltas, xrCamera, requests: () => requests, THREE }); }
+  const app = createXR({ renderer, scene, camera, controls, mapRoot, getReducedMotion: () => Boolean(options.reducedMotion), getTargets: () => targets, getScale: () => scale, getBoundsRadius: () => 10, getEnvironment: () => [environment], onTravel: options.directTravel ? object => { traveled.push(object); if (options.changeScaleOnTravel) scale = 3; if (options.focusOnTravel) app.focusObject(object); } : undefined, onNavigateBack: options.handleBack ? () => { backRequests++; } : undefined, onSelect: object => selected.push(object), onFocus: object => focused.push(object), onImmersiveChange: value => immersiveChanges.push(value), onScale: delta => scaleDeltas.push(delta), onSessionEnd: details => endedStates.push({ ...details, presenting: xr.isPresenting, cameraPosition: camera.position.toArray() }), onMessage: message => messages.push(message) });
+  try { await run({ app, session, xr, endedStates, renderer, environment, referenceSpace, requestArguments, getReferenceSpaceType: () => referenceSpaceType, setScale: value => { scale = value; }, scene, camera, controls, mapRoot, messages, controllers, hands, targets, selected, focused, traveled, getBackRequests: () => backRequests, immersiveChanges, scaleDeltas, xrCamera, requests: () => requests, THREE }); }
   finally {
     for (const [key, descriptor] of previous) {
       if (descriptor) Object.defineProperty(globalThis, key, descriptor);
@@ -567,4 +568,264 @@ test('native session end waits for Three cleanup before restoring the desktop an
     assert.deepEqual(camera.position.toArray(), [3, 4, 5]);
     assert.equal(renderer.getClearAlpha(), 0.8);
   }, null, { nativeEndOrdering: true });
+});
+
+
+test('fast two-hand scaling preserves the world point at the hand midpoint', () => {
+  const start = { position: new Vector3(0, 1, -2), quaternion: new Quaternion(), scale: 0.1 };
+  const result = dualGripTransform(start, new Vector3(-0.15, 0, 0), new Vector3(0.15, 0, 0), new Vector3(-0.3, 0, 0), new Vector3(0.3, 0, 0), 0.0015, 6.4, 2.4);
+  near(result.scale / start.scale, Math.pow(2, 2.4));
+  near(result.position.y / start.position.y, Math.pow(2, 2.4));
+  near(result.position.z / start.position.z, Math.pow(2, 2.4));
+  assert.equal(isTravelGesture({duration: 300, distance: 0.03, rotated: 0.2}), true);
+  assert.equal(isTravelGesture({duration: 300, distance: 0.06, rotated: 0.2}), false);
+});
+
+test('deliberate held gestures require release, fire once, and disarm on tracking loss', () => {
+  const held = createHeldGesture();
+  for (let frame = 0; frame < 20; frame++) assert.equal(held.update(true, 0.1), false);
+  held.update(false, 0.1);
+  for (let frame = 0; frame < 6; frame++) assert.equal(held.update(true, 0.1), false);
+  assert.equal(held.update(true, 0.1), true);
+  for (let frame = 0; frame < 20; frame++) assert.equal(held.update(true, 0.1), false);
+  held.update(false, 0.1);
+  held.update(true, 0.1);
+  held.update(true, 0.1, false);
+  for (let frame = 0; frame < 20; frame++) assert.equal(held.update(true, 0.1), false);
+  held.update(false, 0.1);
+  for (let frame = 0; frame < 6; frame++) held.update(true, 0.1);
+  assert.equal(held.update(true, 0.1), true);
+});
+
+function connectHand(h, handedness = 'left', index = 0) {
+  const hand = h.hands[index], controller = h.controllers[index];
+  hand.visible = controller.visible = true;
+  controller.dispatchEvent({ type: 'connected', data: { handedness, hand: {} } });
+  for (const name of ['wrist', 'thumb-tip', ...['index', 'middle', 'ring', 'pinky'].flatMap(finger => [`${finger}-finger-tip`, `${finger}-finger-phalanx-intermediate`])]) {
+    const joint = new h.THREE.Group();
+    hand.joints[name] = joint; hand.add(joint);
+  }
+  hand.joints['thumb-tip'].position.set(-0.1, 0.1, 0);
+  return closed => {
+    for (const [index, finger] of ['index', 'middle', 'ring', 'pinky'].entries()) {
+      hand.joints[`${finger}-finger-phalanx-intermediate`].position.set(index * 0.01, 0.08, 0);
+      hand.joints[`${finger}-finger-tip`].position.set(index * 0.01, closed ? 0.035 : 0.12, 0);
+    }
+    h.scene.updateMatrixWorld(true);
+  };
+}
+
+test('a fist requires all fingers and cannot be mistaken for an index pinch or missing joints', async () => {
+  await withXRHarness(async h => {
+    const setClosed = connectHand(h);
+    setClosed(true);
+    assert.equal(isClosedHand(h.hands[0].joints), true);
+    h.hands[0].joints['index-finger-tip'].position.y = 0.12;
+    assert.equal(isClosedHand(h.hands[0].joints), false);
+    setClosed(true);
+    h.hands[0].joints['pinky-finger-tip'].visible = false;
+    assert.equal(isClosedHand(h.hands[0].joints), false);
+  });
+});
+
+test('hands-first sessions hide all menus and travel directly with controller fallback', async () => {
+  await withXRHarness(async h => {
+    await h.app.enter({ handsFirst: true }); h.app.update();
+    assert.equal(h.app.handsFirst, true);
+    assert.equal(h.scene.getObjectByName('XR navigation panel').visible, false);
+    assert.equal(h.scene.getObjectByName('XR restore controls').visible, false);
+    const object = { id: 'mars', position: [0, 0, -2], size: 0.1 };
+    const target = new h.THREE.Mesh(new h.THREE.SphereGeometry(0.1), new h.THREE.MeshBasicMaterial());
+    target.position.fromArray(object.position); target.userData.object = object;
+    h.targets.push(target); h.scene.add(target); h.scene.updateMatrixWorld(true);
+    h.controllers[0].visible = true;
+    h.controllers[0].dispatchEvent({ type: 'connected', data: { handedness: 'right' } });
+    clickAtPoint(h.controllers[0], h.scene, target.position, h.THREE);
+    assert.deepEqual(h.traveled, [object]);
+    assert.deepEqual(h.selected, [], 'a single gesture does not require a separate selection then focus');
+    assert.equal(h.app.isInspecting, true);
+    for (let frame = 0; frame < 12; frame++) h.app.update(0.05);
+    assert.equal(h.app.isInspecting, true, 'a scale changed during travel does not cancel arrival');
+    assert.equal(h.app.isPresenting, true);
+  }, null, { directTravel: true, focusOnTravel: true, changeScaleOnTravel: true });
+});
+
+test('a short hand pinch keeps its initial target despite release-ray jitter', async () => {
+  await withXRHarness(async h => {
+    await h.app.enter({handsFirst: true}); h.app.update();
+    connectHand(h, 'right');
+    const object = {id: 'small-moon', position: [0, 0, -2], size: 0.02};
+    const target = new h.THREE.Mesh(new h.THREE.SphereGeometry(0.02), new h.THREE.MeshBasicMaterial());
+    target.position.fromArray(object.position); target.userData.object = object;
+    h.targets.push(target); h.scene.add(target);
+    const gap = value => {
+      h.hands[0].joints['thumb-tip'].position.set(-value / 2, 0, 0);
+      h.hands[0].joints['index-finger-tip'].position.set(value / 2, 0, 0);
+      h.scene.updateMatrixWorld(true); h.app.update();
+    };
+    gap(0.04); gap(0.01);
+    h.controllers[0].rotation.y = 0.15;
+    gap(0.04);
+    assert.deepEqual(h.traveled, [object]);
+    gap(0.01);
+    h.hands[0].joints['index-finger-tip'].visible = false;
+    h.app.update();
+    h.hands[0].joints['index-finger-tip'].visible = true;
+    gap(0.04);
+    assert.equal(h.traveled.length, 1, 'tracking loss cannot activate a locked target');
+  }, null, {directTravel: true});
+});
+
+test('menu-free two-hand zoom amplifies reach without moving the viewer or midpoint anchor', async () => {
+  await withXRHarness(async h => {
+    await h.app.enter({handsFirst: true}); h.app.update();
+    for (let index = 0; index < 2; index++) {
+      const controller = h.controllers[index];
+      controller.visible = true;
+      controller.position.set(index ? 0.15 : -0.15, 0.1, -0.5);
+      controller.dispatchEvent({type: 'connected', data: {handedness: index ? 'right' : 'left'}});
+      controller.dispatchEvent({type: 'squeezestart'});
+    }
+    h.app.update(0);
+    const midpoint = new h.THREE.Vector3(0, 0.1, -0.5);
+    const anchoredPoint = h.mapRoot.worldToLocal(midpoint.clone());
+    const initialScale = h.mapRoot.scale.x, cameraPosition = h.xrCamera.position.clone();
+    h.controllers[0].position.x = -0.3; h.controllers[1].position.x = 0.3;
+    h.app.update(0);
+    near(h.mapRoot.scale.x / initialScale, Math.pow(2, 2.4));
+    near(h.mapRoot.localToWorld(anchoredPoint).distanceTo(midpoint), 0);
+    assert.ok(h.xrCamera.position.equals(cameraPosition));
+  });
+});
+
+test('left fist returns from inspection then moves outward once per deliberate hold', async () => {
+  await withXRHarness(async h => {
+    await h.app.enter({handsFirst: true}); h.app.update();
+    h.app.focusObject({id: 'body', size: 0.1, position: [0, 0, 0]});
+    for (let frame = 0; frame < 12; frame++) h.app.update(0.05);
+    const setClosed = connectHand(h, 'left');
+    const hold = () => { setClosed(true); for (let frame = 0; frame < 10; frame++) h.app.update(0.1); };
+    setClosed(false); h.app.update(); hold();
+    assert.equal(h.app.isInspecting, false);
+    assert.equal(h.getBackRequests(), 0, 'first gesture leaves the close-up');
+    for (let frame = 0; frame < 15; frame++) h.app.update(0.1);
+    assert.equal(h.getBackRequests(), 0, 'holding the same fist cannot cascade through scales');
+    setClosed(false); h.app.update(); hold();
+    assert.equal(h.getBackRequests(), 1, 'a fresh gesture moves one level outward');
+    h.hands[0].visible = false; h.app.update(); h.hands[0].visible = true;
+    hold();
+    assert.equal(h.getBackRequests(), 1, 'tracking recovery requires release before another gesture');
+  }, null, {handleBack: true});
+});
+
+test('right fist and interrupted left fist do not navigate outward', async () => {
+  await withXRHarness(async h => {
+    await h.app.enter({handsFirst: true}); h.app.update();
+    const right = connectHand(h, 'right'); right(false); h.app.update(); right(true);
+    for (let frame = 0; frame < 10; frame++) h.app.update(0.1);
+    assert.equal(h.getBackRequests(), 0);
+    const left = connectHand(h, 'left'); left(false); h.app.update(); left(true);
+    for (let frame = 0; frame < 4; frame++) h.app.update(0.1);
+    h.session.visibilityState = 'visible-blurred'; h.app.update(0.1);
+    h.session.visibilityState = 'visible';
+    for (let frame = 0; frame < 10; frame++) h.app.update(0.1);
+    assert.equal(h.getBackRequests(), 0);
+  }, null, {handleBack: true});
+});
+
+
+test('hands-first exit restores the desktop writing preference and failed setup also restores it', async () => {
+  await withXRHarness(async h => {
+    assert.equal(h.app.isImmersive, false);
+    await h.app.enter({handsFirst: true});
+    assert.equal(h.app.isImmersive, true);
+    await h.session.end();
+    assert.equal(h.app.isImmersive, false);
+    assert.deepEqual(h.immersiveChanges, [true, false]);
+    h.app.setImmersive(true);
+    await h.app.enter({handsFirst: true});
+    await h.session.end();
+    assert.equal(h.app.isImmersive, true, 'an already immersive desktop remains immersive');
+  });
+  await withXRHarness(async h => {
+    assert.equal(await h.app.enter({handsFirst: true}), false);
+    assert.equal(h.app.isImmersive, false);
+    assert.deepEqual(h.immersiveChanges, [true, false]);
+  }, null, {setupError: new Error('XR setup failed')});
+});
+
+test('losing any finger joint interrupts the back gesture until the hand opens again', async () => {
+  await withXRHarness(async h => {
+    await h.app.enter({handsFirst: true}); h.app.update();
+    const left = connectHand(h, 'left'); left(false); h.app.update(); left(true);
+    for (let frame = 0; frame < 4; frame++) h.app.update(0.1);
+    h.hands[0].joints['ring-finger-tip'].visible = false; h.app.update(0.1);
+    h.hands[0].joints['ring-finger-tip'].visible = true;
+    for (let frame = 0; frame < 10; frame++) h.app.update(0.1);
+    assert.equal(h.getBackRequests(), 0);
+    left(false); h.app.update(); left(true);
+    for (let frame = 0; frame < 7; frame++) h.app.update(0.1);
+    assert.equal(h.getBackRequests(), 1);
+  }, null, {handleBack: true});
+});
+
+
+test('foreground moon aim assistance takes priority over a distant sky reference', async () => {
+  await withXRHarness(async h => {
+    await h.app.enter({handsFirst: true}); h.app.update();
+    const object = {id: 'tiny-moon', position: [0.07, 0, -2], size: 0.01};
+    const target = new h.THREE.Mesh(new h.THREE.SphereGeometry(0.01), new h.THREE.MeshBasicMaterial());
+    target.position.fromArray(object.position); target.userData.object = object;
+    const backdrop = new h.THREE.Points();
+    backdrop.userData.angularReferenceOnly = true;
+    backdrop.raycast = (ray, hits) => hits.push({object: backdrop, distance: 60, point: new h.THREE.Vector3(0,0,-60), dataObject: {id:'distant-star',environmentReference:true}});
+    h.targets.push(target, backdrop); h.scene.add(target, backdrop); h.scene.updateMatrixWorld(true);
+    h.controllers[0].visible = true;
+    h.controllers[0].dispatchEvent({type:'connected',data:{handedness:'right'}});
+    h.controllers[0].dispatchEvent({type:'selectstart'});
+    h.controllers[0].dispatchEvent({type:'selectend'});
+    assert.deepEqual(h.traveled, [object]);
+    target.visible = false;
+    h.controllers[0].dispatchEvent({type:'selectstart'});
+    h.controllers[0].dispatchEvent({type:'selectend'});
+    assert.equal(h.traveled[1].id,'distant-star', 'a sky reference remains selectable when no foreground body is aimed at');
+  }, null, {directTravel: true});
+});
+
+
+test('reduced motion completes XR arrival and overview in one frame without moving the tracked viewer', async () => {
+  await withXRHarness(async h => {
+    h.xrCamera.position.set(.4,1.7,2);h.xrCamera.rotation.y=.5;
+    await h.app.enter({handsFirst:true});h.app.update(0);
+    const overview=h.mapRoot.matrixWorld.toArray();
+    const cameraPose=[...h.camera.position.toArray(),...h.camera.quaternion.toArray()];
+    const viewerPose=[...h.xrCamera.position.toArray(),...h.xrCamera.quaternion.toArray()];
+    const object={id:'test-moon',size:.08,position:[4,.5,-3]};
+    const target=new h.THREE.Object3D();target.position.fromArray(object.position);target.userData.object=object;
+    h.mapRoot.add(target);h.targets.push(target);
+    assert.equal(h.app.focusObject(object,.08),true);h.app.update(0);
+    const destination=new h.THREE.Vector3(0,0,-1).applyQuaternion(h.xrCamera.quaternion).add(h.xrCamera.position);
+    near(target.getWorldPosition(new h.THREE.Vector3()).distanceTo(destination),0);
+    near(target.getWorldScale(new h.THREE.Vector3()).x*.08,.28);
+    assert.deepEqual([...h.camera.position.toArray(),...h.camera.quaternion.toArray()],cameraPose);
+    assert.deepEqual([...h.xrCamera.position.toArray(),...h.xrCamera.quaternion.toArray()],viewerPose);
+    h.app.navigateBack();h.app.update(0);
+    h.mapRoot.matrixWorld.toArray().forEach((value,index)=>near(value,overview[index]));
+    assert.equal(h.app.isInspecting,false);
+    assert.deepEqual([...h.xrCamera.position.toArray(),...h.xrCamera.quaternion.toArray()],viewerPose);
+  }, null, {reducedMotion:true});
+});
+
+test('enabling reduced motion during XR arrival finishes it and disabling the preference cannot rewind it', async () => {
+  const options={reducedMotion:false};
+  await withXRHarness(async h => {
+    await h.app.enter({handsFirst:true});h.app.update(0);
+    h.app.focusObject({id:'body',size:.1,position:[4,0,0]},.1);h.app.update(.1);
+    const intermediate=h.mapRoot.matrixWorld.toArray();
+    options.reducedMotion=true;h.app.update(0);
+    const finished=h.mapRoot.matrixWorld.toArray();
+    assert.notDeepEqual(finished,intermediate);
+    options.reducedMotion=false;h.app.update(0);
+    h.mapRoot.matrixWorld.toArray().forEach((value,index)=>near(value,finished[index]));
+  }, null, options);
 });

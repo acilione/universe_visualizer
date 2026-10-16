@@ -1,10 +1,10 @@
 # PC immersive preview and Meta Quest mixed reality
 
-Open the immersive-mode chooser from the headset button in the atlas. The desktop preview, immersive VR and mixed reality use the same map and object catalogue.
+Open the immersive-mode chooser from the headset button in the atlas. Desktop preview, VR and mixed reality default to the combined map of planets, moons, stars and nebulae. They start with the control panels hidden. Choose **Current map** before entry to retain another reference view.
 
 ## Preview on a PC
 
-Choose **Start desktop preview**. This works in a desktop browser with WebGL and does not require WebXR or a headset. It provides a first-person view of the spatial map, with mouse and keyboard standing in for headset movement. It is a single-camera preview; stereoscopic depth, tracked hands and physical passthrough require a headset.
+Choose **Start desktop preview**. This works in a desktop browser with WebGL and does not require WebXR or a headset. It provides a first-person view of the spatial map, with mouse and keyboard standing in for headset movement. The view starts without text overlays; the small restore control opens optional settings and catalogue controls. It is a single-camera preview; stereoscopic depth, tracked hands and physical passthrough require a headset.
 
 | Control | Action |
 | --- | --- |
@@ -12,7 +12,9 @@ Choose **Start desktop preview**. This works in a desktop browser with WebGL and
 | Q / E | Move down / up |
 | Shift | Move faster |
 | Drag the map background | Look around |
-| Click an object | Select it |
+| Click an object | Travel to it or enter its linked system |
+| Mouse wheel | Zoom the map quickly around the current target |
+| B / Backspace | Return from inspection to the overview; repeat to move one reference level outward |
 | Enable mouse look | Enable pointer-lock mouse look |
 | R or Reset placement | Place the map around the current viewpoint again |
 | Reference-level selector | Change astronomical reference level |
@@ -31,18 +33,17 @@ Open the atlas in the Quest browser and choose **Mixed reality** for the map ove
 
 The default **Room scale** layout fits the current map into a volume approximately **12 metres across**. Its initial centre is near the viewer, slightly below eye level. The map then stays at that position in the session's tracked reference space. Turning your head or walking does not drag the map along with you. Objects consequently exhibit positional parallax as you move between them.
 
-The volume's size is adjustable. **Tabletop** provides the smaller overview in front of the viewer. Recentring explicitly places the map again relative to the current tracked position.
+The volume's size is adjustable. **Tabletop** provides the smaller overview in front of the viewer. Recentring explicitly places the map again relative to the current tracked position. The default hand interaction needs no floating menu: point at objects to travel and use the gestures below to manipulate the map or return to broader views.
 
 | Hand or controller input | Action |
 | --- | --- |
-| Point, then brief pinch / trigger | Select an object or panel control |
+| Point, then briefly pinch / press trigger | Travel to the object or enter its linked system |
 | Hold a pinch or controller grip | Move and rotate the map from its current transform |
-| Two simultaneous grips / pinches | Scale and rotate the map |
-| Object focus on the panel | Bring the selected object into inspection range |
-| Panel reference controls | Change the astronomical view |
-| Panel recenter | Place the map around the current viewer again |
-| Panel hide controls | Hide writing; select the small restore control to show it again |
-| Panel exit | End the session and restore the desktop atlas |
+| Pinch with both hands, then spread or bring them together | Zoom quickly; moving the hands around each other also rotates the map |
+| Hold a closed left fist for about 0.65 seconds | Return from inspection to the overview; release and repeat to move one reference level outward |
+| Headset system gesture or system menu | End the session |
+
+A small progress indicator confirms the left-fist hold. The gesture fires once per hold, so keeping the fist closed does not skip through several levels. Controller support remains available. Choose a constellation, its Earth or 3D perspective, and the desired object layers before headset entry; select **Current map** in the chooser to retain that view. Headset navigation uses the gestures above without a floating panel.
 
 After releasing a manipulation, the map keeps its resulting position, orientation and scale. The camera always follows headset tracking. Catalogue positions stay unchanged; interaction transforms their common map coordinate frame.
 
@@ -54,21 +55,27 @@ Selecting a linked marker opens its detailed map within the current immersive se
 
 ## Combined map: planets, stars and nebulae
 
-In the immersive-mode chooser, set **Map content** to **Combined map**, wait for the NASA catalogue to load, then start the PC preview, VR or mixed reality. You can also choose **Combined map** from the preview's reference selector. All three object layers start enabled: **Planets**, **Stars** and **Nebulae**. Planets includes the supported natural satellites and exoplanets; the Sun belongs to Stars.
+The immersive-mode chooser defaults **Map content** to **Combined map** and loads the NASA catalogue before starting PC preview, VR or mixed reality. You can also choose **Combined map** from the preview's reference selector. On first use, all three object layers are enabled: **Planets**, **Stars** and **Nebulae**. Planets includes the supported natural satellites and exoplanets; the Sun belongs to Stars.
 
-Use the object-layer controls to show or hide each category independently. The desktop atlas, PC preview and headset controls use the same choices, which are remembered on this browser. Turning a layer off removes its objects from rendering and selection without moving the map or resetting your viewpoint. Turning all three off is valid. Searching for an object and locating it enables its layer and keeps the combined map open; its scientific information remains available through **Object data**.
+Use the object-layer controls to show or hide each category independently. The desktop atlas and optional PC preview controls use the same choices, which are remembered on this browser and applied in the headset. Set the desired layers before headset entry to keep the session free of menus. Turning a layer off removes its objects from rendering and selection without moving the map or resetting your viewpoint. Turning all three off is valid. Searching for an object and locating it enables its layer and keeps the combined map open; its scientific information remains available through **Object data**.
 
 This view combines different presentation scales. The Solar System and its supported moons occupy the foreground using the atlas's schematic planetary model. Exoplanets are shown at their catalogue host directions. The NASA stellar and nebular catalogues provide the surrounding equatorial sky; these directions are not a common physical-distance model with the foreground planets. Nebular extents use the available angular-size data, and the scientific object panels retain the catalogue measurements and sources. The combined view does not invent distances for objects whose distance is unknown.
 
-In the room layout, the combined map stays fixed in the tracked space as you walk. Changing object layers only changes visibility; it does not recenter, rotate or resize the map. The existing map opening, interaction effects, manual placement and clean-view controls also apply to this view.
+In the room layout, the combined map stays fixed in the tracked space as you walk. Changing object layers only changes visibility; it does not recenter, rotate or resize the map. During close-up inspection, a distant catalogue sky remains around the viewer so that enlarging a planet does not remove the stellar surroundings. Its stars and nebula centres remain selectable. This is an angular reference sky, with no invented stellar parallax or radial distance.
 
 ## Animated map projection
 
-PC preview, VR and mixed reality share a gradual map opening: luminous arcs expand through the surrounding reference grid as the map becomes visible. Fine cyan lines and amber particles provide depth cues inside spatial views. Selecting an object produces a local pulse; manipulating the map adds light near the hands or controllers. The effects do not change catalogue coordinates or move the viewer.
+PC preview, VR and mixed reality share a gradual map opening: luminous arcs expand through the surrounding reference grid as the map becomes visible. A complete faint cyan reference grid, moving light tracers and drifting amber particles provide depth cues above, below and behind the viewer. Arriving at an object produces local rings and sparks; manipulating the map adds light near the hands or controllers. During close-up inspection, a separate particle volume and grid remain anchored in the room at a fixed presentation size, so they survive large changes in map scale. The effects do not change catalogue coordinates or move the viewer.
 
-Use **Replay opening** in the PC preview controls to run the opening again without changing the map placement. **Reset placement** also replays it when the map is placed again. The existing **Particle effects** layer controls the additional holographic effects. Lower rendering quality reduces their particle count. The browser's reduced-motion preference replaces animated effects with a static presentation.
+Use **Replay opening** in the PC preview controls to run the opening again without changing the map placement. **Reset placement** also replays it when the map is placed again. The existing **Particle effects** layer controls the additional holographic effects. Lower rendering quality reduces their particle count. The distant close-up sky draws all valid stellar records at high quality; medium and low quality retain the brightest 60,000 and 24,000 background stars respectively, while the complete catalogue remains searchable. The browser's reduced-motion preference replaces animated effects and background fades with a static presentation.
 
-Angular sky views keep effects on the sky projection and omit the surrounding particle volume, since those views do not supply physical distances. In mixed reality the effects remain transparent over passthrough.
+Angular sky views keep effects on the sky projection and omit the surrounding particle volume, since those views do not supply physical distances. Decorative particles and the reference grid are visual aids, not catalogue objects. Stars retain their catalogue directions and magnitude ordering; display brightness is compressed. Nebular extents illustrate measured angular size rather than observed morphology.
+
+## Darker surroundings in mixed reality
+
+Before entering, adjust **Dim room in mixed reality** in the immersive-mode chooser. The default is **56%**, with a range of **0–80%**. A translucent black background fades in behind the map, reducing the passthrough contribution while leaving the room visible. Nearer opaque planets and virtual hands retain their appearance; luminous map layers render above the dimmer.
+
+This uses ordinary WebXR alpha composition only when the active session reports `environmentBlendMode: "alpha-blend"`. It does not change a native camera or passthrough brightness setting. Additive and opaque sessions do not apply the dimmer. Leaving immersive mode removes it and restores the desktop background. The surrounding catalogue sky and room-sized effects use bounded GPU batches rather than a separate scene object for each star.
 
 ## Open the atlas securely in a headset
 
@@ -102,14 +109,18 @@ Run the automated checks with the development server available:
 npm test
 npm run test:immersive
 npm run test:immersive-effects
+npm run test:immersive-surround
+npm run test:immersive-navigation
+npm run test:immersive-entry
 npm run build
 ```
 
-The browser checks exercise preview entry without WebXR, reference-level changes, map transforms, clean controls, exit restoration, English and Italian controls, narrow-screen layout, and real WebGL camera movement while the map stays fixed. Automated XR simulations cover session and tracking transforms. Actual passthrough, stereo rendering and tracked-hand usability require verification on a physical Quest.
+The browser checks exercise preview entry without WebXR, reference-level changes, map transforms, clean controls, exit restoration, English and Italian controls, narrow-screen layout, and real WebGL camera movement while the map stays fixed. The surrounding-environment checks render all six viewing directions, verify that walking preserves angular star directions, and compare alpha-blend dimming against unchanged foreground pixels. Navigation checks cover direct object travel, close-up context, return gestures and session restoration. Automated XR simulations cover session and tracking transforms. Actual passthrough, stereo rendering and tracked-hand usability require verification on a physical Quest.
 
 Primary references:
 
 - [Meta: WebXR mixed reality](https://developers.meta.com/horizon/documentation/web/webxr-mixed-reality/)
+- [WebXR AR environment blending](https://www.w3.org/TR/webxr-ar-module-1/#xrcompositor-behaviors)
 - [WebXR Device API specification](https://immersive-web.github.io/webxr/)
 - [WebXR reference-space reset events](https://immersive-web.github.io/webxr/#xrreferencespaceevent-interface)
 - [Three.js WebXRManager](https://threejs.org/docs/pages/WebXRManager.html)

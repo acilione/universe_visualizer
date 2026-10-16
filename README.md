@@ -20,7 +20,7 @@ npm run build
 npm run preview -- --port 5174
 ```
 
-The application needs no account, API key or backend. Data and planet textures are bundled locally. The full stellar catalogue loads when a constellation is first opened.
+The application needs no account, API key or backend. Data and planet textures are bundled locally. The relevant stellar catalogue loads when a constellation or combined immersive map is first opened.
 
 ## Official imagery and Gaia DR3 experiment
 
@@ -78,17 +78,22 @@ Shortcuts: **1–5** reference scale, **R** reset, **/** search, **Space** auto-
 
 ## Immersive preview, VR and mixed reality
 
-Open **VR / MR**. **Start desktop preview** provides the room-scale first-person view on a PC without a headset: W A S D to walk, Q / E to change height, drag to look around, and click to select. The preview includes map size, rotation, search and clear-screen controls.
+Open **VR / MR**. The default **Combined map** loads planets, moons, catalogue stars and nebulae together. PC preview and headset modes start with their control panels hidden. The **Planets**, **Stars** and **Nebulae** switches are independent and remember their state; set them before entering or use the optional preview controls. Choose **Current map** to retain another reference view.
 
-Choose **Map content → Combined map: planets, stars and nebulae** to load all three categories together. The **Planets**, **Stars** and **Nebulae** switches work independently in the preview, sidebar and headset panel; choices are saved. The preview’s **Map** selector also opens this mode. It combines the schematic Solar System and moons with NASA stars, nebulae and exoplanet host directions on a surrounding sky projection, using separate display scales.
+**Start desktop preview** provides a first-person view without a headset: W A S D to walk, Q / E to change height, drag to look around, click an object to travel to it, and use the wheel for fast zoom. **B** or **Backspace** returns to the overview; repeating it moves one reference level outward. A small restore control opens optional map, search and placement controls.
 
-On Quest, choose **Enter mixed reality** for passthrough or **Enter VR atlas** for the virtual background. **Room scale** is the default: the map starts around the viewer and stays fixed in the session's floor coordinates as they walk. Hand tracking is optional; controllers are supported. **Tabletop** remains available. See [Immersive views](IMMERSIVE.md) for controls and headset setup.
+On Quest, choose **Enter mixed reality** for passthrough or **Enter VR atlas** for the virtual background. **Room scale** surrounds the viewer and keeps the map fixed in the session's floor coordinates while they walk. Navigation works with bare hands and no floating menu:
 
-- Brief pinch or trigger: select an object.
-- Hold a pinch or controller grip: move/rotate the spatial atlas.
-- Two grips: scale and rotate the atlas.
-- The VR panel provides object focus, reference scales, constellation cycling, Earth/3D perspective, recentering, immersive view and exit.
-- Earth sky surrounds the observer. Grips do not move or tilt the geometric horizon.
+- Point and briefly pinch to travel to a body or enter a linked system.
+- Hold a pinch to move and rotate the map.
+- Pinch with both hands and spread or bring them together for fast zoom.
+- Hold a closed left fist for about **0.65 seconds** to return to the overview; release and repeat to move one level outward.
+
+Controllers remain supported, and the headset system gesture ends the session. **Tabletop** can be selected before entry. Choose constellations, their Earth or 3D perspective, and object layers in the desktop interface, then use **Current map** to enter that view. Earth sky views preserve their geometric horizon.
+
+**Dim room in mixed reality** defaults to **56%** and can be set from **0–80%** before entry. It darkens the background through black alpha composition only when WebXR reports `alpha-blend`, without changing native passthrough settings. Additive sessions do not dim. The dimmer leaves nearer opaque objects unchanged and is removed on exit.
+
+Catalogue stars and nebulae remain around the observer during close-ups. An anchored reference grid, moving tracers, floating particles and arrival pulses provide local depth and interaction feedback. The combined view uses schematic planetary spacing and an angular catalogue sky, not a common physical-distance scale. Effects do not change scientific coordinates; reduced-motion preferences provide a static presentation. See [Immersive views](IMMERSIVE.md) for the complete controls, rendering limits and headset setup.
 
 WebXR requires HTTPS or localhost. A LAN HTTP URL is insufficient. To use existing trusted certificates with the development server:
 
@@ -126,6 +131,9 @@ npm run test:earth-reference
 npm run test:language
 npm run test:layout
 npm run test:immersive
+npm run test:immersive-surround
+npm run test:immersive-navigation
+npm run test:immersive-entry
 npm run test:combined
 npm run test:drilldown
 npm run test:experiments

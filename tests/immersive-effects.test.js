@@ -175,3 +175,18 @@ test('desktop map adjustments give local feedback without replaying the opening'
   assert.equal(uniforms.effectRevealStart.value, openingStart);
   effects.dispose();
 });
+
+
+test('arrival feedback stays local and respects reduced motion', () => {
+  const {effects,uniforms}=setup({radius:80});
+  const point=new THREE.Vector3(2,3,-4);
+  effects.arrive({position:point,radius:2});
+  assert.deepEqual(uniforms.effectEvents.value[0].toArray(),[2,3,-4,3.6]);
+  assert.equal(uniforms.effectEventStrengths.value[0],1);
+  assert.equal(uniforms.effectRevealStart.value,-100);
+  run(effects,1);
+  assert.ok(uniforms.effectActivity.value>0&&uniforms.effectActivity.value<.2);
+  effects.configure({reducedMotion:true});effects.arrive({position:point,radius:2});
+  assert.equal(uniforms.effectEventStrengths.value.every(value=>value===0),true);
+  effects.dispose();
+});

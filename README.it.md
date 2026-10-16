@@ -63,7 +63,7 @@ Il pulsante **Costellazioni** apre una selezione ricercabile delle **88 costella
 
 Le figure sono convenzioni di Stellarium, non legami fisici n? bordi ufficiali IAU. Il cielo applica la precessione da J2000 ma omette moto proprio, parallasse, nutazione e rifrazione. Luminosit? e colori sono amplificati per esplorazione; illuminazione diurna, inquinamento luminoso e terreno non sono simulati. Una stella sotto l?orizzonte non ? spostata artificialmente sopra di esso.
 
-In VR, **Spazio 3D** conserva le prese della mappa con una o due mani. **Dalla Terra** circonda l?osservatore con una cupola a scala naturale: mani e controller selezionano le stelle, mentre l?orizzonte resta fisso. Nel pannello VR, **Figura ?/?** scorre le costellazioni; **Dalla Terra / Spazio 3D** cambia prospettiva senza uscire dal visore. Il movimento del visore orienta lo sguardo; **Ricentra** riallinea cupola e pannello alla posizione attuale.
+In VR, **Spazio 3D** conserva le prese della mappa con una o due mani. **Dalla Terra** circonda l'osservatore con una cupola: mani e controller selezionano le stelle, mentre l'orizzonte resta fisso. Scegli la costellazione e la prospettiva **Dalla Terra / Spazio 3D** nell'interfaccia desktop prima di entrare; seleziona **Mappa attuale** nel pannello di avvio VR/MR per mantenere quella vista. Il movimento del visore orienta lo sguardo e la navigazione avviene senza un pannello flottante.
 
 Provenienza, licenze CC BY-SA 4.0, revisioni e checksum: [DATA_CONSTELLATIONS.md](DATA_CONSTELLATIONS.md). Rigenerazione riproducibile:
 
@@ -85,18 +85,22 @@ Comandi di base: trascina per orbitare, tasto destro per spostare, rotellina per
 
 ## Anteprima PC, VR e realtà mista
 
-Apri **VR / MR** e scegli **Avvia anteprima PC** per vedere la mappa in prima persona senza visore. W A S D per camminare, Q / E per cambiare altezza, trascinamento per guardare intorno e clic per selezionare. Sono disponibili ricerca, dimensione e rotazione della mappa e comandi per nascondere le scritte.
+Apri **VR / MR**. La **Mappa combinata** è la scelta predefinita e carica pianeti, satelliti, stelle e nebulose insieme. L'anteprima PC e il visore partono con i pannelli nascosti. I comandi **Pianeti**, **Stelle** e **Nebulose** sono indipendenti e conservano la scelta: impostali prima di entrare oppure usa i controlli opzionali dell'anteprima. Scegli **Mappa attuale** per mantenere un'altra vista.
 
-Scegli **Contenuto della mappa → Mappa combinata: pianeti, stelle e nebulose** per caricare tutte e tre le categorie insieme. I pulsanti **Pianeti**, **Stelle** e **Nebulose** sono indipendenti e disponibili nell’anteprima, nel pannello laterale e nel visore; le preferenze vengono salvate. Anche il selettore **Mappa** dell’anteprima apre questa vista. Il Sistema Solare schematico, con i satelliti, è circondato da una proiezione delle direzioni NASA di stelle, nebulose e sistemi esoplanetari, con scale visive separate.
+**Avvia anteprima PC** mostra la mappa in prima persona senza visore. W A S D per camminare, Q / E per cambiare altezza, trascinamento per guardare intorno, clic su un oggetto per raggiungerlo e rotellina per lo zoom rapido. **B** o **Backspace** torna alla vista d'insieme; ripetendo il comando si esce di un livello. Il piccolo comando di ripristino apre ricerca, impostazioni e controlli della mappa.
 
-Su Quest, scegli **Entra in realtà mista** per il passthrough oppure **Entra nell'atlante VR** per lo sfondo virtuale. La disposizione predefinita **Scala ambiente** mette la mappa intorno all'osservatore e la mantiene fissa nelle coordinate della sessione mentre cammina. Rimane disponibile la **Mappa ridotta** davanti all'utente. Il tracciamento delle mani è opzionale; in alternativa sono utilizzabili i controller. [Viste immersive](IMMERSIVE.md) descrive comandi e configurazione del visore.
+Su Quest, scegli **Entra in realtà mista** per il passthrough oppure **Entra nell'atlante VR** per lo sfondo virtuale. La disposizione predefinita **Scala ambiente** circonda l'osservatore e resta fissa nelle coordinate della sessione mentre cammina. La navigazione con le mani non richiede un menu:
 
-- Pizzico breve o grilletto: seleziona.
-- Pizzico mantenuto o impugnatura: afferra, sposta e ruota.
-- Due prese: ridimensiona e ruota attorno alle mani.
-- **Avvicina** nel pannello del visore porta il pianeta selezionato a una dimensione comoda per osservarlo, muovendo la mappa e mantenendo fermo l’osservatore.
-- **Libera** nasconde le scritte; un piccolo elemento sferico senza testo consente di ripristinare il pannello.
-- **Ricentra** torna all’insieme; **Esci VR** o il menu del visore termina la sessione.
+- Punta e pizzica brevemente per raggiungere un corpo o entrare nel suo sistema.
+- Mantieni un pizzico per spostare e ruotare la mappa.
+- Pizzica con entrambe le mani e allontanale o avvicinale per lo zoom rapido.
+- Mantieni chiuso il pugno sinistro per circa **0,65 secondi** per tornare alla vista d'insieme; rilascialo e ripeti per uscire di un livello.
+
+Sono supportati anche i controller. Il gesto di sistema del visore termina la sessione. La **Mappa ridotta** si sceglie prima di entrare. Imposta costellazione, prospettiva e livelli nell'interfaccia desktop, poi seleziona **Mappa attuale** per aprire quella vista nel visore. Le viste del cielo terrestre mantengono fisso l'orizzonte geometrico.
+
+**Oscura ambiente in realtà mista** parte dal **56%** e si regola tra **0 e 80%** prima dell'ingresso. Lo sfondo nero traslucido attenua il passthrough soltanto se WebXR dichiara `alpha-blend`; non modifica le impostazioni native della videocamera o del passthrough. Le sessioni additive non vengono oscurate. I corpi opachi in primo piano conservano il loro aspetto e l'oscuramento viene rimosso all'uscita.
+
+Stelle e nebulose di catalogo restano intorno all'osservatore anche durante l'ispezione ravvicinata. Una griglia ancorata all'ambiente, tracce luminose, particelle fluttuanti e impulsi all'arrivo accompagnano l'interazione. Il Sistema Solare schematico e il cielo angolare del catalogo usano scale visive distinte; gli effetti non cambiano le coordinate scientifiche. La preferenza di movimento ridotto rende la presentazione statica. [Viste immersive](IMMERSIVE.md) descrive tutti i comandi, i limiti e la configurazione del visore.
 
 WebXR richiede un contesto sicuro ([MDN](https://developer.mozilla.org/en-US/docs/Web/API/WebXR_Device_API)). Per un visore in rete usa HTTPS con un certificato attendibile dal dispositivo; un indirizzo LAN `http://...` non basta. Il server di sviluppo può utilizzare certificati esistenti:
 

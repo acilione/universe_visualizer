@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Immersive environment GPU fixture</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden}body{background:#050a11;position:relative}body.room{background:linear-gradient(180deg,#aaa899 0 64%,#777366 64% 65%,#b9ab8b 65%);position:relative}body.room:before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 159px,#282c3330 160px 163px),repeating-linear-gradient(0deg,transparent 0 159px,#282c3330 160px 163px)}canvas{position:absolute;width:100%;height:100%}
+</style></head><body><canvas></canvas><script type="module">
+import * as THREE from 'three';
+import { createImmersiveEnvironment } from '../../src/immersive-environment.js';
+import { loadCelestialCatalog } from '../../src/celestial-catalog.js';
+const renderer = new THREE.WebGLRenderer({canvas:document.querySelector('canvas'),alpha:true,antialias:true,preserveDrawingBuffer:true});
+renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(1);renderer.setClearColor(0,0);
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(72,innerWidth/innerHeight,.01,1500);camera.position.set(0,1.65,0);
+const environment=createImmersiveEnvironment({parent:scene});
+const foreground=new THREE.Mesh(new THREE.SphereGeometry(.18,32,24),new THREE.MeshBasicMaterial({color:'#dbbc81',toneMapped:false}));
+foreground.position.set(0,1.65,-2);foreground.name='opaque-near-field-test-object';foreground.visible=false;scene.add(foreground);
+const catalogue=await loadCelestialCatalog();environment.setCatalogue(catalogue);
+const render=()=>{environment.update(0,camera.position);scene.updateMatrixWorld(true);renderer.render(scene,camera);};
+function rgba(x,y){render();const gl=renderer.getContext();const data=new Uint8Array(4);gl.readPixels(x,innerHeight-y-1,1,1,gl.RGBA,gl.UNSIGNED_BYTE,data);return Array.from(data);}
+const settle=()=>{for(let i=0;i<120;i++)environment.update(.1,camera.position);render();};
+window.fixture={THREE,renderer,scene,camera,environment,foreground,catalogue,render,settle,rgba,ready:true};
+environment.configure({active:true,mode:'desktop',stars:true,nebulae:true,skyVisible:true,dim:0,quality:'high',reducedMotion:true});settle();
+</script></body></html>

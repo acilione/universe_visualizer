@@ -44,6 +44,9 @@ try {
     await page.locator('[data-action="start-preview"]').click();
     await expect(page.locator('#modal')).not.toBeVisible();
     await expect(page.locator('.app-shell')).toHaveClass(/preview-active/);
+    await expect(page.locator('.app-shell')).toHaveClass(/preview-clean/);
+    await expect(page.locator('#preview-hud')).not.toBeVisible();
+    await page.locator('#preview-restore').click();
     await expect(page.locator('#preview-hud')).toBeVisible();
   }
   async function exitPreview() {

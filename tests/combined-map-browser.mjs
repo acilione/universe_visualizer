@@ -156,6 +156,8 @@ try {
     await expect(page.locator('[data-action="start-preview"]')).toBeEnabled({ timeout: 90000 });
     await page.locator('[data-action="start-preview"]').click();
     await expect(page.locator('.app-shell')).toHaveClass(/preview-active/);
+    await expect(page.locator('.app-shell')).toHaveClass(/preview-clean/);
+    await page.locator('#preview-restore').click();
     await expect(page.locator('#preview-scale')).toHaveValue('9');
     await expect(layers()).toBeVisible();
   };

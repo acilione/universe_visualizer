@@ -3,7 +3,7 @@ import * as THREE from 'three';
 // All effects live in map coordinates: no camera motion and no change to catalogue data.
 // The five renderables share their time and event uniforms and allocate no frame buffers.
 const EVENT_SLOTS = 4;
-const DUST_COUNT = 1800;
+const DUST_COUNT = 2200;
 const TAU = Math.PI * 2;
 const CYAN = new THREE.Color('#8de1e5');
 const GOLD = new THREE.Color('#e8bd79');
@@ -58,7 +58,7 @@ export function createImmersiveEffects({ parent } = {}) {
   group.userData.immersiveEffects = true;
   group.visible = false;
   parent.add(group);
-  const settings = { radius: 40, sky: false, quality: 'high', reducedMotion: false, enabled: true };
+  const settings = { radius: 40, sky: false, quality: 'high', reducedMotion: false, enabled: true, ambientOnly: false };
   let active = false;
   let disposed = false;
   let elapsed = 0;
@@ -68,6 +68,7 @@ export function createImmersiveEffects({ parent } = {}) {
     effectTime: { value: 0 },
     effectRadius: { value: settings.radius },
     effectMotion: { value: 1 },
+    effectActivity: { value: 0 },
     effectRevealStart: { value: -100 },
     effectEvents: { value: Array.from({ length: EVENT_SLOTS }, () => new THREE.Vector4()) },
     effectEventStarts: { value: new Float32Array(EVENT_SLOTS).fill(-100) },
@@ -93,12 +94,13 @@ attribute float aSize;
 uniform float effectTime;
 uniform float effectRadius;
 uniform float effectMotion;
+uniform float effectActivity;
 uniform float effectRevealStart;
 varying vec3 vTint;
 varying float vAlpha;
 void main() {
-  float slowTime = effectTime * effectMotion * 0.035;
-  vec3 drift = vec3(sin(slowTime + aPhase), cos(slowTime * 0.7 + aPhase), sin(slowTime * 0.8 + aPhase * 2.0)) * 0.009 * effectMotion;
+  float slowTime = effectTime * effectMotion * 0.12;
+  vec3 drift = vec3(sin(slowTime + aPhase), cos(slowTime * 0.7 + aPhase), sin(slowTime * 0.8 + aPhase * 2.0)) * 0.018 * effectMotion;
   vec3 local = (position + drift) * effectRadius;
   vec4 view = modelViewMatrix * vec4(local, 1.0);
   gl_Position = projectionMatrix * view;
@@ -108,7 +110,7 @@ void main() {
   float depthFade = smoothstep(0.02, 0.15, -view.z);
   float life = (effectTime - effectRevealStart) / 3.2;
   float scan = exp(-pow((length(position) - life) * 21.0, 2.0)) * step(0.0, life) * (1.0 - step(1.1, life)) * effectMotion;
-  vAlpha = nearFade * depthFade * (0.17 + 0.055 * sin(slowTime + aPhase) + scan * 0.45);
+  vAlpha = nearFade * depthFade * (0.23 + 0.065 * sin(slowTime + aPhase) + scan * 0.5 + effectActivity * 0.12);
   vTint = color;
 }`, pointFragment, true));
   dust.name = 'immersive-volume-dust';
@@ -135,6 +137,23 @@ void main() {
       }
     }
   }
+  // A complete faint spherical reference grid continues above, below, and
+  // behind the observer. It shares the tracers' draw call and remains anchored
+  // to the map as the user walks; it is not an astronomical measurement.
+  for (let ring = 0; ring < 11; ring++) {
+    const latitude = ring < 5 ? (ring - 2) * Math.PI / 6 : null;
+    const longitude = (ring - 5) * Math.PI / 6;
+    for (let segment = 0; segment < 180; segment++) {
+      if (segment % 30 > 27) continue;
+      for (let endpoint = 0; endpoint < 2; endpoint++) {
+        const progress = (segment + endpoint) / 180, theta = progress * TAU;
+        if (latitude !== null) base.set(Math.cos(theta) * Math.cos(latitude), Math.sin(latitude), Math.sin(theta) * Math.cos(latitude));
+        else base.set(Math.cos(theta) * Math.cos(longitude), Math.sin(theta), Math.cos(theta) * Math.sin(longitude));
+        arcPositions.push(base.x, base.y, base.z); arcProgress.push(progress); arcPhases.push(ring * .137);
+        arcColors.push(CYAN.r, CYAN.g, CYAN.b);
+      }
+    }
+  }
   const arcGeometry = geometryWith({ position: [arcPositions, 3], aProgress: [arcProgress, 1], aPhase: [arcPhases, 1], color: [arcColors, 3] });
   const arcs = new THREE.LineSegments(arcGeometry, material(uniforms, `
 attribute float aProgress;
@@ -142,21 +161,24 @@ attribute float aPhase;
 uniform float effectTime;
 uniform float effectRadius;
 uniform float effectMotion;
+uniform float effectActivity;
 uniform float effectRevealStart;
 varying vec3 vTint;
 varying float vAlpha;
 void main() {
   vec4 view = modelViewMatrix * vec4(position * effectRadius * 1.04, 1.0);
   gl_Position = projectionMatrix * view;
-  float tracer = fract(aProgress - effectTime * effectMotion * 0.014 + aPhase);
+  float tracer = fract(aProgress - effectTime * effectMotion * 0.032 + aPhase);
   float trail = smoothstep(0.92, 0.992, tracer) * (1.0 - smoothstep(0.992, 1.0, tracer));
   float entrance = clamp((effectTime - effectRevealStart) / 3.2, 0.0, 1.0);
   float revealAlpha = mix(0.035, 1.0, smoothstep(aProgress * 0.6, aProgress * 0.6 + 0.2, entrance));
   float pulse = sin(clamp(entrance, 0.0, 1.0) * 3.14159265) * effectMotion * 0.13;
-  vAlpha = (0.026 + trail * 0.36 + pulse) * revealAlpha * smoothstep(0.15, 0.55, length(view.xyz));
+  vAlpha = (0.052 + trail * (0.44 + effectActivity * 0.15) + pulse) * revealAlpha * smoothstep(0.15, 0.55, length(view.xyz));
   vTint = color;
 }`, lineFragment, true));
   arcs.name = 'immersive-reference-tracers';
+  arcs.userData.illustrative = true;
+  arcs.userData.referenceGrid = true;
   group.add(arcs);
 
   const scanPositions = [];
@@ -174,6 +196,7 @@ void main() {
 uniform float effectTime;
 uniform float effectRadius;
 uniform float effectMotion;
+uniform float effectActivity;
 uniform float effectRevealStart;
 varying vec3 vTint;
 varying float vAlpha;
@@ -263,15 +286,16 @@ void main() {
   function syncVisibility() {
     group.visible = !disposed && active && settings.enabled;
     dust.visible = !settings.sky;
-    scan.visible = !settings.sky && !settings.reducedMotion;
-    rings.visible = !settings.sky && !settings.reducedMotion;
-    sparks.visible = !settings.sky && !settings.reducedMotion;
+    scan.visible = !settings.sky && !settings.reducedMotion && !settings.ambientOnly;
+    rings.visible = !settings.sky && !settings.reducedMotion && !settings.ambientOnly;
+    sparks.visible = !settings.sky && !settings.reducedMotion && !settings.ambientOnly;
   }
 
   function resetEvents() {
     lastInteraction = -Infinity;
     uniforms.effectEventStarts.value.fill(-100);
     uniforms.effectEventStrengths.value.fill(0);
+    uniforms.effectActivity.value = 0;
   }
 
   function pulse(position, radius, strength) {
@@ -281,6 +305,7 @@ void main() {
     uniforms.effectEvents.value[slot].set(position.x, position.y, position.z, radius);
     uniforms.effectEventStarts.value[slot] = elapsed;
     uniforms.effectEventStrengths.value[slot] = strength;
+    uniforms.effectActivity.value = Math.max(uniforms.effectActivity.value, strength);
   }
 
   function configure(options = {}) {
@@ -288,7 +313,7 @@ void main() {
     const oldRadius = settings.radius;
     const oldSky = settings.sky;
     if (Number.isFinite(options.radius) && options.radius > 0) settings.radius = options.radius;
-    for (const key of ['sky', 'reducedMotion', 'enabled']) {
+    for (const key of ['sky', 'reducedMotion', 'enabled', 'ambientOnly']) {
       if (typeof options[key] === 'boolean') settings[key] = options[key];
     }
     if ('quality' in options) settings.quality = options.quality;
@@ -326,6 +351,10 @@ void main() {
       const objectRadius = Number.isFinite(radius) && radius > 0 ? radius : settings.radius * 0.006;
       pulse(position, Math.min(settings.radius * 0.18, Math.max(objectRadius * 1.3, settings.radius * 0.006)), 0.75);
     },
+    arrive({ position, radius } = {}) {
+      const objectRadius = Number.isFinite(radius) && radius > 0 ? radius : settings.radius * .025;
+      pulse(position, Math.min(settings.radius * .3, Math.max(objectRadius * 1.8, settings.radius * .025)), 1);
+    },
     interact({ type, points = [] } = {}) {
       if (type === 'reveal') return;
       if (!points.length || ((type === 'grab-move' || type === 'adjust') && elapsed - lastInteraction < 0.28)) return;
@@ -338,6 +367,7 @@ void main() {
       if (disposed || !active || !settings.enabled || settings.reducedMotion || !Number.isFinite(dt) || dt <= 0) return;
       elapsed += Math.min(dt, 0.1);
       uniforms.effectTime.value = elapsed;
+      uniforms.effectActivity.value *= Math.exp(-Math.min(dt, .1) * 1.8);
     },
     dispose() {
       if (disposed) return;

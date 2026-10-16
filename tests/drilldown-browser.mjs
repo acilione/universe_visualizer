@@ -150,9 +150,12 @@ try {
 
     await page.locator('[data-scale="2"]').click();
     await page.locator('[data-action="vr"]').first().click();
+    await page.locator('#xr-content').selectOption('current');
     await expect(page.locator('[data-action="start-preview"]')).toBeEnabled();
     await page.locator('[data-action="start-preview"]').click();
     await expect(page.locator('.app-shell')).toHaveClass(/preview-active/);
+    await expect(page.locator('.app-shell')).toHaveClass(/preview-clean/);
+    await page.locator('#preview-restore').click();
     await expect(page.locator('#preview-scale')).toHaveValue('2');
     await page.locator('[data-action="preview-search"]').click();
     await page.locator('#search-input').fill('Solar System');

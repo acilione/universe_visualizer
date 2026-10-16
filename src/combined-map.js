@@ -13,7 +13,7 @@ const visibleInTree = object => {for (let node = object; node; node = node.paren
 
 // Each catalogue stays one GPU batch. Sparse map-local cells are traversed along
 // the ray, so controller hover never scans 118,000 individual star records.
-function indexedPicking(points, objects, pickRadius) {
+export function indexedPicking(points, objects, pickRadius) {
   const cells = new Map(), bounds = new THREE.Box3(), point = new THREE.Vector3();
   for (let index = 0; index < objects.length; index++) {
     point.fromArray(objects[index].position);
@@ -66,6 +66,8 @@ function indexedPicking(points, objects, pickRadius) {
         const bucket = cells.get(key);
         if (!bucket || !ray.intersectsBox(bucket.bounds)) continue;
         for (const index of bucket.indices) {
+          const range=this.geometry.drawRange;
+          if(index<range.start||index>=range.start+range.count)continue;
           stats.candidates++;
           point.fromArray(objects[index].position).sub(ray.origin);
           const along = point.dot(ray.direction);

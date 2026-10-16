@@ -1,0 +1,38 @@
+import { chromium, expect } from '@playwright/test';
+import assert from 'node:assert/strict';
+import { mkdir } from 'node:fs/promises';
+await mkdir('test-results/immersive-surround',{recursive:true});
+const base=process.env.TEST_URL||'http://localhost:5173';
+const browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const page=await browser.newPage({viewport:{width:1280,height:900},reducedMotion:'reduce'});
+const errors=[];page.on('pageerror',error=>errors.push(error.message));page.setDefaultTimeout(60000);
+await page.addInitScript(()=>{if(!localStorage.getItem('aether.preferences'))localStorage.setItem('aether.preferences',JSON.stringify({quality:'low',autoRotate:false}));});
+const ready=()=>expect(page.locator('.loading')).toBeHidden({timeout:90000});
+const open=async()=>{await page.locator('[data-action="vr"]').first().click();await expect(page.locator('#xr-dimming')).toBeVisible();};
+try{
+ await page.goto(base,{waitUntil:'networkidle',timeout:90000});await ready();await open();
+ await expect(page.locator('#xr-content')).toHaveValue('combined');
+ await expect(page.locator('#xr-dimming')).toHaveValue('0.56');await expect(page.locator('#xr-dimming-value')).toHaveText('56%');
+ await page.locator('#xr-dimming').focus();await page.keyboard.press('Home');await expect(page.locator('#xr-dimming-value')).toHaveText('0%');
+ assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('aether.preferences')).mrDimming),0);
+ await page.keyboard.press('End');await expect(page.locator('#xr-dimming-value')).toHaveText('80%');
+ for(let i=0;i<11;i++)await page.keyboard.press('ArrowLeft');
+ await expect(page.locator('#xr-dimming-value')).toHaveText('36%');
+ await page.reload({waitUntil:'networkidle'});await ready();await open();
+ await expect(page.locator('#xr-dimming')).toHaveValue('0.36');await expect(page.locator('#xr-dimming-value')).toHaveText('36%');
+ console.log('PASS: MR darkness defaults to 56%, reaches zero and 80%, and preserves an explicit setting after reload');
+ await expect(page.locator('[data-action="start-preview"]')).toBeEnabled({timeout:90000});await page.locator('[data-action="start-preview"]').click();
+ await expect(page.locator('.app-shell')).toHaveClass(/preview-clean/);await expect(page.locator('#preview-hud')).not.toBeVisible();
+ await expect(page.locator('#preview-scale')).toHaveValue('9');await expect(page.locator('#preview-restore')).toBeVisible();
+ await page.screenshot({path:'test-results/immersive-surround/default-clean-entry.png'});
+ await page.keyboard.press('Escape');await expect(page.locator('.app-shell')).not.toHaveClass(/preview-clean/);
+ await expect(page.locator('#preview-hud')).toBeVisible();await page.keyboard.press('Escape');await expect(page.locator('.app-shell')).not.toHaveClass(/preview-active/);
+ await page.locator('[data-action="settings"]').first().click();await Promise.all([page.waitForEvent('load'),page.locator('#language-setting').selectOption('it')]);await ready();await open();
+ await expect(page.locator('label[for="xr-dimming"]')).toContainText('realt\u00e0 mista');
+ assert.equal(await page.locator('label[for="xr-dimming"]').evaluate(el=>/\\u[0-9a-f]{4}/i.test(el.textContent)),false);
+ await expect(page.locator('#xr-dimming')).toHaveValue('0.36');
+ await page.setViewportSize({width:380,height:844});await page.locator('#xr-dimming').scrollIntoViewIfNeeded();await expect(page.locator('#xr-dimming')).toBeInViewport();
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ await page.screenshot({path:'test-results/immersive-surround/mr-settings-it-mobile.png'});
+ assert.deepEqual(errors,[]);console.log('PASS: Combined entry starts without the controls panel; Italian dimmer label, persistence and narrow-screen access work');
+}finally{await browser.close();}

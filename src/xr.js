@@ -1,6 +1,6 @@
 import { t } from './i18n.js';
 import * as THREE from 'three';
-import { singleGripTransform, dualGripTransform, isSelectionGesture } from './xr-math.js';
+import { singleGripTransform, dualGripTransform, isSelectionGesture, isTravelGesture, isClosedHand, createHeldGesture } from './xr-math.js';
 import { computeSpatialPlacement, spatialWorldToLocal } from './spatial-map.js';
 
 const WIDTH = 1160;
@@ -26,7 +26,7 @@ const SCALE_NAMES = [['Solar System','Sistema Solare'],['Nearby stars','Stelle v
  * onScale receives -1/+1; mapRoot transforms must be left to this module in VR.
  * XRInputSource.targetRaySpace works for both hands and handheld controllers.
  */
-export function createXR({ renderer, scene, camera, controls, mapRoot, getTargets, getBoundsRadius = () => 30, getEnvironment = () => [], onSelect, onFocus, onScale, getScale, getPresentationMode = () => 'atlas', getObjectLayers = () => null, onObjectLayerChange = () => {}, onSessionEnd, onImmersiveChange, onMessage = () => {}, onMapAction = () => {} }) {
+export function createXR({ renderer, scene, camera, controls, mapRoot, getTargets, getBoundsRadius = () => 30, getEnvironment = () => [], onSelect, onFocus, onTravel, onNavigateBack, onScale, getScale, getPresentationMode = () => 'atlas', getReducedMotion = () => false, getObjectLayers = () => null, onObjectLayerChange = () => {}, onSessionEnd, onImmersiveChange, onMessage = () => {}, onMapAction = () => {} }) {
   renderer.xr.enabled = true;
   renderer.xr.setReferenceSpaceType('local-floor');
   const raycaster = new THREE.Raycaster();
@@ -80,6 +80,11 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   let layout = 'room';
   let removeReferenceReset = null;
   let immersive = false;
+  let handsFirst = false;
+  let inspecting = false;
+  let overviewState = null;
+  let overviewPlaced = false;
+  let overviewScale = 0.04;
   let focusState = null;
   let snapshot = null;
   let recenterPending = false;
@@ -224,7 +229,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   }
 
   function pick(input) {
-    if (!input.controller.visible) return null;
+    if (!input.controller.visible || (input.source?.hand && !inputPose(input))) return null;
     input.controller.updateWorldMatrix(true, false);
     rotationMatrix.extractRotation(input.controller.matrixWorld);
     raycaster.ray.origin.setFromMatrixPosition(input.controller.matrixWorld);
@@ -246,11 +251,35 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       return { ...panelHit, button, panel: true };
     }
     // The terrestrial sky is a 60 m dome, not a miniature held at arm's length.
-    raycaster.far = isPlanetarium() || layout === 'room' ? 120 : 20;
+    raycaster.far = handsFirst && layout === 'room' ? 500 : isPlanetarium() || layout === 'room' ? 120 : 20;
     const targets = (getTargets?.() || []).filter(visibleObject);
     const hits = raycaster.intersectObjects(targets, false);
     const hit = hits.find(candidate => candidate.dataObject || candidate.object.userData.object);
-    return hit ? { ...hit, item: hit.dataObject || hit.object.userData.object } : null;
+    const direct = hit ? { ...hit, item: hit.dataObject || hit.object.userData.object } : null;
+    const backgroundHit = direct?.item?.environmentReference || direct?.object.userData.angularReferenceOnly;
+    if (direct && (!handsFirst || !backgroundHit)) return direct;
+    // Small distant bodies remain reachable with normal hand-tracking jitter.
+    // Indexed star catalogues retain their spatial ray index (never scan points).
+    if (!handsFirst) return null;
+    let assisted = null, bestScore = Infinity;
+    const point = new THREE.Vector3(), offset = new THREE.Vector3(), scale = new THREE.Vector3();
+    for (const target of targets) {
+      if (!target.userData.object || !target.geometry || target.userData.indexedCatalogue) continue;
+      target.getWorldPosition(point);
+      offset.copy(point).sub(raycaster.ray.origin);
+      const along = offset.dot(raycaster.ray.direction);
+      if (along < raycaster.near || along > raycaster.far) continue;
+      if (!target.geometry.boundingSphere) target.geometry.computeBoundingSphere();
+      const worldScale = target.getWorldScale(scale);
+      const radius = (target.geometry.boundingSphere?.radius || 0) * Math.max(Math.abs(worldScale.x), Math.abs(worldScale.y), Math.abs(worldScale.z));
+      const miss = Math.sqrt(Math.max(0, offset.lengthSq() - along * along));
+      const tolerance = Math.max(radius, Math.tan(THREE.MathUtils.degToRad(3)) * along + 0.015);
+      const score = miss / tolerance;
+      if (score > 1 || score >= bestScore) continue;
+      bestScore = score;
+      assisted = { object: target, point: point.clone(), distance: offset.length(), item: target.userData.object, assisted: true };
+    }
+    return assisted || direct;
   }
 
   function activate(hit) {
@@ -280,7 +309,15 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       }
     } else if (hit.item) {
       setInfo(hit.item);
-      onSelect?.(hit.item);
+      if (handsFirst && !isPlanetarium()) {
+        if (onTravel) onTravel(hit.item);
+        else if (onFocus) onFocus(hit.item);
+        else { onSelect?.(hit.item); focusObject(hit.item); }
+        // Engine navigation may change the scale and immediately start focus.
+        // Do not cancel that arrival on the next frame's view-change detection.
+        lastScale = getScale?.();
+        lastPresentationMode = presentationMode();
+      } else onSelect?.(hit.item);
     }
   }
 
@@ -290,7 +327,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     if (!pose) return;
     input.press = { kind, time: performance.now(), pose, hit: pick(input), manipulated: kind === 'squeeze', maxDistance: 0, maxAngle: 0 };
     gesture = null;
-    if (!input.press.hit?.panel) focusState = null;
+    if (!input.press.hit?.panel) { focusState = null; overviewState = null; }
   }
 
   // Feedback follows the whole grab, including transitions between one and two
@@ -321,9 +358,12 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     const distance = Math.max(press.maxDistance, pose ? pose.position.distanceTo(press.pose.position) : Infinity);
     const rotated = Math.max(press.maxAngle, pose ? pose.quaternion.angleTo(press.pose.quaternion) : Infinity);
     const releaseHit = pick(input);
-    if (isSelectionGesture({ duration, distance, rotated, manipulated: press.manipulated })) {
+    if ((handsFirst ? isTravelGesture : isSelectionGesture)({ duration, distance, rotated, manipulated: press.manipulated })) {
       const sameButton = press.hit?.panel && releaseHit?.panel && press.hit.button === releaseHit.button;
-      const sameObject = !press.hit?.panel && press.hit?.item && releaseHit?.item?.id === press.hit.item.id;
+      const targetStillAvailable = press.hit?.object && visibleObject(press.hit.object) && (getTargets?.() || []).includes(press.hit.object);
+      const sameObject = !press.hit?.panel && press.hit?.item && (handsFirst
+        ? targetStillAvailable
+        : releaseHit?.item?.id === press.hit.item.id);
       if (sameButton || sameObject) activate(press.hit);
     }
     input.press = null;
@@ -334,6 +374,9 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   function cancelInput(input) {
     input.press = null;
     input.pinching = false;
+    input.backHold?.reset();
+    input.backIndicator.visible = false;
+    input.fistActive = false;
     gesture = null;
     endReleasedMapGrab();
   }
@@ -347,16 +390,22 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     controller.add(ray);
     const cursor = new THREE.Mesh(new THREE.SphereGeometry(0.006, 10, 8), jointMaterials[i]);
     cursor.visible = false;
-    scene.add(controller, grip, hand, cursor);
+    const backIndicator = new THREE.Mesh(new THREE.RingGeometry(0.021, 0.024, 48), new THREE.MeshBasicMaterial({ color: 0xa5efe7, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthTest: false, toneMapped: false }));
+    backIndicator.name = 'XR back gesture progress';
+    backIndicator.renderOrder = 101;
+    backIndicator.visible = false;
+    scene.add(controller, grip, hand, cursor, backIndicator);
     // A small procedural grip stays available when controller models are absent.
     const handle = new THREE.Mesh(new THREE.CapsuleGeometry(0.018, 0.065, 4, 8), new THREE.MeshBasicMaterial({ color: 0x24414a, wireframe: true }));
     handle.rotation.x = Math.PI / 3;
     grip.add(handle);
     ownedGeometries.add(cursor.geometry);
+    ownedGeometries.add(backIndicator.geometry);
+    ownedMaterials.add(backIndicator.material);
     ownedGeometries.add(handle.geometry);
     ownedMaterials.add(ray.material);
     ownedMaterials.add(handle.material);
-    const input = { controller, grip, hand, ray, cursor, handle, source: null, press: null, pinching: false, joints: new Map() };
+    const input = { controller, grip, hand, ray, cursor, handle, source: null, press: null, pinching: false, fistActive: false, backIndicator, backHold: createHeldGesture(), joints: new Map() };
     inputs.push(input);
     listen(controller, 'connected', event => {
       input.source = event.data;
@@ -394,6 +443,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     endMapGrab();
     gesture = null;
     focusState = null;
+    inspecting = false;
     const viewer = renderer.xr.getCamera();
     const placement = computeSpatialPlacement({
       boundsRadius: getBoundsRadius(),
@@ -401,17 +451,21 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       viewerQuaternion: viewer.getWorldQuaternion(new THREE.Quaternion()),
       layout, planetarium: isPlanetarium(),
     });
-    baseScale = placement.scale;
-    applyTransform(placement);
+    baseScale = overviewScale = placement.scale;
+    if (handsFirst && overviewPlaced) overviewState = { from: rootTransform(), to: placement, elapsed: 0 };
+    else { overviewState = null; applyTransform(placement); }
+    overviewPlaced = true;
     positionPanel();
     recenterPending = false;
     onMapAction({ type: 'reveal' });
+    if (handsFirst) onMapAction({ type: 'overview' });
   }
 
   /** A floor-space origin reset changes coordinates, not the physical map pose. */
   function referenceReset(event) {
     for (const input of inputs) cancelInput(input);
     focusState = null;
+    overviewState = null;
     if (!event.transform?.matrix) {
       recenter();
       onMessage(t('Tracking origin changed. The map has been recentered.', 'Origine del tracciamento cambiata. La mappa è stata ricentrata.'));
@@ -459,7 +513,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     immersive = Boolean(value);
     panel.visible = active && !immersive;
     syncLayerState();
-    restoreOrb.visible = active && immersive;
+    restoreOrb.visible = active && immersive && !handsFirst;
     if (active) {
       if (immersive) positionRestoreOrb();
       else positionPanel();
@@ -473,9 +527,35 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   function recenter() {
     if (!active) return false;
     focusState = null;
+    overviewState = null;
     recenterPending = true;
     for (const input of inputs) cancelInput(input);
     return true;
+  }
+
+  /** First leave a close-up; the next deliberate gesture navigates one level out. */
+  function navigateBack() {
+    if (!active) return false;
+    if (inspecting || rootTransform().scale > overviewScale * 1.6) return recenter();
+    if (onNavigateBack) onNavigateBack();
+    else recenter();
+    lastScale = getScale?.();
+    lastPresentationMode = presentationMode();
+    return true;
+  }
+
+  function updateOverview(delta) {
+    if (!overviewState) return;
+    const state = overviewState;
+    state.elapsed += Math.max(0, Math.min(Number.isFinite(delta) ? delta : 1 / 60, 0.1));
+    const progress = getReducedMotion() ? 1 : Math.min(1, state.elapsed / 0.55);
+    const eased = progress * progress * (3 - 2 * progress);
+    applyTransform({
+      position: state.from.position.clone().lerp(state.to.position, eased),
+      quaternion: state.from.quaternion.clone().slerp(state.to.quaternion, eased),
+      scale: Math.exp(THREE.MathUtils.lerp(Math.log(state.from.scale), Math.log(state.to.scale), eased)),
+    });
+    if (progress === 1) overviewState = null;
   }
 
   function objectAnchor(object, extent) {
@@ -504,6 +584,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   function focusObject(object, extent) {
     if (!active || !object || isPlanetarium()) return false;
     if (recenterPending) placeOverview();
+    overviewState = null;
     const anchor = objectAnchor(object, extent);
     if (!anchor) return false;
     const viewer = renderer.xr.getCamera();
@@ -513,11 +594,13 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     const fromCenter = mapRoot.localToWorld(anchor.center.clone());
     const radius = THREE.MathUtils.clamp(extent?.displayRadius ?? 0.28, 0.2, 0.35);
     for (const input of inputs) cancelInput(input);
+    inspecting = true;
     focusState = {
       object, extent, radius, destination, fromCenter, fromScale: mapRoot.scale.x,
-      quaternion: mapRoot.quaternion.clone(), elapsed: 0, duration: 0.85,
+      quaternion: mapRoot.quaternion.clone(), elapsed: 0, duration: handsFirst ? 0.55 : 0.85,
     };
     onMapAction({ type: 'focus', object });
+    if (handsFirst) onMapAction({ type: 'travel', object });
     return true;
   }
 
@@ -530,7 +613,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     const scaleFactor = Math.max(Math.abs(parentScale.x), Math.abs(parentScale.y), Math.abs(parentScale.z));
     const nextScale = state.radius / (anchor.radius * scaleFactor);
     if (!Number.isFinite(nextScale) || nextScale < 1e-8 || nextScale > 1000) { focusState = null; return; }
-    state.elapsed += Math.max(0, Math.min(Number.isFinite(delta) ? delta : 1 / 60, 0.1));
+    state.elapsed = getReducedMotion() ? state.duration : state.elapsed + Math.max(0, Math.min(Number.isFinite(delta) ? delta : 1 / 60, 0.1));
     const progress = Math.min(1, state.elapsed / state.duration);
     const eased = progress * progress * (3 - 2 * progress);
     const scale = Math.exp(THREE.MathUtils.lerp(Math.log(state.fromScale), Math.log(nextScale), eased));
@@ -552,6 +635,9 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     const viewChanged = snapshot ? snapshot.scale !== getScale?.() : false;
     active = false;
     entering = false;
+    overviewState = null;
+    overviewPlaced = false;
+    inspecting = false;
     panel.visible = false;
     layerPanel.visible = false;
     restoreOrb.visible = false;
@@ -586,6 +672,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
         controls.enabled = viewChanged || currentMode !== previousPresentationMode ? currentMode !== 'planetarium' : snapshot.controlsEnabled;
         controls.target.copy(snapshot.target);
       }
+      setImmersive(snapshot.immersive);
       snapshot = null;
     }
     onSessionEnd?.({ presentationMode: currentMode, previousPresentationMode, viewChanged, modeChanged: currentMode !== previousPresentationMode });
@@ -594,7 +681,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       : t('VR session ended. The desktop atlas is restored.', 'Sessione VR terminata. Sei tornato all’atlante.'));
   }
 
-  async function enter({ mode = 'immersive-vr', layout: requestedLayout = 'room' } = {}) {
+  async function enter({ mode = 'immersive-vr', layout: requestedLayout = 'room', handsFirst: requestedHandsFirst = false } = {}) {
     if (mode !== 'immersive-vr' && mode !== 'immersive-ar') return false;
     if (disposed) return false;
     if (active) {
@@ -623,8 +710,11 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
         return false;
       }
       sessionMode = mode;
+      handsFirst = Boolean(requestedHandsFirst);
+      overviewPlaced = false;
       layout = requestedLayout === 'tabletop' ? 'tabletop' : 'room';
       snapshot = {
+        immersive,
         background: scene.background, fog: scene.fog,
         clearColor: renderer.getClearColor?.(new THREE.Color()), clearAlpha: renderer.getClearAlpha?.() ?? 1,
         environment: getEnvironment().filter(Boolean).map(object => [object, object.visible]), controlsEnabled: controls?.enabled,
@@ -633,6 +723,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
         rootPosition: mapRoot.position.clone(), rootQuaternion: mapRoot.quaternion.clone(), rootScale: mapRoot.scale.clone(),
         target: controls?.target.clone(), presentationMode: presentationMode(), scale: getScale?.(),
       };
+      if (handsFirst) setImmersive(true);
       if (mode === 'immersive-ar') {
         scene.background = null;
         scene.fog = null;
@@ -673,7 +764,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       entering = false;
       panel.visible = !immersive;
       syncLayerState();
-      restoreOrb.visible = immersive;
+      restoreOrb.visible = immersive && !handsFirst;
       recenterPending = true;
       panelDirty = true;
       onMessage(mode === 'immersive-ar' && isPlanetarium()
@@ -708,13 +799,19 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
 
   function update(delta = 1 / 60) {
     if (!active || !renderer.xr.isPresenting) return;
+    const session = renderer.xr.getSession();
+    const frame = renderer.xr.getFrame?.(), referenceSpace = renderer.xr.getReferenceSpace?.();
+    if ((session?.visibilityState && session.visibilityState !== 'visible') || (frame && referenceSpace && !frame.getViewerPose(referenceSpace))) {
+      for (const input of inputs) cancelInput(input);
+      return;
+    }
     const currentMode = presentationMode();
     const currentScale = getScale?.();
     syncLayerState();
     if (currentMode !== lastPresentationMode || currentScale !== lastScale) {
       lastScale = currentScale;
       lastPresentationMode = currentMode;
-      recenter();
+      if (!(handsFirst && focusState)) recenter();
       panelDirty = true;
     }
     if (recenterPending) {
@@ -723,8 +820,9 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       if (frame && referenceSpace && !frame.getViewerPose(referenceSpace)) return;
       placeOverview();
     }
+    updateOverview(delta);
     updateFocus(delta);
-    if (immersive) positionRestoreOrb();
+    if (immersive && !handsFirst) positionRestoreOrb();
     const time = performance.now();
     let nextHover = -1;
     for (let i = 0; i < inputs.length; i++) {
@@ -743,10 +841,28 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
         if (!pose) {
           cancelInput(input);
         } else {
+          const fistTracked = ['index', 'middle', 'ring', 'pinky'].every(finger => input.hand.joints[`${finger}-finger-tip`]?.visible && input.hand.joints[`${finger}-finger-phalanx-intermediate`]?.visible);
+          const closed = handsFirst && input.source.handedness === 'left' && isClosedHand(input.hand.joints);
+          input.fistActive = closed;
+          if (closed) {
+            // A fist takes precedence over incidental thumb/index contact.
+            if (input.press) { input.press = null; input.pinching = false; gesture = null; endReleasedMapGrab(); }
+            const otherBusy = inputs.some(other => other !== input && other.press);
+            if (input.backHold.update(true, delta, !otherBusy)) navigateBack();
+          } else input.backHold.update(false, delta, fistTracked);
+          const progress = input.backHold.progress;
+          input.backIndicator.visible = progress > 0;
+          if (progress > 0) {
+            const eye = renderer.xr.getCamera().getWorldPosition(new THREE.Vector3());
+            input.hand.joints.wrist.getWorldPosition(input.backIndicator.position);
+            input.backIndicator.position.addScaledVector(eye.clone().sub(input.backIndicator.position).normalize(), 0.035);
+            input.backIndicator.lookAt(eye);
+            input.backIndicator.geometry.setDrawRange(0, Math.ceil(progress * 48) * 6);
+          }
           const thumb = input.hand.joints['thumb-tip'];
           const index = input.hand.joints['index-finger-tip'];
           const gap = thumb.position.distanceTo(index.position);
-          const pinching = input.pinching ? gap < 0.03 : gap < 0.018;
+          const pinching = !closed && (input.pinching ? gap < 0.03 : gap < 0.018);
           if (pinching && !input.pinching) startInput(input, 'pinch');
           else if (!pinching && input.pinching) endInput(input);
           input.pinching = pinching;
@@ -754,17 +870,17 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       } else if (input.press && !inputPose(input)) {
         cancelInput(input);
       }
-      const hit = pick(input);
-      input.cursor.visible = !!hit && !!input.source;
+      const hit = handsFirst && input.press?.hit && !input.press.manipulated ? input.press.hit : pick(input);
+      input.cursor.visible = !!hit && !!input.source && !input.fistActive;
       if (hit) {
         input.cursor.position.copy(hit.point);
-        input.cursor.scale.setScalar(isPlanetarium() && !hit.panel ? Math.max(1, hit.distance / 2) : 1);
+        input.cursor.scale.setScalar(!hit.panel && (isPlanetarium() || handsFirst) ? Math.max(1, Math.min(12, hit.distance / 2)) : 1);
         input.ray.scale.z = hit.distance;
         if (hit.panel && hit.button >= 0) nextHover = hit.button;
       } else {
         input.ray.scale.z = 3;
       }
-      input.ray.material.opacity = input.press ? 0.9 : 0.4;
+      input.ray.material.opacity = input.fistActive ? 0 : input.press ? 0.75 : handsFirst ? (hit ? 0.2 : 0.045) : 0.4;
       if (input.press) {
         const pose = inputPose(input);
         if (pose) {
@@ -782,13 +898,15 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       if (gesture?.mode !== 'dual' || gesture.first.distanceTo(gesture.second) < 0.03) {
         gesture = { mode: 'dual', root: rootTransform(), first: poses[0].position, second: poses[1].position };
       }
-      applyTransform(dualGripTransform(gesture.root, gesture.first, gesture.second, poses[0].position, poses[1].position, baseScale * 0.3, baseScale * 4));
+      applyTransform(dualGripTransform(gesture.root, gesture.first, gesture.second, poses[0].position, poses[1].position,
+        handsFirst ? Math.max(1e-8, gesture.root.scale * 0.015) : baseScale * 0.3,
+        handsFirst ? Math.min(1e5, gesture.root.scale * 64) : baseScale * 4, handsFirst ? 2.4 : 1));
       updateMapGrab(poses);
     } else if (grabbing.length === 1) {
       const input = grabbing[0];
       const press = input.press;
       const pose = inputPose(input);
-      const shouldGrab = press.manipulated || time - press.time > 350 || press.maxDistance >= 0.025 || press.maxAngle >= 0.12;
+      const shouldGrab = press.manipulated || time - press.time > (handsFirst ? 420 : 350) || press.maxDistance >= (handsFirst ? 0.045 : 0.025) || press.maxAngle >= (handsFirst ? 0.28 : 0.12);
       if (shouldGrab) {
         press.manipulated = true;
         if (gesture?.mode !== 'single' || gesture.input !== input) {
@@ -819,6 +937,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     for (const input of inputs) {
       input.ray.removeFromParent();
       input.cursor.removeFromParent();
+      input.backIndicator.removeFromParent();
       // Only this module creates children on these grip groups.
       input.handle.removeFromParent();
       for (const visual of input.joints.values()) visual.removeFromParent();
@@ -843,5 +962,5 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   }
 
   paintPanel();
-  return { enter, setLayout, update, setInfo, focusObject, recenter, setImmersive, dispose, get layout() { return layout; }, get mode() { return sessionMode; }, get isPresenting() { return active; }, get isImmersive() { return immersive; } };
+  return { enter, setLayout, update, setInfo, focusObject, recenter, navigateBack, setImmersive, dispose, get handsFirst() { return handsFirst; }, get isInspecting() { return inspecting; }, get environmentBlendMode() { return renderer.xr.getSession()?.environmentBlendMode || null; }, get layout() { return layout; }, get mode() { return sessionMode; }, get isPresenting() { return active; }, get isImmersive() { return immersive; } };
 }

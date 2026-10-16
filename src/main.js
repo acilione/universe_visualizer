@@ -31,6 +31,7 @@ const state = {
   autoRotate: typeof preferences.autoRotate === 'boolean' ? preferences.autoRotate : !reducedMotion,
   quality: preferences.quality === 'low' ? 'low' : 'high',
   gaiaDr3: preferences.gaiaDr3 === true,
+  mrDimming: Number.isFinite(preferences.mrDimming) ? Math.max(0,Math.min(.8,preferences.mrDimming)) : .56,
   objectLayers: Object.fromEntries(['planets','stars','nebulae'].map(name=>[name,preferences.objectLayers?.[name]!==false])),
   tour: false, sound: false, cinematic: false
 };
@@ -54,7 +55,7 @@ let returnFocus = null;
 let xrSupported = false;
 let mrSupported = false;
 let spatialLayout = 'room';
-let immersiveContent = 'current';
+let immersiveContent = 'combined';
 let combinedData = null;
 let combinedPromise = null;
 let combinedLoading = false;
@@ -157,7 +158,7 @@ $('#app').innerHTML = `
           <div class="preview-actions preview-map-actions" role="group" aria-label="${t("Transform the map","Trasforma la mappa")}"><button data-action="preview-scale-down" aria-label="${t("Reduce map size","Riduci dimensione mappa")}" title="${t("Reduce map size","Riduci dimensione mappa")}">${icon('minus')}</button><button data-action="preview-scale-up" aria-label="${t("Increase map size","Aumenta dimensione mappa")}" title="${t("Increase map size","Aumenta dimensione mappa")}">${icon('plus')}</button><button data-action="preview-rotate-left" aria-label="${t("Rotate map left","Ruota mappa a sinistra")}" title="${t("Rotate map left","Ruota mappa a sinistra")}">${icon('rotate-ccw')}</button><button data-action="preview-rotate-right" aria-label="${t("Rotate map right","Ruota mappa a destra")}" title="${t("Rotate map right","Ruota mappa a destra")}">${icon('rotate-cw')}</button><button data-action="recenter-preview">${t("Reset placement","Ripristina posizione")}</button><button data-action="preview-replay" aria-label="${t("Replay map opening","Ripeti apertura della mappa")}" title="${t("Replay map opening","Ripeti apertura della mappa")}">${icon('play')}${t("Replay opening","Ripeti apertura")}</button><button data-action="preview-search">${icon('search')}${t("Search","Cerca")}</button></div>
           <button class="preview-object" data-action="preview-object"><span id="preview-selection"></span>${icon('info')}</button>
         </div>
-        <div class="preview-help"><p>${t("W A S D: walk · Q / E: down / up · Shift: faster","W A S D: cammina · Q / E: scendi / sali · Shift: più veloce")}</p><p>${t("Drag: look around · Click: select · Esc: exit","Trascina: guarda intorno · Clic: seleziona · Esc: esci")}</p><button data-action="preview-pointer-lock">${t("Enable mouse look","Attiva visuale con mouse")}</button></div>
+        <div class="preview-help"><p>${t("W A S D: walk · Q / E: down / up · Shift: faster","W A S D: cammina · Q / E: scendi / sali · Shift: più veloce")}</p><p>${t("Drag: look · Click: travel · Scroll: zoom · B: back · Esc: exit","Trascina: guarda · Clic: raggiungi · Rotellina: zoom · B: indietro · Esc: esci")}</p><button data-action="preview-pointer-lock">${t("Enable mouse look","Attiva visuale con mouse")}</button></div>
       </div>
     </section>
     <button id="preview-restore" data-action="preview-clean" title="${t("Show controls","Mostra comandi")}" aria-label="${t("Show preview controls","Mostra comandi anteprima")}" hidden>${icon('minimize-2')}</button>
@@ -169,8 +170,8 @@ $('#app').innerHTML = `
 `;
 
 function savePreferences() {
-  const { labels, grid, particles, autoRotate, quality, objectLayers, gaiaDr3 } = state;
-  try { localStorage.setItem('aether.preferences', JSON.stringify({ labels, grid, particles, autoRotate, quality, objectLayers, gaiaDr3 })); } catch { /* Storage can be unavailable in private browsers. */ }
+  const { labels, grid, particles, autoRotate, quality, objectLayers, gaiaDr3, mrDimming } = state;
+  try { localStorage.setItem('aether.preferences', JSON.stringify({ labels, grid, particles, autoRotate, quality, objectLayers, gaiaDr3, mrDimming })); } catch { /* Storage can be unavailable in private browsers. */ }
 }
 
 function notify(message) {
@@ -946,13 +947,14 @@ function vrContent() {
     <label class="xr-layout-setting" for="xr-layout">${t("Initial map layout","Disposizione iniziale della mappa")}<select id="xr-layout"><option value="room" ${spatialLayout==='room'?'selected':''}>${t("Room scale · map surrounds you","Scala ambiente · mappa intorno a te")}</option><option value="tabletop" ${spatialLayout==='tabletop'?'selected':''}>${t("Tabletop · small map in front","Mappa ridotta · davanti a te")}</option></select></label>
     <label class="xr-layout-setting" for="xr-content">${t('Map content','Contenuto della mappa')}<select id="xr-content"><option value="current" ${immersiveContent==='current'?'selected':''}>${t('Current map','Mappa attuale')}</option><option value="combined" ${immersiveContent==='combined'?'selected':''}>${t('Combined map: planets, stars and nebulae','Mappa combinata: pianeti, stelle e nebulose')}</option></select></label>
     ${immersiveContent==='combined'?`<div class="object-layer-switches" role="group" aria-label="${t('Object categories','Categorie di oggetti')}">${objectLayerButtons()}</div><p class="combined-projection-note">${t('Solar System model plus catalogue sky directions. Exoplanet markers share their host positions; sky distances use a separate display scale.','Modello del Sistema Solare e direzioni celesti di catalogo. Gli esopianeti condividono la posizione della stella ospite; il cielo usa una scala visiva separata.')}</p><p id="combined-load-status" role="status">${combinedLoading?t('Loading NASA catalogues…','Caricamento cataloghi NASA…'):escape(combinedError||t('All three object categories are available.','Tutte e tre le categorie di oggetti sono disponibili.'))}</p>${combinedError?`<button class="focus-button" data-action="retry-combined">${t('Retry catalogue loading','Riprova caricamento cataloghi')}</button>`:''}`:''}
+    <label class="xr-layout-setting" for="xr-dimming"><span>${t('Dim room in mixed reality','Oscura ambiente in realt\u00e0 mista')} <output id="xr-dimming-value">${Math.round(state.mrDimming*100)}%</output></span><input id="xr-dimming" type="range" min="0" max="0.8" step="0.04" value="${state.mrDimming}" /></label>
     <div class="xr-mode-options">
-      <article class="xr-mode-card"><h3>${t("DESKTOP PREVIEW","ANTEPRIMA PC")}</h3><p>${t("View the same spatial layout on your PC. Walk with W A S D, change height with Q / E and drag to look around. No headset required.","Osserva la stessa disposizione spaziale sul PC. Cammina con W A S D, cambia altezza con Q / E e trascina per guardarti intorno. Non serve un visore.")}</p><button class="focus-button" data-action="start-preview" ${universe&&contentReady?'':'disabled'}>${icon('monitor')}${t("Start desktop preview","Avvia anteprima PC")}</button></article>
-      <article class="xr-mode-card"><h3>${t("META QUEST MIXED REALITY","REALTÀ MISTA META QUEST")}</h3><p>${t("See your room through passthrough, with the map fixed around you. Walk between objects and use hands or controllers to interact.","Vedi il tuo ambiente attraverso il passthrough, con la mappa fissa intorno a te. Cammina tra gli oggetti e interagisci con mani o controller.")}</p><button class="focus-button" data-action="start-mr" ${mrSupported&&universe&&contentReady?'':'disabled'}>${icon('scan')}${t("Enter mixed reality","Entra in realtà mista")}</button><small>${mrSupported?t("Passthrough session supported.","Sessione passthrough supportata."):t("Requires an immersive AR session in a compatible headset browser.","Richiede una sessione AR immersiva nel browser di un visore compatibile.")}</small></article>
+      <article class="xr-mode-card"><h3>${t("DESKTOP PREVIEW","ANTEPRIMA PC")}</h3><p>${t("Enter the surrounding map on your PC. Click to travel, scroll for fast zoom, and press B to go back. W A S D moves; drag to look.","Entra nella mappa sul PC. Clicca per raggiungere un oggetto, usa la rotellina per lo zoom rapido e B per tornare indietro. W A S D per muoverti, trascina per guardare.")}</p><button class="focus-button" data-action="start-preview" ${universe&&contentReady?'':'disabled'}>${icon('monitor')}${t("Start desktop preview","Avvia anteprima PC")}</button></article>
+      <article class="xr-mode-card"><h3>${t("META QUEST MIXED REALITY","REALTÀ MISTA META QUEST")}</h3><p>${t("A dimmed room surrounded by the map. Point and pinch to reach an object; spread two pinches to zoom. Explore with bare hands and no menu.","La mappa ti circonda in un ambiente oscurato. Punta e pizzica per raggiungere un oggetto; allontana due pizzichi per ingrandire. Esplora a mani nude, senza menu.")}</p><button class="focus-button" data-action="start-mr" ${mrSupported&&universe&&contentReady?'':'disabled'}>${icon('scan')}${t("Enter mixed reality","Entra in realtà mista")}</button><small>${mrSupported?t("Passthrough session supported.","Sessione passthrough supportata."):t("Requires an immersive AR session in a compatible headset browser.","Richiede una sessione AR immersiva nel browser di un visore compatibile.")}</small></article>
       <article class="xr-mode-card"><h3>${t("VIRTUAL REALITY","REALTÀ VIRTUALE")}</h3><p>${t("Enter the spatial map with a fully virtual background. Room-scale walking and the same map interactions are available.","Entra nella mappa spaziale con uno sfondo interamente virtuale. Puoi camminare nell'ambiente e usare gli stessi comandi della mappa.")}</p><button class="focus-button" data-action="start-vr" ${xrSupported&&universe&&contentReady?'':'disabled'}>${icon('glasses')}${t("Enter VR atlas","Entra nell'atlante VR")}</button></article>
     </div>
     <p id="xr-status" role="status">${status}</p>
-    <h3>${t("HANDS AND CONTROLLERS","MANI E CONTROLLER")}</h3><p>${t("Brief pinch or trigger: select. Hold a pinch or grip: move and rotate the map. Two hands: resize. Release to fix the map in its new position. The spatial panel provides scale navigation, reset and exit.","Pizzico breve o grilletto: seleziona. Pizzico mantenuto o presa: sposta e ruota la mappa. Due mani: ridimensiona. Rilascia per fissare la nuova posizione. Il pannello spaziale permette di cambiare scala, ripristinare ed uscire.")}</p>
+    <h3>${t("HANDS AND CONTROLLERS","MANI E CONTROLLER")}</h3><p>${t("Point and briefly pinch: travel to an object or enter its system. Hold a pinch: move and rotate the map. Pinch with both hands and spread or bring them together: fast zoom. Hold a closed left fist: return to the overview; repeat to move one level outward. Controllers also work; the headset system gesture exits.","Punta e pizzica brevemente: raggiungi un oggetto o entra nel suo sistema. Mantieni un pizzico: sposta e ruota la mappa. Pizzica con entrambe le mani e allontanale o avvicinale: zoom rapido. Mantieni chiuso il pugno sinistro: torna alla vista generale; ripeti per uscire di un livello. Funziona anche con controller; usa il gesto di sistema del visore per uscire.")}</p>
     <p>${t("Enable hand tracking in the headset settings. Earth and catalogue sky views retain their angular projection; their sky cannot be grabbed or walked through.","Attiva il tracciamento delle mani nelle impostazioni del visore. Le viste del cielo terrestre e del catalogo mantengono la proiezione angolare; il cielo non può essere afferrato o attraversato.")}</p>`;
 }
 
@@ -971,7 +973,7 @@ async function startVR(button, mode='immersive-vr') {
   button.disabled = true;
   try {
     if(immersiveContent==='combined'&&universe.index!==9)universe.buildCombinedMap(combinedData);
-    const started = await universe.enterVR({mode,layout:spatialLayout});
+    const started = await universe.enterVR({mode,layout:spatialLayout,handsFirst:true});
     if (started) closeModal();
   } catch (error) { notify(error?.message || t("Unable to start the immersive session.","Impossibile avviare la sessione immersiva.")); }
   finally { button.disabled = false; }
@@ -1006,7 +1008,7 @@ function onPreviewChange(active, details={}) {
   if(!active)setPreviewClean(false);
   const selectors='.topbar,.intro,.left-panel,.right-panel,.bottom-panel,.footer,.view-controls,.center-caption,.labels,.exit-cinema';
   document.querySelectorAll(selectors).forEach(element=>{element.inert=active || state.cinematic;});
-  $('#universe').setAttribute('aria-label',active?t("Desktop VR preview. W A S D to walk, Q and E to change height, drag to look and click to select.","Anteprima VR su PC. W A S D per camminare, Q ed E per cambiare altezza, trascina per guardare e clicca per selezionare."):t("Three-dimensional cosmic atlas. Drag to orbit and scroll to zoom.","Atlante cosmico tridimensionale. Trascina per orbitare e usa la rotellina per avvicinarti."));
+  $('#universe').setAttribute('aria-label',active?t("Desktop VR preview. W A S D to walk, Q and E to change height, drag to look, click to travel, scroll to zoom and B to go back.","Anteprima VR su PC. W A S D per camminare, Q ed E per cambiare altezza, trascina per guardare, clicca per raggiungere, rotellina per lo zoom e B per tornare indietro."):t("Three-dimensional cosmic atlas. Drag to orbit and scroll to zoom.","Atlante cosmico tridimensionale. Trascina per orbitare e usa la rotellina per avvicinarti."));
   updatePreviewHud();
 }
 
@@ -1014,7 +1016,8 @@ function startPreview() {
   if(!universe||(immersiveContent==='combined'&&!combinedData))return;
   if(immersiveContent==='combined'&&universe.index!==9)universe.buildCombinedMap(combinedData);
   stopTour();if(state.cinematic)setCinematic(false);closeModal();
-  universe.enterPreview({layout:spatialLayout});
+  universe.enterPreview({layout:spatialLayout,directTravel:true});
+  setPreviewClean(true);
   $('#universe').focus();
 }
 
@@ -1038,6 +1041,11 @@ $('#modal').addEventListener('error', event => {
   image.closest('.archive-image').querySelector('figcaption').prepend(message);
 },true);
 
+document.addEventListener('input', event => {
+  if(event.target.id!=='xr-dimming')return;
+  state.mrDimming=universe?.setMRDimming(Number(event.target.value))??Number(event.target.value);
+  const output=$('#xr-dimming-value');if(output)output.textContent=Math.round(state.mrDimming*100)+'%';savePreferences();
+});
 document.addEventListener('change', event => {
   if(event.target.id==='xr-content'){immersiveContent=event.target.value==='combined'?'combined':'current';refreshCombinedLoading();if(immersiveContent==='combined')prepareCombinedCatalogue().catch(()=>{});else refreshCombinedLoading();return;}
   if(event.target.id==='xr-layout'||event.target.id==='preview-layout'){spatialLayout=event.target.value==='tabletop'?'tabletop':'room';if(universe?.preview.isActive)universe.preview.setLayout(spatialLayout);return;}
@@ -1221,6 +1229,7 @@ try {
   });
   ['labels','grid','particles'].forEach(name => universe.setLayer(name, state[name]));
   universe.setAutoRotate(state.autoRotate);
+  universe.setMRDimming(state.mrDimming);
   universe.setQuality(state.quality);
 } catch (error) {
   announceFailure();
