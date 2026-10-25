@@ -1,0 +1,93 @@
+import assert from 'node:assert/strict';
+import { mkdir } from 'node:fs/promises';
+import { chromium, expect as playwrightExpect } from '@playwright/test';
+import { GAIA_DR3_HIPS } from '../src/gaia-manifest.js';
+const expect = playwrightExpect.configure({ timeout: 45000 });
+const base = (process.env.TEST_URL || 'http://localhost:5173').replace(/\/$/, '');
+const output = 'test-results/multi-constellations'; await mkdir(output, { recursive: true });
+const browser = await chromium.launch({ headless: true, args: ['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'] });
+const context = await browser.newContext({ viewport:{width:1280,height:900},deviceScaleFactor:.75,reducedMotion:'reduce',timezoneId:'UTC' });
+const page = await context.newPage(); page.setDefaultTimeout(45000);
+const errors=[];page.on('pageerror',error=>errors.push(error.message));
+await context.addInitScript(()=>localStorage.setItem('aether.preferences',JSON.stringify({quality:'low',autoRotate:false,particles:false,labels:false})));
+await context.route('https://fonts.googleapis.com/**',route=>route.fulfill({status:204,body:''}));
+await context.route('https://fonts.gstatic.com/**',route=>route.fulfill({status:204,body:''}));
+await context.route('**/src/main.js*',async route=>{
+  const response=await route.fetch();await route.fulfill({response,body:await response.text()+'\nObject.defineProperty(window,"testAtlas",{get:()=>universe});\n'});
+});
+let releaseStars;let held=0;let ready=new Promise(resolve=>{releaseStars=resolve;});
+await context.route('**/catalog/stars.json',async route=>{held++;await ready;await route.continue();});
+try{
+  await page.goto(base,{waitUntil:'networkidle',timeout:90000});
+  await expect(page.locator('.loading')).toBeHidden({timeout:90000});
+  await page.waitForFunction(()=>window.testAtlas?.index===9);
+  await page.locator('[data-action="constellations"]').first().click();
+  await expect(page.locator('#constellation-results [data-constellation]')).toHaveCount(88);
+  await page.locator('#modal [data-constellation="Ori"]').click();
+  await expect.poll(()=>held).toBe(1);
+  assert.equal(await page.evaluate(()=>testAtlas.index),9,'The old map remains active while its first constellation catalogue loads');
+  await page.locator('#observer-settings > summary').click();
+  await page.locator('#observer-latitude').fill('39.5');
+  await page.locator('#observer-longitude').fill('16.2');
+  await page.locator('#observer-timezone').selectOption('Europe/Rome');
+  await page.locator('#observer-datetime').fill('2027-01-22T20:30');
+  await page.locator('#observer-datetime').dispatchEvent('change');
+  releaseStars();
+  await page.waitForFunction(()=>testAtlas.index===6&&testAtlas.constellationData.observer.latitude===39.5&&testAtlas.constellationData.observer.longitude===16.2&&testAtlas.constellationData.observer.dateIso==='2027-01-22T19:30:00.000Z');
+  assert.deepEqual(await page.evaluate(()=>testAtlas.viewContext.constellationIds),['Ori']);
+  await expect(page.locator('#constellation-controls')).not.toHaveAttribute('aria-busy','true');
+  console.log('PASS: Observer edits during the first delayed constellation load keep the latest values and pending selection');
+  await page.locator('#observer-settings > summary').click();
+  await page.locator('#constellation-search').fill('Ursa Major');
+  const option=page.locator('#modal [data-constellation="UMa"]');
+  await option.focus();await page.keyboard.press('Space');
+  await expect(option).toHaveAttribute('aria-checked','true');
+  await expect(page.locator('#constellation-controls')).not.toHaveAttribute('aria-busy','true');
+  const focused=await page.evaluate(()=>({tag:document.activeElement?.tagName,id:document.activeElement?.dataset.constellation||null}));
+  console.log('Keyboard focus after Space:',JSON.stringify(focused));
+  await page.screenshot({path:output+'/desktop-selection.png',timeout:60000});
+  assert.equal(focused.id,'UMa','A checklist rerender must preserve keyboard focus on its toggled figure');
+  await page.keyboard.press('Space');await expect(option).toHaveAttribute('aria-checked','false');
+  assert.equal(await page.evaluate(()=>document.activeElement?.dataset.constellation),'UMa');
+  assert.deepEqual(await page.evaluate(()=>testAtlas.viewContext.constellationIds),['Ori']);
+  await page.setViewportSize({width:390,height:844});
+  await page.screenshot({path:output+'/mobile-keyboard-selection.png',timeout:60000});
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  assert.deepEqual(errors,[]);
+  console.log('PASS: Repeated Space toggles retain checkbox focus and remain usable at mobile width');
+
+  // A pending first selection must not overtake a new catalogue handoff.
+  await page.evaluate(()=>{localStorage.clear();sessionStorage.clear();});
+  held=0;ready=new Promise(resolve=>{releaseStars=resolve;});
+  await page.setViewportSize({width:1280,height:900});
+  const service=GAIA_DR3_HIPS.baseUrl;let centre={ra:0,dec:0};
+  const properties=`creator_did = ivo://CDS/I/355/gaiadr3\ndataproduct_type = catalog\nhips_frame = equatorial\nhips_tile_format = tsv\nhips_cat_nrows = 1811709771\nhips_order_min = 1\nhips_order = 11\nhips_service_url = ${service}\n`;
+  const metadata='<VOTABLE><COOSYS system="ICRS" epoch="2016.0"/><RESOURCE><TABLE><FIELD name="Source" datatype="long"/>'+[['RAdeg','deg'],['DEdeg','deg'],['Gmag','mag'],['Plx','mas'],['e_Plx','mas'],['pmRA','mas/yr'],['pmDE','mas/yr']].map(([name,unit])=>`<FIELD name="${name}" datatype="double" unit="${unit}"/>`).join('')+'</TABLE></RESOURCE></VOTABLE>';
+  await context.route(service+'/**',route=>{
+    const url=route.request().url(),headers={'access-control-allow-origin':'*'};
+    if(url.endsWith('/properties'))return route.fulfill({status:200,headers,body:properties});
+    if(url.endsWith('/metadata.xml'))return route.fulfill({status:200,headers,contentType:'application/xml',body:metadata});
+    const body=[['Source','RAdeg','DEdeg','Gmag','Plx','e_Plx','pmRA','pmDE'],['9007199254740993',centre.ra,centre.dec,4.2,10,.1,0,0]].map(row=>row.join('\t')).join('\n');
+    return route.fulfill({status:200,headers,contentType:'text/tab-separated-values',body});
+  });
+  await page.reload({waitUntil:'networkidle',timeout:90000});
+  await expect(page.locator('.loading')).toBeHidden({timeout:90000});await page.waitForFunction(()=>window.testAtlas?.index===9);
+  await page.locator('[data-action="constellations"]').first().click();
+  await expect(page.locator('#constellation-results [data-constellation]')).toHaveCount(88);
+  await page.locator('#modal [data-constellation="Ori"]').click();await expect.poll(()=>held).toBe(1);
+  await page.keyboard.press('Escape');
+  centre=await page.evaluate(()=>{const direction=testAtlas.directionToGaia();return {ra:(Math.atan2(-direction.z,direction.x)*180/Math.PI+360)%360,dec:Math.asin(direction.y)*180/Math.PI};});
+  await page.locator('.catalogue-view-switch [data-action="gaia-stream"]').click();
+  await expect(page.locator('.app-shell')).toHaveClass(/gaia-stream-view/);
+  await expect(page.locator('.catalogue-view-switch [data-action="atlas-view"]')).toBeEnabled();
+  releaseStars();await expect(page.locator('#constellation-controls')).not.toHaveAttribute('aria-busy','true');
+  assert.equal(await page.evaluate(()=>testAtlas.index),8,'The late constellation response cannot replace Gaia');
+  await page.locator('.catalogue-view-switch [data-action="atlas-view"]').click();
+  await expect(page.locator('.catalogue-view-switch [data-action="atlas-view"]')).toBeEnabled();
+  assert.equal(await page.evaluate(()=>testAtlas.index),9,'Return restores the combined map captured before the cancelled selection');
+  assert.equal(await page.evaluate(()=>testAtlas.gaiaSkyView),null);
+  assert.deepEqual(errors,[]);
+  console.log('PASS: Entering Gaia cancels a pending first constellation load and returns to the captured map');
+
+}catch(error){console.error(error);throw error;}
+finally{releaseStars();await browser.close();}

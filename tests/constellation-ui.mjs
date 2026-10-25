@@ -30,10 +30,14 @@ try {
   await page.locator('[data-action="constellations"]').first().click();
   await expect(page.locator('#constellation-results [data-constellation]')).toHaveCount(88);
   await expect(page.locator('#constellation-count')).toContainText('88 constellations');
+  await expect(page.locator('[data-action="observer-orion-winter"], #constellation-apply, [data-action="apply-observer"]')).toHaveCount(0);
   await expect(page.locator('#observer-fields')).toBeHidden();
   await page.locator('#constellation-search').fill('orione');
   await expect(page.locator('#constellation-results [data-constellation]')).toHaveCount(1);
   await page.locator('[data-constellation="Ori"]').click();
+  await expect(page.locator('[data-constellation="Ori"]')).toHaveAttribute('aria-checked', 'true');
+  await expect(page.locator('#modal')).toBeVisible();
+  await page.locator('[data-action="view-constellations"]').click();
   await expect(page.locator('#modal')).not.toBeVisible({ timeout: 60000 });
   await expect(page.locator('.app-shell')).toHaveClass(/constellation-view/);
   await expect(page.locator('.app-shell')).not.toHaveClass(/earth-sky-view/);
@@ -69,20 +73,23 @@ try {
   await expect(page.locator('#observer-fields')).toContainText('not simulated');
   await page.locator('#observer-latitude').fill('91');
   await page.locator('#observer-datetime').fill('2026-01-15T21:00');
-  await page.locator('#constellation-apply').click();
+  await page.locator('[data-action="view-constellations"]').click();
   assert.equal(await page.locator('#observer-latitude').evaluate(input => input.validity.valid), false);
   await expect(page.locator('#modal')).toBeVisible();
   await page.locator('#observer-latitude').fill('41.9028');
   await page.locator('#observer-longitude').fill('181');
-  await page.locator('#constellation-apply').click();
+  await page.locator('[data-action="view-constellations"]').click();
   assert.equal(await page.locator('#observer-longitude').evaluate(input => input.validity.valid), false);
   await page.locator('#observer-longitude').fill('12.4964');
   await page.locator('#observer-datetime').fill('1800-01-15T21:00');
-  await page.locator('#constellation-apply').click();
+  await page.locator('[data-action="view-constellations"]').click();
   assert.equal(await page.locator('#observer-datetime').evaluate(input => input.validity.valid), false);
   await expect(page.locator('#modal')).toBeVisible();
   await page.locator('#observer-datetime').fill('2026-01-15T21:00');
-  await page.locator('#constellation-apply').click();
+  await page.locator('#observer-datetime').dispatchEvent('change');
+  await expect(page.locator('#observer-status')).not.toBeEmpty();
+  await expect(page.locator('#modal')).toBeVisible();
+  await page.locator('[data-action="view-constellations"]').click();
   await expect(page.locator('#modal')).not.toBeVisible({ timeout: 60000 });
   await expect(page.locator('#constellation-status')).toContainText('21 figure stars above');
   await expect(page.locator('#constellation-status')).toContainText('Jan 15');
@@ -98,15 +105,16 @@ try {
   await page.locator('#observer-latitude').fill('91');
   await page.locator('#observer-settings > summary').click();
   await expect(page.locator('#observer-fields')).toBeHidden();
-  await page.locator('[data-constellation="Ori"]').click();
+  await page.locator('[data-action="view-constellations"]').click();
   await expect(page.locator('#observer-fields')).toBeVisible();
   assert.equal(await page.locator('#observer-latitude').evaluate(input => input.validity.valid), false);
   await page.locator('#observer-latitude').fill('38\u00b006\u203251.98\u2033N');
   await page.locator('#observer-longitude').fill('15\u00b039\u203200\u2033E');
   await page.locator('#observer-datetime').fill('2026-12-11T20:00');
+  await page.locator('#observer-datetime').dispatchEvent('change');
   await page.locator('#observer-settings > summary').click();
   await expect(page.locator('#observer-fields')).toBeHidden();
-  await page.locator('[data-constellation="Ori"]').click();
+  await page.locator('[data-action="view-constellations"]').click();
   await expect(page.locator('#modal')).not.toBeVisible({ timeout: 60000 });
   await expect(page.locator('.app-shell')).toHaveClass(/earth-perspective-view/);
   await expect(page.locator('.app-shell')).not.toHaveClass(/earth-sky-view/);
@@ -144,9 +152,12 @@ try {
 
   // Crux remains below the geometric horizon from Rome, even when selected.
   await page.locator('[data-action="constellations"]').first().click();
+  await page.locator('#modal [data-remove-constellation="Ori"]').click();
   await page.locator('#constellation-search').fill('Croce del Sud');
   await expect(page.locator('#constellation-results [data-constellation]')).toHaveCount(1);
   await page.locator('[data-constellation="Cru"]').click();
+  await expect(page.locator('[data-constellation="Cru"]')).toHaveAttribute('aria-checked', 'true');
+  await page.locator('[data-action="view-constellations"]').click();
   await expect(page.locator('#modal')).not.toBeVisible({ timeout: 60000 });
   await expect(page.locator('#constellation-status')).toContainText('0 figure stars above');
   await page.locator('[data-action="earth-orbit"]').click();
@@ -167,7 +178,7 @@ try {
   await expect(page.locator('#constellation-controls')).toBeHidden();
   await expect(page.locator('[data-scale="1"]')).toHaveAttribute('aria-pressed', 'true');
   assert.deepEqual(errors, []);
-  console.log('Constellation UI verified: 88 figures, Earth reference and perspective, DMS winter input preserved in observer controls, explicit timezone, horizon, mobile and immersion.');
+  console.log('Constellation UI verified: 88 figures, Earth reference and perspective, DMS winter input preserved in observer controls, automatic observer validation, explicit timezone, persistent checklist, horizon, mobile and immersion.');
 } finally {
   await browser.close();
 }

@@ -25,7 +25,8 @@ function fixture({ previewActive = false } = {}) {
     selectObject(object) { selected.push(object); this.selected = object; },
     updateMoonOrbits() { this.moonUpdates = (this.moonUpdates || 0) + 1; },
     resetView(immediate) { assert.equal(immediate, true); this.normalResets = (this.normalResets || 0) + 1; },
-    showConstellation() {
+    showConstellations(ids,options) {
+      this.requestedConstellations={ids,options};
       this.viewRequest++;
       return new Promise(resolve => { resolveBuilder = resolve; });
     },
@@ -101,4 +102,21 @@ test('valid preview restoration delegates its saved navigation state without app
   f.installBuiltView(); const builtPose = pose(f.engine.camera); f.finish(true); await pending;
   assert.deepEqual(f.restoredPreview, [f.saved.preview]);
   assert.deepEqual(pose(f.engine.camera), builtPose, 'the preview component owns restoration of its viewer and map');
+});
+
+
+test('multiple IDs and their fixed scale reach the constellation restore builder', async () => {
+  const f=fixture();f.saved.constellation.ids=['Ori','UMa'];f.saved.constellation.distanceFactor=.026;
+  const pending=f.engine.restoreAtlasView(f.saved);
+  assert.deepEqual(f.engine.requestedConstellations.ids,['Ori','UMa']);
+  assert.equal(f.engine.requestedConstellations.options.distanceFactor,.026);
+  f.installBuiltView();f.finish();await pending;
+});
+
+test('empty restored constellation selection cannot resurrect a stale selected star or UI placeholder', async () => {
+  const f=fixture();f.saved.constellation.ids=[];f.saved.selected={id:'constellations-empty',position:[0,0,0]};
+  const pending=f.engine.restoreAtlasView(f.saved);
+  assert.deepEqual(f.engine.requestedConstellations.ids,[]);
+  f.installBuiltView();f.engine.objects=[];f.engine.selected=null;f.finish();await pending;
+  assert.equal(f.engine.selected,null);assert.deepEqual(f.selected,[null]);
 });

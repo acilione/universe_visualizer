@@ -137,9 +137,6 @@ dialog .observer-fields p{grid-column:1/-1;margin:0;font-size:10px;line-height:1
 .earth-perspective-view [data-action="rotate"]{display:none}
 .observer-fields .observer-zone{grid-column:1/-1}
 .observer-fields select{display:block;width:100%;margin-top:7px;padding:10px;color:#dbede6;background:#080f14;border:1px solid #a4c9be38;border-radius:4px;font-size:11px;color-scheme:dark}
-.observer-preset{grid-column:1/-1;text-align:left;display:flex;flex-wrap:wrap;align-items:center;gap:7px 8px;padding:10px;border:1px solid #b0dac62a;border-radius:4px;color:#b7dace;font-size:10px;line-height:1.6}
-.observer-preset svg{width:13px;height:13px}
-.observer-preset small{flex-basis:100%;padding-left:21px;color:#8eaba2;font-size:9px}
 @media(max-width:900px){.constellation-controls:has(#earth-space-controls:not([hidden])){grid-template-columns:minmax(0,1fr)}.earth-space-controls{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center;gap:6px 10px;padding:8px 0}.earth-space-controls small{grid-column:1/-1;font-size:8px}.earth-space-controls .layer-row{font-size:9px}.earth-perspective-button{font-size:9px;padding:8px}.constellation-view:not(.earth-sky-view) .view-controls{bottom:345px}.constellation-view:not(.earth-sky-view) .toast{bottom:365px}}
 @media(max-height:800px) and (min-width:901px){.earth-space-controls{padding:7px 0;gap:6px}.earth-space-controls small{font-size:8px}.constellation-view .layers{margin-top:12px}}
 
@@ -308,3 +305,35 @@ dialog[data-kind="images"]{width:min(880px,calc(100vw - 32px));max-width:none}
 @media(max-width:900px){.catalogue-view-switch{margin-top:10px}.catalogue-view-switch button{padding:7px 13px;font-size:10px}.constellation-controls .observer-adjust{grid-row:1/3}.constellation-controls .constellation-status{grid-row:2}.constellation-controls #earth-space-controls{grid-column:1;grid-row:1}}
 
 @media(min-width:901px){.left-panel{top:var(--atlas-sidebar-top,340px)}}
+
+/* Multi-constellation selection controls one shared stellar coordinate system. */
+.constellation-chips{display:flex;flex-wrap:wrap;gap:6px;max-height:116px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;padding:3px}
+.constellation-chips:empty{display:none}
+.constellation-chips button{display:inline-flex;align-items:center;gap:8px;padding:7px 9px;border:1px solid #83bdac66;border-radius:4px;background:#6cb89e15;color:#c7e6da;max-width:100%;font-size:11px;text-align:left}
+.constellation-chips button span{overflow-wrap:anywhere;min-width:0}
+.constellation-chips button svg{width:13px;height:13px;flex-shrink:0}
+.constellation-chips button:hover{border-color:#bceada;background:#6cb89e30}
+.constellation-chips p{font-size:12px;color:#99afaa;margin:4px 0}
+.constellation-selection-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin:15px 0 8px;font-size:10px;color:#b5cdc4;letter-spacing:1px}
+.constellation-selection-heading>div{display:flex;gap:8px;flex-wrap:wrap}
+.constellation-selection-heading button{padding:7px 9px;border:1px solid #729d8d55;border-radius:4px;font-size:11px;letter-spacing:0;color:#c8dcd2}
+.constellation-selection-heading strong{margin-left:6px;font-variant-numeric:tabular-nums}
+.constellation-toggle-label{font-size:10px;color:#94d2b9;white-space:nowrap}
+.constellation-result[aria-checked=true]{border-color:#95cbb680;background:#6baf941c}
+.constellation-result>span:nth-child(2){min-width:0}
+.constellation-view-button{margin-top:10px}
+#observer-status{margin-bottom:0}
+@media(max-width:900px){
+  .constellation-view .left-panel{right:74px;max-height:38dvh;overflow-y:auto}
+  .constellation-controls{display:flex;flex-direction:column;gap:7px;padding:9px}
+  .constellation-controls .observer-adjust{flex-direction:row;align-self:stretch;padding:7px;justify-content:center}
+  #constellation-visible{max-height:72px;gap:4px;padding:0}
+  #constellation-visible button{font-size:9px;padding:5px 7px}
+  .constellation-view .view-controls .immersion-button{width:33px;height:33px;padding:0;justify-content:center}
+  .constellation-view .view-controls .immersion-button span{display:none}
+}
+@media(max-width:560px){
+  .constellation-selection-heading{font-size:9px}.constellation-selection-heading button{font-size:10px;padding:6px}
+  .constellation-chips{max-height:100px}.constellation-chips button{font-size:10px}
+  .constellation-toggle-label{font-size:9px}
+}

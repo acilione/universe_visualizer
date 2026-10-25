@@ -223,3 +223,103 @@ test('Reggio Calabria observer orientation agrees between fixed 3D stars and the
     assert.ok(Math.abs(first.azimuthDeg-second.azimuthDeg)>60,'time changes local orientation without moving measured stellar positions');
   } finally { dispose(space);dispose(former);dispose(later); }
 });
+
+test('multi-constellation selections share one fixed physical scale and keep existing stars in place', () => {
+  const original=build('Ori');
+  const together=createConstellationView({catalog,figures:[figure('Ori'),figure('UMa'),figure('Sgr')],observer,renderer});
+  const remaining=createConstellationView({catalog,figures:[figure('Ori'),figure('Sgr')],observer,renderer,distanceFactor:together.distanceFactor});
+  try {
+    assert.equal(original.distanceFactor,.026);assert.equal(together.distanceFactor,.026);
+    assert.deepEqual(together.context.constellationIds,['Ori','UMa','Sgr']);
+    assert.equal(together.context.name,'3 constellations');
+    for(const source of original.objects){
+      assert.deepEqual(together.objects.find(star=>star.hip===source.hip).position,source.position);
+      assert.deepEqual(remaining.objects.find(star=>star.hip===source.hip).position,source.position);
+    }
+    assert.equal(together.group.children.filter(child=>child.name==='catalog-stars').length,1);
+    assert.equal(cloud(original).geometry.attributes.position.count,109400);
+    assert.deepEqual(cloud(together).geometry.attributes.position.array,cloud(original).geometry.attributes.position.array);
+    assert.deepEqual(cloud(remaining).geometry.attributes.position.array,cloud(original).geometry.attributes.position.array);
+    assert.equal(original.catalogueRadius,together.catalogueRadius);
+    assert.equal(remaining.catalogueRadius,together.catalogueRadius);
+    assert.equal(original.context.extent,together.context.extent);
+    assert.equal(remaining.context.extent,together.context.extent);
+    assert.ok(together.sceneExtentRadius>=Math.max(...together.objects.map(star=>radial(star.position))));
+    assert.equal(together.context.distanceFactor,together.distanceFactor);
+  } finally {dispose(original);dispose(together);dispose(remaining);}
+});
+
+test('shared HIP members and reversed shared segments are rendered once with all figure memberships', () => {
+  const first={...figure('Ori'),segments:[[26727,26311],[26311,25930]]};
+  const second={...figure('Tau'),segments:[[26311,26727],[25930,26311]]};
+  const view=createConstellationView({catalog,figures:[first,second,first],observer,renderer});
+  try {
+    assert.deepEqual(view.context.constellationIds,['Ori','Tau']);
+    assert.equal(view.context.starCount,3);assert.equal(view.objects.length,3);
+    assert.equal(view.context.segmentCount,2);assert.equal(view.context.spaceSegmentCount,2);
+    assert.equal(coreLines(view).geometry.attributes.position.count,4);
+    for(const star of view.objects){
+      assert.deepEqual(star.constellationIds,['Ori','Tau']);
+      assert.deepEqual(star.figureMemberships.map(item=>item.id),['Ori','Tau']);
+      assert.equal(star.con,catalog.byHip.get(star.hip).con,'figure membership must not rewrite the original catalogue classification');
+    }
+    for(const segment of view.group.getObjectByName('constellation-lines').userData.segmentMemberships)assert.deepEqual(segment.constellationIds,['Ori','Tau']);
+  } finally {dispose(view);}
+});
+
+test('clearing every selected figure leaves a valid stellar catalogue and Earth origin without a default figure', () => {
+  const view=createConstellationView({catalog,figure:figure('Ori'),figures:[],observer,renderer});
+  try {
+    assert.deepEqual(view.objects,[]);assert.deepEqual(view.figures,[]);assert.equal(view.figure,null);
+    assert.deepEqual(view.context.constellationIds,[]);assert.deepEqual(view.context.constellationNames,[]);
+    assert.equal(view.context.constellationId,null);assert.equal(view.context.constellationCount,0);
+    assert.equal(view.context.starCount,0);assert.equal(view.context.segmentCount,0);
+    assert.equal(view.group.getObjectByName('constellation-lines').children.length,0);
+    assert.equal(view.group.getObjectByName('grid').children.length,0);
+    assert.ok(view.group.getObjectByName('solar-origin'));
+    assert.equal(cloud(view).geometry.attributes.position.count,109400);
+    assert.ok(view.sceneExtentRadius>=view.catalogueRadius);
+    assert.ok(view.center.toArray().every(Number.isFinite)&&view.lookDirection.toArray().every(Number.isFinite));
+    assert.ok(view.radius>0&&Number.isFinite(view.radius));
+    view.setEarthPerspective(true);view.setEarthPerspective(false);view.setEarthPerspective(true);
+    assert.equal(cloud(view).geometry.attributes.position.count+view.group.getObjectByName('earth-angular-stars').geometry.attributes.position.count,119625);
+    assert.deepEqual(view.angularObjects,[]);
+    assert.equal(view.group.getObjectByName('angular-constellation-lines').children.length,0);
+    assert.equal(view.group.children.filter(child=>child.name==='earth-angular-reference').length,1);
+  } finally {dispose(view);}
+});
+
+test('selecting all 88 figures deduplicates the full union and never duplicates the catalogue background', () => {
+  const view=createConstellationView({catalog,figures,observer,renderer});
+  try {
+    assert.equal(view.context.constellationCount,88);assert.equal(view.context.starCount,710);
+    assert.equal(view.context.segmentCount,695);assert.equal(view.context.unknownDistanceCount,7);
+    assert.equal(view.objects.length,703);assert.equal(new Set(view.objects.map(star=>star.hip)).size,703);
+    assert.ok(view.objects.every(star=>star.position.every(Number.isFinite)));
+    assert.equal(view.group.children.filter(child=>child.name==='catalog-stars').length,1);
+    const alpheratz=view.objects.find(star=>star.hip===677);
+    assert.deepEqual(alpheratz.constellationIds,['And','Peg']);
+    view.setEarthPerspective(true);
+    assert.equal(view.angularObjects.length,7);assert.equal(new Set(view.angularObjects.map(star=>star.hip)).size,7);
+    assert.equal(cloud(view).geometry.attributes.position.count+view.group.getObjectByName('earth-angular-stars').geometry.attributes.position.count,119625);
+    assert.equal(view.context.renderedStarCount,119625);
+    assert.equal(view.group.getObjectByName('constellation-lines').userData.segmentCount+view.group.getObjectByName('angular-constellation-lines').userData.segmentCount,695);
+    view.setEarthPerspective(false);
+    assert.equal(view.group.getObjectByName('earth-angular-reference').visible,false);
+    assert.ok(view.objects.every(star=>star.distanceLy!==null));
+  } finally {dispose(view);}
+});
+
+test('unknown-only selections and explicit saved physical scales remain finite and do not invent stellar distances', () => {
+  const unknown={id:'test-unknown',name:'Unknown-distance test',abbr:'test',segments:[[5165,89341],[89341,5165]]};
+  const view=createConstellationView({catalog,figures:[unknown],observer,renderer,distanceFactor:.01});
+  try {
+    assert.equal(view.distanceFactor,.01);assert.equal(view.objects.length,0);assert.equal(view.context.unknownDistanceCount,2);
+    assert.equal(view.context.segmentCount,1);assert.equal(view.context.spaceSegmentCount,0);
+    assert.equal(view.group.getObjectByName('grid').children.length,0);
+    view.setEarthPerspective(true);assert.equal(view.angularObjects.length,2);
+    for(const star of view.angularObjects){assert.equal(star.distanceLy,null);assert.equal(star.positionKind,'sky-projection');close(radial(star.position),60);}
+    assert.equal(view.group.getObjectByName('angular-constellation-lines').userData.segmentCount,1);
+  } finally {dispose(view);}
+  for(const distanceFactor of [0,-1,Infinity,NaN])assert.throws(()=>createConstellationView({catalog,figures:[],observer,renderer,distanceFactor}),RangeError);
+});

@@ -14,7 +14,7 @@ import { createPlanetVisual, disposePlanetTextures, updatePlanetVisualLighting }
 import { hostView, exoplanets } from './planets.js';
 import { solarMoons, moonsForPlanet } from './moons.js';
 import { planetCameraFraming, overviewDistance } from './planet-navigation.js';
-import { loadConstellation, loadConstellations } from './constellation-catalog.js';
+import { loadConstellationSelection, loadConstellations } from './constellation-catalog.js';
 import { createConstellationView } from './constellation-visuals.js';
 import { makeEarthReference } from './earth-reference.js';
 import { createCatalogueSkyView, catalogueObjectFov } from './catalogue-sky-visuals.js';
@@ -170,34 +170,48 @@ export class Universe {
   }
   navigateFromXR(delta){
     if(this.index<6||this.index===8||this.index===9){this.setScale(THREE.MathUtils.clamp((this.index===5||this.index===8||this.index===9?0:this.index)+delta,0,4));return;}
-    const current=this.constellationData;
-    loadConstellations().then(({constellations})=>{
-      if(this.constellationData!==current||(this.index!==6&&this.index!==7))return;
+    const current=this.constellationData,request=this.viewRequest;
+    return loadConstellations().then(({constellations})=>{
+      if(this.constellationData!==current||this.viewRequest!==request||(this.index!==6&&this.index!==7))return;
       const ordered=[...constellations].sort((a,b)=>a.name.localeCompare(b.name,locale()));
-      const index=ordered.findIndex(item=>item.id===current.figure.id);
-      const figure=ordered[(index+delta+ordered.length)%ordered.length];
-      return this.showConstellation(figure.id,{mode:current.mode,observer:current.observer});
+      const ids=current.ids||(current.figure?[current.figure.id]:[]),selected=new Set(ids);
+      const step=delta<0?-1:1;
+      let cursor=ordered.findIndex(item=>item.id===ids.at(-1));
+      if(cursor<0)cursor=step>0?-1:0;
+      for(let offset=1;offset<=ordered.length;offset++){
+        const figure=ordered[(cursor+step*offset+ordered.length*2)%ordered.length];
+        if(!selected.has(figure.id))return this.showConstellations([...ids,figure.id],{mode:'space',observer:current.observer});
+      }
     }).catch(error=>this.onMessage(error.message));
   }
   focusFromXR(object){
     if(this.index<6||this.index===8||this.index===9){this.focusObject(object);return;}
     if(this.earthPerspective)this.returnToSpaceOrbit();else this.viewFromEarth();
   }
-  async showConstellation(id,options={}){
+  showConstellation(id,options={}){return this.showConstellations([id],options);}
+  async showConstellations(ids,options={}){
     const request=++this.viewRequest;
-    // Legacy saved Earth screens now enter the same measured 3D scene.
-    const earthPerspective=options.earthPerspective??(options.mode==='earth'||this.index===6&&this.earthPerspective);
     const observer=options.observer||this.constellationData?.observer;
-    const data=await loadConstellation(id,{...options,mode:'space',observer});
+    const data=await loadConstellationSelection(ids,{...options,mode:'space',observer});
     if(request!==this.viewRequest||this.disposed)return false;
-    this.constellationData=data;
-    const view=createConstellationView({...data,renderer:this.renderer});
+    const earthPerspective=options.earthPerspective??(options.mode==='earth'||this.index===6&&this.earthPerspective);
+    const preserveNavigation=this.index===6&&this.earthPerspective===earthPerspective&&options.reframe!==true;
+    const previousFrame=this.earthSkyFrame?.clone(),previousObserver=this.constellationData?.observer;
+    const observerChanged=previousObserver?.latitude!==data.observer.latitude||previousObserver?.longitude!==data.observer.longitude||previousObserver?.dateIso!==data.observer.dateIso;
+    const distanceFactor=options.distanceFactor??(this.index===6?this.constellationView?.distanceFactor:undefined);
+    const view=createConstellationView({...data,renderer:this.renderer,distanceFactor});
     const m=view.skyTransform.equatorialToLocal;
     this.earthSkyFrame=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().set(m[0],m[1],m[2],0,m[3],m[4],m[5],0,m[6],m[7],m[8],0,0,0,0,1));
     this.earthSkyInverse=this.earthSkyFrame.clone().invert();
-    this.constellationView=view;this.systemHost=null;view.context.earthVisible=this.earthVisible;view.context.earthPerspective=false;
-    this.buildView(6,view.objects,view.context,false,view.group);
-    if(earthPerspective)this.viewFromEarth({immediate:true});
+    this.constellationData={...data,distanceFactor:view.distanceFactor};this.constellationView=view;this.systemHost=null;
+    view.context.earthVisible=this.earthVisible;view.context.earthPerspective=preserveNavigation&&earthPerspective;
+    this.buildView(6,view.objects,view.context,false,view.group,{preserveNavigation});
+    if(preserveNavigation&&earthPerspective&&observerChanged){
+      if(this.preview?.isActive||this.renderer.xr.isPresenting){
+        if(previousFrame)this.mapRoot.quaternion.multiply(previousFrame.invert()).multiply(this.earthSkyFrame).normalize();
+        this.mapRoot.updateMatrixWorld(true);
+      }else this.applySkyLook();
+    }else if(!preserveNavigation&&earthPerspective)this.viewFromEarth({immediate:true});
     return true;
   }
   async showCatalogueObject(object,data=this.catalogueData){
@@ -223,15 +237,16 @@ export class Universe {
     if(typeof saved.earthVisible==='boolean')this.earthVisible=saved.earthVisible;
     let result;
     if(saved.index===9){result=this.buildCombinedMap(this.catalogueData);}
-    else if(saved.index===6||saved.index===7){result=this.showConstellation(saved.constellation.id,{mode:'space',observer:saved.constellation.observer,earthPerspective:saved.earthPerspective||saved.index===7});}
+    else if(saved.index===6||saved.index===7){result=this.showConstellations(saved.constellation?.ids??(saved.constellation?.id?[saved.constellation.id]:[]),{mode:'space',observer:saved.constellation?.observer,distanceFactor:saved.constellation?.distanceFactor,earthPerspective:saved.earthPerspective||saved.index===7});}
     else if(saved.index===8){result=this.showCatalogueObject(saved.selected,this.catalogueData);}
     else if(saved.index===5){result=this.showSystem(saved.objects.find(object=>object.bodyKind==='exoplanet'));}
     else result=this.setScale(saved.index);
     const request=this.viewRequest;
     if(await result===false||this.disposed||this.viewRequest!==request)return false;
     if(Boolean(this.preview.isActive)!==previewActive||Boolean(this.renderer.xr.isPresenting)!==xrActive)return false;
-    const selected=this.objects.find(object=>object.id===saved.selected?.id)||saved.selected;
-    if(selected)this.selectObject(selected);
+    const constellationRestore=saved.index===6||saved.index===7;
+    const selected=this.objects.find(object=>object.id===saved.selected?.id)||(constellationRestore?null:saved.selected);
+    if(selected||constellationRestore)this.selectObject(selected);
     if(saved.previewActive&&!previewActive){this.focusedPlanet=null;this.focusedMoonSystem=null;this.resetView(true);return true;}
     this.focusedPlanet=saved.focusedPlanet;this.focusedMoonSystem=saved.focusedMoonSystem;this.updateMoonOrbits();
     this.cameraFlight=null;this.skyFlight=null;this.skyEntry=null;
@@ -409,18 +424,19 @@ export class Universe {
     if(immediate||this.reducedMotion){this.skyYaw=yaw;this.skyPitch=pitch;this.skyFlight=null;this.applySkyLook();}
     else this.skyFlight={start:this.elapsed,fromYaw:this.skyYaw,toYaw:yaw,fromPitch:this.skyPitch,toPitch:pitch};
   }
-  buildView(index,objects,context,initial=false,customMap=null){
+  buildView(index,objects,context,initial=false,customMap=null,{preserveNavigation=false}={}){
+    const selectedId=preserveNavigation?this.selected?.id:null;
     if(this.gaiaSkyView&&customMap!==this.gaiaSkyView.group){this.gaiaSkyView.dispose();this.gaiaSkyView=null;this.onGaiaStreamStatus({active:false});}
     this.cameraFlight=null;this.skyFlight=null;this.skyEntry=null;this.skyPointers.clear();
-    this.earthPerspective=false;this.earthReference=null;this.earthMarker=null;this.earthLabel=null;
+    if(!preserveNavigation)this.earthPerspective=false;this.earthReference=null;this.earthMarker=null;this.earthLabel=null;
     const previousIndex=this.index;
-    if(previousIndex===7||previousIndex===8||index===7||index===8){for(const retiring of this.retiring)this.disposeGroup(retiring.group);this.retiring=[];if(this.content){this.disposeGroup(this.content);this.content=null;}}
+    if(preserveNavigation||previousIndex===7||previousIndex===8||index===7||index===8){for(const retiring of this.retiring)this.disposeGroup(retiring.group);this.retiring=[];if(this.content){this.disposeGroup(this.content);this.content=null;}}
     if(this.content)this.retiring.push({group:this.content,start:this.elapsed});
     this.index=index;this.objects=objects;this.viewContext=context;this.focusedPlanet=null;this.focusedMoonSystem=null;this.spinning=[];this.bodyVisuals.clear();this.targets=[];this.labels.forEach(l=>l.element.remove());this.labels=[];
     this.controls.enabled=!this.isSkyNavigation()&&!this.renderer.xr.isPresenting&&!this.preview?.isActive;
     this.controls.autoRotate=!this.isSkyNavigation()&&this.autoRotate;
-    this.camera.fov=index===8?this.catalogueSkyView.fov:index===7?70:(this.canvas.clientWidth<700?59:44);this.camera.updateProjectionMatrix();
-    this.content=new THREE.Group();this.mapRoot.add(this.content);this.content.userData.born=this.elapsed;
+    if(!preserveNavigation){this.camera.fov=index===8?this.catalogueSkyView.fov:index===7?70:(this.canvas.clientWidth<700?59:44);this.camera.updateProjectionMatrix();}
+    this.content=new THREE.Group();this.mapRoot.add(this.content);this.content.userData.born=preserveNavigation?this.elapsed-3:this.elapsed;
     this.boundsRadius=this.isPlanetaryView()?Math.max(20,...objects.map(o=>Math.max(o.orbit||0,Math.hypot(...o.position)+(o.size||0))))+2.6:23;
     if(customMap){
       this.boundsRadius=index===9?this.combinedView.radius:index===8?this.catalogueSkyView.radius:this.constellationView.radius;
@@ -442,7 +458,16 @@ export class Universe {
     this.sunLight.position.fromArray(source?.position||[0,0,0]);
     this.sunLight.visible=this.isPlanetaryView()||index===9;
     this.configureImmersiveEffects();
-    this.selected=null;this.onScale(index,context);this.selectObject(index===9?objects.find(object=>this.objectLayers[object.combinedLayer]):objects[0]);this.setLayer('particles',this.layers.particles);
+    this.selected=null;this.onScale(index,context);
+    this.selectObject(this.objects.find(object=>object.id===selectedId)||(index===9?objects.find(object=>this.objectLayers[object.combinedLayer]):this.objects[0])||null);this.setLayer('particles',this.layers.particles);
+    if(index===6){
+      this.controls.maxDistance=Math.max(this.controls.maxDistance,this.boundsRadius*8);
+      const extent=this.constellationView.sceneExtentRadius||this.boundsRadius*2;
+      const mapScale=Math.max(...this.mapRoot.getWorldScale(new THREE.Vector3()).toArray().map(Math.abs));
+      const eyeDistance=this.camera.getWorldPosition(new THREE.Vector3()).distanceTo(this.mapRoot.getWorldPosition(new THREE.Vector3()));
+      this.camera.far=Math.max(this.camera.far,1500,eyeDistance+extent*mapScale*2,this.controls.maxDistance+extent*2);this.camera.updateProjectionMatrix();
+    }
+    if(preserveNavigation)return;
     if(this.preview?.isActive){this.preview.onViewChanged();if(this.isSkyNavigation())this.preview.lookAtObject?.(this.selected);}else if(!this.renderer.xr.isPresenting)this.resetView(initial||previousIndex===7||previousIndex===8||index===7||index===8);else this.xr.recenter();
     if(initial)this.content.userData.born=-3;
   }
@@ -463,7 +488,12 @@ export class Universe {
   setOpacity(group,opacity){group.traverse(o=>{if(!o.material)return;for(const m of Array.isArray(o.material)?o.material:[o.material]){if(m.uniforms?.uOpacity)m.uniforms.uOpacity.value=(m.userData.baseOpacity??1)*opacity;else if(m.visible!==false){if(m.userData.baseOpacity===undefined)m.userData.baseOpacity=m.opacity;m.transparent=true;m.opacity=m.userData.baseOpacity*opacity;}}});}
   disposeGroup(group){group.traverse(o=>{if(o.userData.bodyId)o.userData.dispose?.();o.geometry?.dispose();if(o.material){for(const m of Array.isArray(o.material)?o.material:[o.material])m.dispose();}});group.removeFromParent();}
   selectObject(object){
-    if(!object)return;
+    if(!object){
+      this.selected=null;this.focusedPlanet=null;this.focusedMoonSystem=null;
+      if(this.selectionRing){this.selectionRing.removeFromParent();this.selectionRing.geometry.dispose();this.selectionRing.material.dispose();this.selectionRing=null;}
+      for(const label of this.labels)label.element.classList.remove('selected');
+      this.onSelect(null);this.xr?.setInfo({name:this.viewContext.name,scaleLabel:this.viewContext.name});this.updateMoonOrbits();return;
+    }
     if(object.gaiaStreamed&&this.gaiaSkyView)object=this.gaiaSkyView.resolve(object);
     if(this.index===9){
       const placed=this.combinedView.getObject(object.id);
@@ -609,7 +639,7 @@ export class Universe {
     if(this.gaiaSkyView){this.gaiaSkyView.setQuality(quality,this.renderer.getPixelRatio());this.resize();return;}
     if(this.index===9){this.combinedView.setQuality(quality,this.renderer.getPixelRatio());this.configureImmersiveEffects();this.resize();return;}
     if(this.index===8){const yaw=this.skyYaw,pitch=this.skyPitch,fov=this.camera.fov;this.showCatalogueObject(object,this.catalogueData).then(()=>{if(this.index===8&&!this.preview?.isActive&&!this.renderer.xr.isPresenting){this.skyYaw=yaw;this.skyPitch=pitch;this.camera.fov=fov;this.camera.updateProjectionMatrix();this.applySkyLook();}}).catch(error=>this.onMessage(error.message));this.resize();return;}
-    if(this.index>=6){this.showConstellation(this.constellationData.figure.id,{mode:this.constellationData.mode,observer:this.constellationData.observer}).catch(error=>this.onMessage(error.message));this.resize();return;}
+    if(this.index>=6){this.showConstellations(this.constellationData.ids||[],{mode:this.constellationData.mode,observer:this.constellationData.observer}).catch(error=>this.onMessage(error.message));this.resize();return;}
     this.buildView(this.index,this.objects,this.viewContext);this.systemHost=host;if(object)this.selectObject(object);this.resize();
   }
   configureImmersiveEffects(){

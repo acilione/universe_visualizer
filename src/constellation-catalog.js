@@ -40,12 +40,22 @@ export function loadStarCatalog() {
     return { metadata: data.metadata, stars, byHip: new Map(stars.filter(s => s.hip).map(s => [s.hip, s])) };
   }).catch(error => { starsPromise = null; throw error; });
 }
-export async function loadConstellation(id, options = {}) {
+export async function loadConstellationSelection(ids, options = {}) {
+  if (!Array.isArray(ids) || ids.some(id => typeof id !== 'string' || !id.length)) throw new TypeError(t('Constellation identifiers must be an array of names.', 'Gli identificatori delle costellazioni devono essere un elenco di nomi.'));
+  const uniqueIds = [...new Set(ids)];
   const mode = options.mode || 'space';
   if (!['space', 'earth'].includes(mode)) throw new RangeError(t('Invalid constellation view.', 'Vista della costellazione non valida.'));
   const observer = validateObserver(options.observer || { latitude: 41.9028, longitude: 12.4964, dateIso: new Date().toISOString() });
-  const [figures, catalog] = await Promise.all([loadConstellations(), loadStarCatalog()]);
-  const figure = figures.constellations.find(item => item.id === id);
-  if (!figure) throw new RangeError(t('Constellation not found.', 'Costellazione non trovata.'));
-  return { catalog, figure, mode, observer };
+  const [available, catalog] = await Promise.all([loadConstellations(), loadStarCatalog()]);
+  const byId = new Map(available.constellations.map(figure => [figure.id, figure]));
+  const figures = uniqueIds.map(id => {
+    const figure = byId.get(id);
+    if (!figure) throw new RangeError(t('Constellation not found: ', 'Costellazione non trovata: ') + id);
+    return figure;
+  });
+  return { catalog, figures, ids: uniqueIds, figure: figures[0] || null, mode, observer };
+}
+
+export function loadConstellation(id, options = {}) {
+  return loadConstellationSelection([id], options);
 }

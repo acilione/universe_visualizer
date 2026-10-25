@@ -21,7 +21,7 @@ export function captureAtlasView(universe) {
     focusedPlanet: universe.focusedPlanet || null,
     focusedMoonSystem: universe.focusedMoonSystem || null,
     preview: universe.preview?.isActive ? universe.preview.captureNavigationState?.() || null : null,
-    constellation: data ? { id: data.figure?.id ?? null, mode: data.mode, observer: cloneData(data.observer || null) } : null,
+    constellation: data ? { id: data.ids?.[0] ?? data.figure?.id ?? null, ids: (data.ids || (data.figure?.id ? [data.figure.id] : [])).slice(), distanceFactor: data.distanceFactor ?? universe.constellationView?.distanceFactor, mode: data.mode, observer: cloneData(data.observer || null) } : null,
     camera: {
       position: camera.position.clone(), quaternion: camera.quaternion.clone(), up: camera.up.clone(),
       target: controls.target?.clone() || new THREE.Vector3(),

@@ -31,7 +31,10 @@
     "test:immersive-entry": "node tests/immersive-entry-browser.mjs",
     "test:desktop-startup": "node tests/desktop-startup-browser.mjs",
     "test:gaia-stream": "node tests/gaia-stream-browser.mjs",
-    "test:catalogue-handoff": "node tests/catalogue-handoff-browser.mjs"
+    "test:catalogue-handoff": "node tests/catalogue-handoff-browser.mjs",
+    "test:constellation-multi-engine": "node tests/constellation-multi-engine.mjs",
+    "test:multi-constellations": "node tests/multi-constellations-browser.mjs",
+    "test:constellation-input": "node tests/multi-constellation-input-browser.mjs"
   },
   "dependencies": {
     "@hscmap/healpix": "1.4.12",

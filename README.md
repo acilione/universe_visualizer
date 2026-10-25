@@ -71,13 +71,14 @@ The **NASA catalogue sky** places objects by equatorial direction on a reference
 
 Hipparcos ICRS positions at J1991.25 are propagated to J2000 with tangent-vector proper motion when both components exist. Otherwise their original position epoch is shown. Positive parallaxes with known relative uncertainty at most 20% permit a labelled inverse-parallax distance estimate. Original source uncertainties, photometric bands and catalogue-specific spectral measurements are retained.
 
-In **Constellations**, choose a figure in the 3D map:
+In **Constellations**, add or remove figures with the checklist. Several figures share the same stellar coordinate system. The panel stays open while editing; **View map** closes it. Visible-figure chips remove individual constellations, and **Add all / Remove all** manage the full set. An empty selection keeps the stellar catalogue visible. Selection changes preserve the current camera and Earth-origin perspective.
+
+Constellation controls:
 
 - **Show Earth** is enabled by default in 3D. The reference globe is enlarged at the origin.
 - **View from Earth**, or selecting the globe, places the camera at the Earth origin while retaining stellar depth. Its local up direction follows the selected location and time. The same map stays visible above and below the geometric horizon; there is no separate horizon screen. Drag to look around; **Return to orbit** restores spatial navigation.
-- **Location and time** accepts decimal degrees, decimal commas and degrees/minutes/seconds. The observer timezone is explicit; the default is Europe/Rome, with daylight-saving rules. Dates span 1900–2100.
+- **Location and time** applies valid edits automatically and accepts decimal degrees, decimal commas and degrees/minutes/seconds. The observer timezone is explicit; the default is Europe/Rome, with daylight-saving rules. Dates span 1900–2100.
 - Observer edits are preserved when entering or leaving the Earth-origin perspective.
-- The Orion example uses **38°06′51.98″ N, 15°39′00″ E, 11 December 2026 at 20:00 CET** (19:00 UTC). All 21 stars in the figure are above the geometric horizon.
 - The **10,225 stars without usable distance** remain available as angular directions from Earth and are omitted from the physical 3D volume. Seven figure stars have unknown depth.
 
 The Earth-origin orientation includes J2000 precession. Proper motion, parallax, nutation, atmospheric refraction, daylight, light pollution and terrain are not simulated. Earth–Sun separation is negligible at the constellation scale and is omitted. The sky stays at the selected instant until changed.

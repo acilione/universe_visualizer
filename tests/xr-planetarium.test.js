@@ -186,15 +186,15 @@ test('leaving the sky restores atlas focus and enables current desktop orbit con
 });
 
 
-test('constellation world panel exposes figure cycling and perspective switching', async t => {
+test('constellation world panel exposes additive figure controls and perspective switching', async t => {
   const h = createHarness(t);
   h.connect();
   await h.xr.enter();
   h.xr.update();
-  assert.ok(h.text.includes('\u2190 FIGURE'));
-  assert.ok(h.text.includes('FIGURE \u2192'));
+  assert.ok(h.text.includes('\u2190 ADD'));
+  assert.ok(h.text.includes('ADD \u2192'));
   assert.ok(h.text.includes('RETURN TO ORBIT'));
-  assert.ok(h.text.includes('Change the constellation or perspective using the panel.'));
+  assert.ok(h.text.includes('Arrows add constellations. Focus changes the perspective.'));
   const panel = h.mapRoot.parent.getObjectByName('XR navigation panel');
   const clickPanel = (x, y) => {
     const target = panel.localToWorld(new THREE.Vector3((x / 1160 - 0.5) * 1.45, (0.5 - y / 420) * (1.45 * 420 / 1160), 0));
@@ -222,7 +222,7 @@ test('VR uses English by default and renders Italian only after an explicit lang
   const h = createHarness(t);
   await h.xr.enter();
   h.xr.update();
-  assert.ok(h.text.includes('← FIGURA'));
+  assert.ok(h.text.includes('← AGGIUNGI'));
   assert.ok(h.text.includes('TORNA A ORBITARE'));
   assert.ok(h.text.includes('RICENTRA'));
   assert.ok(h.text.includes('ESCI VR'));

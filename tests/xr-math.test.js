@@ -981,6 +981,8 @@ test('constellation XR focus action describes the current perspective rather tha
   await withXRHarness(async ({ app, session, setScale, panelText }) => {
     setScale(6); await app.enter(); app.update(0);
     assert.ok(panelText.includes('VIEW FROM EARTH'));
+    assert.ok(panelText.includes('← ADD')); assert.ok(panelText.includes('ADD →'));
+    assert.ok(panelText.includes('Arrows add constellations. Focus changes the perspective.'));
     panelText.length = 0; options.planetarium = true; app.update(.01);
     assert.ok(panelText.includes('RETURN TO ORBIT'));
     await session.end();

@@ -42,7 +42,8 @@ try{
  assert.ok(await page.evaluate(()=>atlas.labels.filter(label=>label.data.earthAngularReference).every(label=>label.element.hidden)));
  await page.evaluate(()=>atlas.viewFromEarth({immediate:true}));
  await page.evaluate(()=>atlas.navigateFromXR(1));
- await page.waitForFunction(()=>atlas.viewContext.constellationId!=='Sgr');
+ await page.waitForFunction(()=>atlas.viewContext.constellationIds.length===2&&atlas.viewContext.constellationIds.includes('Sgr'));
+ assert.equal(await page.evaluate(()=>new Set(atlas.viewContext.constellationIds).size),2);
  assert.equal(await page.evaluate(()=>atlas.index),6);
  assert.equal(await page.evaluate(()=>atlas.earthPerspective),true);
  await page.evaluate(()=>atlas.focusFromXR(atlas.selected));

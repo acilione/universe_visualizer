@@ -35,6 +35,12 @@ Le linee sono convenzioni visive della cultura astronomica moderna di Stellarium
 
 Sette stelle delle figure hanno distanza ignota/dubbia in HYG: **HIP 5165, 22783, 31216, 33165, 54463, 89341 (Polis), 92202**. Le figure interessate sono Fenice, Giraffa, Unicorno, Cane Maggiore, Carena, Sagittario e Scudo. Guarda dalla Terra completa la figura con riferimenti esclusivamente angolari per queste stelle; orbitando nel volume 3D le connessioni senza distanza rimangono omesse. L’orientamento locale usa luogo, data e orario dell’osservatore, senza tagliare la mappa all’orizzonte. Il Serpente resta un'unica costellazione con due gruppi separati di segmenti, coerentemente con la fonte.
 
+## Selezione e scala della mappa
+
+Le figure si possono aggiungere e rimuovere indipendentemente, fino a visualizzare tutte le 88 costellazioni. Stelle e segmenti condivisi vengono disegnati una sola volta. Una selezione vuota mantiene il campo stellare senza linee.
+
+Tutte le selezioni usano la stessa scala fisica (0,026 unità della scena per anno luce) e lo stesso campo di 109.400 stelle con distanza disponibile. Aggiungere o rimuovere una figura non cambia le posizioni delle stelle, la scala della mappa o il punto di osservazione. Guarda dalla Terra aggiunge le 10.225 stelle prive di distanza come riferimenti angolari.
+
 ## Riproduzione e verifica
 
 Dalla radice del progetto, con Python 3 e accesso alle fonti pubbliche:

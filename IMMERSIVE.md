@@ -45,13 +45,15 @@ The volume's size is adjustable. **Tabletop** provides the smaller overview in f
 | Hold a closed left fist for about 0.65 seconds | Return from inspection to the overview; release and repeat to move one reference level outward |
 | Headset system gesture or system menu | End the session |
 
-A small progress indicator confirms the left-fist hold. The gesture fires once per hold, so keeping the fist closed does not skip through several levels. Controller support remains available. Choose a constellation, its Earth or 3D perspective, and the desired object layers before headset entry; select **Current map** in the chooser to retain that view. Headset navigation uses the gestures above without a floating panel.
+A small progress indicator confirms the left-fist hold. The gesture fires once per hold, so keeping the fist closed does not skip through several levels. Controller support remains available. Choose the visible constellations, their Earth or 3D perspective, and the desired object layers before headset entry; select **Current map** in the chooser to retain that view. Headset navigation uses the gestures above without a floating panel.
 
 After releasing a manipulation, the map keeps its resulting position, orientation and scale. The camera always follows headset tracking. Catalogue positions stay unchanged; interaction transforms their common map coordinate frame.
 
 VR/MR jumps between bodies and returns to the overview use a short fade of the virtual map: 120 ms out, one invisible frame to apply the destination, then 160 ms in. The map never sweeps or grows through the viewer during a jump. Headset tracking, the distant reference sky and room passthrough continue throughout; reduced-motion mode applies the destination immediately. Hand manipulation remains direct and intentional.
 
 The reference space is **session-local** (`local-floor`), with metre units and a floor-relative origin. It is not an absolute geographic coordinate system, and map placement is not saved as a persistent room anchor between sessions. If the platform resets its tracking origin and supplies a transform, the map placement is compensated to preserve its physical location. Otherwise the application recentres it and reports the change.
+
+The constellation chooser supports independent additions and removals, including all 88 figures or no figure lines. Editing the selection preserves the camera and map placement in desktop, PC preview and XR. Optional XR panel arrows add the next unselected figure without removing existing figures. Stars and segments shared by figures are rendered once.
 
 The constellation observer basis combines precession, local sidereal time and observer latitude/longitude. Preview and XR apply this rotation to map placement while preserving the viewer pose. North is a virtual reference direction; there is no automatic calibration to physical north. The enlarged Earth globe is an origin marker, not a literal surface on which the camera is placed.
 

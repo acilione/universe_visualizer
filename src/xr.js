@@ -190,7 +190,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       context.font = '600 23px sans-serif';
       context.textAlign = 'center';
       const label = constellationView
-        ? ({ previous: t("← FIGURE","← FIGURA"), next: t("FIGURE →","FIGURA →"), focus: isPlanetarium() ? t("RETURN TO ORBIT","TORNA A ORBITARE") : t("VIEW FROM EARTH","GUARDA DALLA TERRA") }[b.action] || t(...b.label))
+        ? ({ previous: t("← ADD","← AGGIUNGI"), next: t("ADD →","AGGIUNGI →"), focus: isPlanetarium() ? t("RETURN TO ORBIT","TORNA A ORBITARE") : t("VIEW FROM EARTH","GUARDA DALLA TERRA") }[b.action] || t(...b.label))
         : t(...b.label);
       context.fillText(label, b.x + b.w / 2, b.y + b.h / 2);
       context.textAlign = 'left';
@@ -202,7 +202,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       : t("HANDS  ·  Brief pinch: select   /   Hold: move and rotate   /   Two hands: zoom","MANI  ·  Pizzico breve: seleziona   /   Tieni: sposta e ruota   /   Due mani: zoom"), 30, 333, 1090);
     context.fillStyle = '#788f92';
     context.fillText(constellationView
-      ? t("Change the constellation or perspective using the panel.","Cambia figura o prospettiva dal pannello.")
+      ? t("Arrows add constellations. Focus changes the perspective.","Le frecce aggiungono costellazioni. Focus cambia prospettiva.")
       : isPlanetarium()
       ? t("CONTROLLERS  ·  Trigger: select   /   Recenter: recenter the sky","CONTROLLER  ·  Grilletto: seleziona   /   Ricentra: ricentra il cielo")
       : t("CONTROLLERS  ·  Trigger: select   /   Grip: grab","CONTROLLER  ·  Grilletto: seleziona   /   Impugnatura: afferra"), 30, 375, 1090);

@@ -60,3 +60,15 @@ test('missing mapped shell intersection falls back to finite orientation and inv
   const atlas = fixture(); atlas.camera.lookAt(0, 100, 100); atlas.selected = { raDeg: NaN, decDeg: 3, position: [5, 6, 7] };
   same(directionToGaia(atlas), atlas.camera.getWorldDirection(new THREE.Vector3())); assert.throws(() => directionToGaia({})); assert.throws(() => captureAtlasView({}));
 });
+
+
+test('constellation capture preserves independent selection arrays, fixed scale and empty selections', () => {
+  const atlas=fixture();atlas.index=6;
+  atlas.constellationData={ids:['Ori','UMa'],figures:[{id:'Ori'},{id:'UMa'}],mode:'space',distanceFactor:.026,observer:{latitude:38,longitude:15,dateIso:'2026-12-11T19:00:00Z'}};
+  const saved=captureAtlasView(atlas);
+  atlas.constellationData.ids.push('Cas');atlas.constellationData.distanceFactor=3;
+  assert.deepEqual(saved.constellation.ids,['Ori','UMa']);assert.equal(saved.constellation.id,'Ori');assert.equal(saved.constellation.distanceFactor,.026);
+  atlas.constellationData.ids=[];atlas.objects=[];atlas.selected=null;
+  const empty=captureAtlasView(atlas);
+  assert.deepEqual(empty.constellation.ids,[]);assert.equal(empty.constellation.id,null);assert.equal(empty.selected,null);assert.deepEqual(empty.objects,[]);
+});

@@ -48,10 +48,11 @@ let nasaSearchEntries = [];
 const nasaEnrichments = new Set();
 const planetBrowser = { query: '', filter: 'all', parentId: '', page: 0 };
 const constellationBrowser = {
-  query: '', mode: 'space', earthPerspective: false, id: 'Ori', data: null, busy: false, earthVisible: true, timeZone: 'Europe/Rome',
+  query: '', mode: 'space', earthPerspective: false, id: null, ids: Array.isArray(preferences.constellationIds) ? [...new Set(preferences.constellationIds.filter(id=>typeof id==='string'))].slice(0,88) : [], pendingIds: null, data: null, busy: false, earthVisible: true, timeZone: 'Europe/Rome',
   observer: { latitude: 41.9028, longitude: 12.4964, dateIso: new Date().toISOString() }
 };
 let constellationModalRequest = 0;
+let constellationSelectionRequest = 0;
 let returnFocus = null;
 let xrSupported = false;
 let mrSupported = false;
@@ -109,6 +110,7 @@ $('#app').innerHTML = `
       </section>
       <section class="constellation-controls" id="constellation-controls" aria-label="${t("Constellation perspective","Prospettiva della costellazione")}" hidden>
         <button class="constellation-change" data-action="constellations"><span id="constellation-current">${t("Constellations","Costellazioni")}</span>${icon('search')}</button>
+        <div id="constellation-visible" class="constellation-chips" aria-label="${t('Visible constellations','Costellazioni visibili')}"></div>
         <div id="earth-space-controls" class="earth-space-controls" hidden>
           <div class="layer-row"><span>${icon('globe-2')}${t("Show Earth","Mostra la Terra")}</span><button class="toggle" role="switch" aria-label="${t("Show Earth","Mostra la Terra")}" aria-checked="true" data-action="earth-visible"></button></div>
           <button class="earth-perspective-button" data-action="earth-perspective">${icon('focus')}${t("View from Earth","Guarda dalla Terra")}</button>
@@ -190,7 +192,7 @@ positionSidePanel();
 
 function savePreferences() {
   const { labels, grid, particles, autoRotate, quality, objectLayers, gaiaDr3, mrDimming } = state;
-  try { localStorage.setItem('aether.preferences', JSON.stringify({ labels, grid, particles, autoRotate, quality, objectLayers, gaiaDr3, mrDimming })); } catch { /* Storage can be unavailable in private browsers. */ }
+  try { localStorage.setItem('aether.preferences', JSON.stringify({ labels, grid, particles, autoRotate, quality, objectLayers, gaiaDr3, mrDimming, constellationIds:constellationBrowser.ids })); } catch { /* Storage can be unavailable in private browsers. */ }
 }
 
 function notify(message) {
@@ -215,6 +217,7 @@ const currentScale = () => scales[state.scale] || {
 };
 
 function objectMarkup(object, isModal = false) {
+  if(object?.id==='constellations-empty')return `<div class="card-top"><span>${t('CONSTELLATIONS','COSTELLAZIONI')}</span>${icon('sparkles')}</div><div class="card-content"><h2>${t('No figures selected','Nessuna figura selezionata')}</h2><p>${t('The stellar catalogue remains visible. Add constellation figures from the selection panel.','Il catalogo stellare resta visibile. Aggiungi le figure delle costellazioni dal pannello di selezione.')}</p><button class="focus-button" data-action="constellations">${t('Choose constellations','Scegli le costellazioni')}</button></div>`;
   const scale = currentScale();
   const planet = isPlanet(object);
   const moon = isMoon(object);
@@ -260,6 +263,7 @@ function objectMarkup(object, isModal = false) {
 }
 
 function renderObject(object) {
+  if(!object&&state.scale===6)object={id:'constellations-empty',name:t('Constellations','Costellazioni'),bodyKind:'sky-region',source:state.context?.source};
   if (!object || !object.name) return;
   state.object = object;
   updatePreviewHud();
@@ -297,7 +301,8 @@ function updateScale(index, context = null) {
   const combined = index === 9;
   const detached = index >= 5;
   if (constellationView) {
-    constellationBrowser.id = context?.constellationId || constellationBrowser.id;
+    constellationBrowser.ids = [...(context?.constellationIds || (context?.constellationId ? [context.constellationId] : []))];
+    constellationBrowser.id = constellationBrowser.ids[0]||null;
     constellationBrowser.mode = 'space';
     constellationBrowser.earthPerspective = Boolean(context?.earthPerspective);
     if (typeof context?.earthVisible === 'boolean') constellationBrowser.earthVisible = context.earthVisible;
@@ -349,6 +354,7 @@ function updateScale(index, context = null) {
     button.setAttribute('aria-pressed', selected);
   });
   if (!detached) renderObject(catalog[scale.id][0]);
+  if(constellationView){renderConstellationSelection();savePreferences();}
   refreshIcons();
 }
 
@@ -691,25 +697,42 @@ function observerFormMarkup() {
     <label for="observer-latitude">${t("Latitude","Latitudine")} <small>${t("North + / South −","Nord + / Sud −")}</small><input id="observer-latitude" type="text" inputmode="text" required autocomplete="off" spellcheck="false" aria-describedby="observer-coordinate-help" value="${observer.latitude}"/></label>
     <label for="observer-longitude">${t("Longitude","Longitudine")} <small>${t("East + / West −","Est + / Ovest −")}</small><input id="observer-longitude" type="text" inputmode="text" required autocomplete="off" spellcheck="false" aria-describedby="observer-coordinate-help" value="${observer.longitude}"/></label>
     <label for="observer-datetime" class="observer-date">${t("Date and time","Data e ora")} <small>${t("Selected timezone · 1900–2100","Nel fuso scelto · 1900–2100")}</small><input id="observer-datetime" type="datetime-local" min="1900-01-02T00:00" max="2100-12-30T23:59" required value="${localDateInput(observer.dateIso)}"/></label>
-    <p id="observer-coordinate-help">${t("Decimal degrees (38.1144) or degrees, minutes and seconds (38°06′51.98″N).","Accetta decimali (38,1144) o gradi, primi e secondi (38°06′51.98″N).")}</p>
+    <p id="observer-coordinate-help">${t("Decimal degrees or degrees, minutes and seconds, with optional N/S/E/W.","Accetta gradi decimali o gradi, primi e secondi, con N/S/E/W facoltativi.")}</p>
     <label for="observer-timezone" class="observer-zone">${t("Timezone","Fuso orario")}<select id="observer-timezone">${zones.map(zone => `<option value="${escape(zone)}" ${zone === constellationBrowser.timeZone ? 'selected' : ''}>${zone === 'Europe/Rome' ? t("Italy · Europe/Rome (CET / CEST)","Italia · Europe/Rome (CET / CEST)") : zone === 'UTC' ? 'UTC' : escape(zone) + t(" · device"," · dispositivo")}</option>`).join('')}</select></label>
-    <div class="observer-actions"><button data-action="observer-now">${icon('rotate-ccw')}${t("Now","Adesso")}</button><button id="constellation-apply" data-action="apply-observer">${t("Update ","Aggiorna ")}${escape(constellationBrowser.data?.constellations.find(item => item.id === constellationBrowser.id)?.name || t("sky","il cielo"))}${icon('arrow-right')}</button></div>
-    <button class="observer-preset" data-action="observer-orion-winter">${icon('sparkles')}${t("Orion example · 11 Dec 2026, 20:00 Italy","Esempio Orione · 11 dic 2026, 20:00 Italia")}<small>38°06′51.98″N · 15°39′00″E</small></button>
+    <div class="observer-actions"><button data-action="observer-now">${icon('rotate-ccw')}${t("Now","Adesso")}</button></div>
+    <p id="observer-status" class="constellation-progress" role="status">${t('Valid changes apply automatically.','Le modifiche valide si applicano automaticamente.')}</p>
     <p>${t("Location and time set the local orientation used by View from Earth. The 3D map remains visible in every direction, including below the geometric horizon. Daylight and atmospheric refraction are not simulated.","Luogo e orario definiscono l'orientamento locale di Guarda dalla Terra. La mappa 3D resta visibile in ogni direzione, anche sotto l'orizzonte geometrico. Luce diurna e rifrazione atmosferica non sono simulate.")}</p>
   </fieldset>`;
 }
 
+function constellationSelectionMarkup(){
+  const names=constellationBrowser.data?.constellations||[];
+  return constellationBrowser.ids.map(id=>{
+    const figure=names.find(item=>item.id===id);
+    const name=figure?.name||state.context?.constellationNames?.[state.context?.constellationIds?.indexOf(id)]||id;
+    return `<button data-remove-constellation="${escape(id)}" ${constellationBrowser.busy?'disabled':''} aria-label="${escape(t('Remove ','Rimuovi ')+name)}"><span>${escape(name)}</span>${icon('x')}</button>`;
+  }).join('');
+}
+function renderConstellationSelection(){
+  const markup=constellationSelectionMarkup();
+  const sidebar=$('#constellation-visible');if(sidebar)sidebar.innerHTML=markup;
+  const selected=$('#constellation-selection');
+  if(selected)selected.innerHTML=markup||`<p>${t('No constellation lines selected.','Nessuna figura selezionata.')}</p>`;
+  const count=$('#constellation-selected-count');if(count)count.textContent=constellationBrowser.ids.length;
+  document.querySelectorAll('[data-action="view-constellations"],[data-action="all-constellations"],[data-action="clear-constellations"]').forEach(button=>button.disabled=constellationBrowser.busy);
+}
 function renderConstellationResults() {
   const results = $('#constellation-results');
-  if (!results || !constellationBrowser.data) return;
+  renderConstellationSelection();
+  if (!results || !constellationBrowser.data) {refreshIcons();return;}
   const query = normalized(constellationBrowser.query.trim());
   const matches = constellationBrowser.data.constellations.filter(item => normalized(`${item.name} ${item.englishName || ''} ${item.italianName || ''} ${item.latinName} ${item.abbr} ${item.id}`).includes(query)).sort((a, b) => a.name.localeCompare(b.name, locale()));
   results.innerHTML = matches.map(item => {
-    const starCount = new Set(item.segments.flat()).size;
-    return `<button class="constellation-result${item.id === constellationBrowser.id ? ' selected' : ''}" data-constellation="${escape(item.id)}" ${constellationBrowser.busy ? 'disabled' : ''}>
-      <span class="constellation-monogram" aria-hidden="true">${icon('sparkles')}<small>${escape(item.abbr)}</small></span><span><strong>${escape(item.name)}</strong><small>${escape(item.latinName)} · ${starCount}${t(" stars in the figure"," stelle nella figura")}</small></span>${icon('arrow-up-right')}</button>`;
-  }).join('') || `<p class="constellation-empty">${t("No constellations found. Try “Orion”, “Ursa” or “Cassiopeia”.","Nessuna costellazione trovata. Prova “Orione”, “Orsa” o “Cassiopea”.")}</p>`;
-  $('#constellation-count').textContent = `${matches.length}${t(matches.length === 1 ? " constellation" : " constellations", matches.length === 1 ? " costellazione" : " costellazioni")}${matches.length !== constellationBrowser.data.constellations.length ? t(" found", matches.length === 1 ? " trovata" : " trovate") : t(" · select a constellation"," · seleziona una costellazione")}`;
+    const starCount = new Set(item.segments.flat()).size, selected=constellationBrowser.ids.includes(item.id);
+    return `<button class="constellation-result${selected ? ' selected' : ''}" data-constellation="${escape(item.id)}" role="checkbox" aria-checked="${selected}" aria-label="${escape(t(selected?'Remove ':'Add ',selected?'Rimuovi ':'Aggiungi ')+item.name)}" ${constellationBrowser.busy ? 'disabled' : ''}>
+      <span class="constellation-monogram" aria-hidden="true">${icon(selected?'check':'plus')}<small>${escape(item.abbr)}</small></span><span><strong>${escape(item.name)}</strong><small>${escape(item.latinName)} · ${starCount}${t(" stars in the figure"," stelle nella figura")}</small></span><span class="constellation-toggle-label">${t(selected?'Remove':'Add',selected?'Rimuovi':'Aggiungi')}</span></button>`;
+  }).join('') || `<p class="constellation-empty">${t('No constellations match the search.','Nessuna costellazione corrisponde alla ricerca.')}</p>`;
+  $('#constellation-count').textContent = `${matches.length}${t(matches.length === 1 ? " constellation" : " constellations", matches.length === 1 ? " costellazione" : " costellazioni")} · ${constellationBrowser.ids.length}${t(' visible',' visibili')}`;
   refreshIcons();
 }
 
@@ -717,20 +740,20 @@ function renderConstellationModal() {
   const stars = constellationBrowser.data.metadata?.starCount || constellationBrowser.data.metadata?.catalogStarCount;
   $('#modal-body').innerHTML = `
     <p class="catalog-introduction"><strong>${t("88 constellations · spatial map and Earth-origin perspective.","88 costellazioni · mappa spaziale e prospettiva dalla Terra.")}</strong> ${stars ? number(stars) : t("Over 119,000","Oltre 119.000")}${t(" HYG catalogue stars with equatorial coordinates and measured distances where available."," stelle HYG con coordinate equatoriali e distanze misurate quando disponibili.")}</p>
+    <div class="constellation-selection-heading"><span>${t('VISIBLE CONSTELLATIONS','COSTELLAZIONI VISIBILI')} <strong id="constellation-selected-count">${constellationBrowser.ids.length}</strong></span><div><button data-action="all-constellations">${t('Add all (88)','Aggiungi tutte (88)')}</button><button data-action="clear-constellations">${t('Remove all','Rimuovi tutte')}</button></div></div>
+    <div id="constellation-selection" class="constellation-chips" aria-label="${t('Visible constellations','Costellazioni visibili')}"></div>
     <details id="observer-settings" ${constellationBrowser.editObserver ? 'open' : ''}><summary>${t('Location and time for View from Earth','Luogo e orario per Guarda dalla Terra')}</summary>${observerFormMarkup()}</details>
     <label for="constellation-search" class="readout-title">${t("SEARCH CONSTELLATIONS","CERCA UNA COSTELLAZIONE")}</label>
     <input id="constellation-search" class="search-input" type="search" value="${escape(constellationBrowser.query)}" placeholder="${t("Orion, Cassiopeia, Ursa Major…","Orione, Cassiopea, Orsa Maggiore…")}" autocomplete="off" spellcheck="false" aria-controls="constellation-results"/>
     <div id="constellation-count" class="result-count" role="status"></div>
     <div id="constellation-results" class="constellation-results"></div>
     <div id="constellation-progress" class="constellation-progress" role="status" aria-live="polite"></div>
+    <button class="focus-button constellation-view-button" data-action="view-constellations">${t('View map','Mostra mappa')}${icon('arrow-right')}</button>
     <p class="catalog-provenance">${t("Stars without a measured distance are shown only as angular directions when viewing from Earth. HYG is an observational catalogue with limited coverage. ","Le stelle senza distanza misurata compaiono solo come direzioni angolari quando si guarda dalla Terra. HYG è un catalogo osservativo con copertura limitata. ")}<a href="https://github.com/astronexus/HYG-Database" target="_blank" rel="noopener noreferrer">${t("HYG 4.1 · source and licence","HYG 4.1 · fonte e licenza")}</a></p>`;
   renderConstellationResults();
   $('#constellation-search').addEventListener('input', event => { constellationBrowser.query = event.target.value; renderConstellationResults(); });
   $('#observer-fields').addEventListener('input', event => event.target.setCustomValidity?.(''));
-  $('#observer-timezone').addEventListener('change', event => {
-    constellationBrowser.timeZone = event.target.value;
-    $('#observer-datetime').setCustomValidity('');
-  });
+  $('#observer-fields').addEventListener('change',()=>applyObserverChanges());
   refreshIcons();
 }
 
@@ -740,6 +763,8 @@ async function openConstellations({ observer = false } = {}) {
   openModal('constellations', t("Constellations","Costellazioni"), `<p class="constellation-loading" role="status">${t("Loading 88 constellations…","Caricamento delle 88 costellazioni…")}</p>`);
   try {
     constellationBrowser.data ||= await loadConstellations();
+    const validIds=new Set(constellationBrowser.data.constellations.map(figure=>figure.id));
+    constellationBrowser.ids=constellationBrowser.ids.filter(id=>validIds.has(id));
     if (request !== constellationModalRequest || !$('#modal').open || $('#modal').dataset.kind !== 'constellations') return;
     renderConstellationModal();
     $(observer ? '#observer-latitude' : '#constellation-search').focus();
@@ -769,33 +794,58 @@ function readObserverForm() {
   return true;
 }
 
-async function selectConstellation(id, earthPerspective = constellationBrowser.earthPerspective) {
-  if (constellationBrowser.busy) return;
-  if (!readObserverForm()) return;
-  if (!universe) return notify(t("Constellation views require WebGL. Enable hardware acceleration and reload.","La vista delle costellazioni richiede il motore grafico WebGL. Attiva l’accelerazione grafica e ricarica."));
-  stopTour();
-  constellationBrowser.busy = true;
-  const previousPerspective = constellationBrowser.earthPerspective;
-  const pending = document.querySelectorAll('[data-constellation], #constellation-apply');
-  pending.forEach(button => { button.disabled = true; });
-  if ($('#constellation-progress')) $('#constellation-progress').textContent = t("Loading stars and constellation geometry…","Caricamento di stelle e geometria delle costellazioni…");
-  else notify(t("Loading stars…","Caricamento delle stelle…"));
-  $('#constellation-controls').setAttribute('aria-busy', 'true');
-  try {
-    const shown = await universe.showConstellation(id, { mode: 'space', observer: { ...constellationBrowser.observer }, earthPerspective });
-    if (shown === false) return;
-    constellationBrowser.id = id;
-    if ($('#modal').dataset.kind === 'constellations') closeModal();
-  } catch (error) {
-    constellationBrowser.earthPerspective = previousPerspective;
-    const message = error?.message || t("Unable to open this constellation. Try again.","Impossibile aprire questa costellazione. Riprova tra un momento.");
-    if ($('#constellation-progress')) $('#constellation-progress').textContent = message;
-    else notify(message);
-  } finally {
-    constellationBrowser.busy = false;
-    pending.forEach(button => { button.disabled = false; });
-    $('#constellation-controls').removeAttribute('aria-busy');
+async function applyConstellationSelection(ids, { close = false, earthPerspective = constellationBrowser.earthPerspective } = {}) {
+  if (!readObserverForm()) return false;
+  if (!universe) {notify(t('Constellation views require WebGL.','La vista delle costellazioni richiede WebGL.'));return false;}
+  if(close&&state.scale===6&&!constellationBrowser.busy&&JSON.stringify(ids)===JSON.stringify(state.context?.constellationIds)&&JSON.stringify(constellationBrowser.observer)===JSON.stringify(state.context?.observer)){closeModal();return true;}
+  cancelInitialCombinedView();stopTour();
+  const focused=document.activeElement, focusInModal=Boolean(focused?.closest('#modal'));
+  const focusId=focused?.dataset.constellation||focused?.dataset.removeConstellation;
+  const focusAction=focused?.dataset.action;
+  const request=++constellationSelectionRequest,next=[...new Set(ids)];
+  constellationBrowser.pendingIds=next;constellationBrowser.busy=true;renderConstellationResults();
+  $('#constellation-controls').setAttribute('aria-busy','true');
+  if($('#constellation-progress'))$('#constellation-progress').textContent=t('Updating constellation selection…','Aggiornamento delle costellazioni selezionate…');
+  try{
+    const shown=await universe.showConstellations(next,{mode:'space',observer:{...constellationBrowser.observer},earthPerspective});
+    if(shown===false||request!==constellationSelectionRequest)return false;
+    constellationBrowser.ids=next;constellationBrowser.id=next[0]||null;savePreferences();
+    if($('#constellation-progress'))$('#constellation-progress').textContent=next.length+t(' constellations visible.',' costellazioni visibili.');
+    if(close&&$('#modal').dataset.kind==='constellations')closeModal();
+    return true;
+  }catch(error){
+    if(request!==constellationSelectionRequest)return false;
+    const message=error?.message||t('Unable to update the constellation selection.','Impossibile aggiornare le costellazioni selezionate.');
+    if($('#constellation-progress'))$('#constellation-progress').textContent=message;else notify(message);
+    return false;
+  }finally{
+    if(request===constellationSelectionRequest){
+      constellationBrowser.busy=false;constellationBrowser.pendingIds=null;
+      $('#constellation-controls').removeAttribute('aria-busy');renderConstellationResults();
+      // Replacing the checklist must not strand keyboard focus on the document.
+      // Leave focus alone if the user moved to another field while loading.
+      if(!close&&[document.body,$('#modal')].includes(document.activeElement)&&(!focusInModal||$('#modal').open&&$('#modal').dataset.kind==='constellations')){
+        const scope=focusInModal?'#modal':'#constellation-controls';
+        const target=focusId
+          ? $(`${scope} [data-constellation="${CSS.escape(focusId)}"]`)||$(`${scope} [data-remove-constellation="${CSS.escape(focusId)}"]`)||$(focusInModal?'#constellation-search':'.constellation-change')
+          : ['all-constellations','clear-constellations'].includes(focusAction)?$(`${scope} [data-action="${focusAction}"]`):null;
+        target?.focus({preventScroll:true});
+      }
+    }
   }
+}
+async function toggleConstellation(id){
+  if(constellationBrowser.busy)return;
+  const ids=constellationBrowser.ids;
+  await applyConstellationSelection(ids.includes(id)?ids.filter(value=>value!==id):[...ids,id]);
+}
+async function applyObserverChanges(){
+  if(!readObserverForm())return;
+  const status=$('#observer-status');
+  if(state.scale!==6&&!constellationBrowser.busy){if(status)status.textContent=t('Observer settings saved for the next constellation view.','Impostazioni dell’osservatore salvate per la prossima vista.');return;}
+  if(status)status.textContent=t('Applying observer settings…','Applicazione delle impostazioni dell’osservatore…');
+  const applied=await applyConstellationSelection(constellationBrowser.pendingIds||constellationBrowser.ids);
+  if(applied&&$('#observer-status'))$('#observer-status').textContent=t('Observer settings applied.','Impostazioni dell’osservatore applicate.');
 }
 
 function openCollections() {
@@ -829,7 +879,7 @@ function openAbout() {
 
 function openHelp() {
   openModal('help', t("Controls and navigation","Comandi e navigazione"), `
-    <div class="help-keys"><div><strong>${t("Drag","Trascina")}</strong>${t("Orbit the map","Orbita intorno alla mappa")}</div><div><strong>${t("Scroll / two fingers","Rotellina / due dita")}</strong>${t("Zoom in and out","Avvicina e allontana")}</div><div><strong>${t("Click / tap a planet or moon","Clic / tocco su un pianeta o satellite")}</strong>${t("Inspect the selected body","Osserva il corpo selezionato")}</div><div><strong>${t("Planets & moons","Pianeti e satelliti")}</strong>${t("Browse eight planets, confirmed exoplanets and major natural satellites","Sfoglia otto pianeti, esopianeti confermati e satelliti naturali principali")}</div><div><strong>${t("Constellations","Costellazioni")}</strong>${t("Select a 3D constellation, then View from Earth. Location and time are configurable","Seleziona una costellazione 3D, poi Guarda dalla Terra. Luogo e orario sono configurabili")}</div><div><strong>${t("Immersive view","Vista immersiva")}</strong>${t("Hide all text. Press Esc or use the top-right icon to restore controls","Nasconde tutte le scritte. Esc o l’icona in alto a destra per tornare")}</div><div><strong>1 — 5</strong>${t("Change reference scale","Cambia scala di riferimento")}</div><div><strong>/</strong>${t("Search stars, planets and moons","Cerca stelle, pianeti e satelliti")}</div><div><strong>${t("Space","Spazio")}</strong>${t("Pause or resume rotation","Ferma o riprendi la rotazione")}</div><div><strong>R</strong>${t("Reset the camera","Ripristina l’inquadratura")}</div><div><strong>Esc</strong>${t("Close dialogs and immersive view","Chiudi finestre e vista immersiva")}</div></div>
+    <div class="help-keys"><div><strong>${t("Drag","Trascina")}</strong>${t("Orbit the map","Orbita intorno alla mappa")}</div><div><strong>${t("Scroll / two fingers","Rotellina / due dita")}</strong>${t("Zoom in and out","Avvicina e allontana")}</div><div><strong>${t("Click / tap a planet or moon","Clic / tocco su un pianeta o satellite")}</strong>${t("Inspect the selected body","Osserva il corpo selezionato")}</div><div><strong>${t("Planets & moons","Pianeti e satelliti")}</strong>${t("Browse eight planets, confirmed exoplanets and major natural satellites","Sfoglia otto pianeti, esopianeti confermati e satelliti naturali principali")}</div><div><strong>${t("Constellations","Costellazioni")}</strong>${t("Add or remove constellations in 3D, or use View from Earth with your location and time","Aggiungi o rimuovi costellazioni in 3D, oppure usa Guarda dalla Terra con luogo e orario desiderati")}</div><div><strong>${t("Immersive view","Vista immersiva")}</strong>${t("Hide all text. Press Esc or use the top-right icon to restore controls","Nasconde tutte le scritte. Esc o l’icona in alto a destra per tornare")}</div><div><strong>1 — 5</strong>${t("Change reference scale","Cambia scala di riferimento")}</div><div><strong>/</strong>${t("Search stars, planets and moons","Cerca stelle, pianeti e satelliti")}</div><div><strong>${t("Space","Spazio")}</strong>${t("Pause or resume rotation","Ferma o riprendi la rotazione")}</div><div><strong>R</strong>${t("Reset the camera","Ripristina l’inquadratura")}</div><div><strong>Esc</strong>${t("Close dialogs and immersive view","Chiudi finestre e vista immersiva")}</div></div>
     <h3>${t("VIRTUAL REALITY","NELLA REALTÀ VIRTUALE")}</h3><p>${t("Desktop preview provides a first-person view without a headset. WebXR supports room-scale VR and mixed reality with a compatible headset. Hand tracking requires device and browser support; controllers are also supported.","L’anteprima PC offre una visuale in prima persona senza visore. Un visore WebXR compatibile permette di usare VR e realtà mista alla scala dell’ambiente. Il tracciamento delle mani richiede un visore e un browser che lo supportino. Anche i controller sono utilizzabili.")}</p><button class="focus-button" data-action="vr">${icon('glasses')}${t("VR controls","Comandi VR")}</button>`);
 }
 
@@ -898,6 +948,7 @@ async function openGaiaStream(){
   if(!universe||gaiaSwitchBusy||isGaiaStreamView())return;
   cancelInitialCombinedView();stopTour();closeModal();immersiveContent='current';
   gaiaSwitchBusy=true;renderCatalogueSwitch();
+  universe.cancelPendingView();
   const request=universe.viewRequest,saved=universe.captureAtlasView();
   const direction=universe.directionToGaia().toArray(),fov=universe.camera.fov;
   let prepared;
@@ -1123,7 +1174,7 @@ function rememberCurrentView() {
       scale: state.scale, catalogueView: state.context?.id,
       gaiaDirection:isGaiaStreamView()&&universe?universe.camera.getWorldDirection(universe.camera.position.clone()).toArray():undefined,
       gaiaFov:isGaiaStreamView()?universe?.camera.fov:undefined, objectId: state.object.id, host: state.object.host,
-      constellationId: constellationBrowser.id, mode: constellationBrowser.mode,
+      constellationId: constellationBrowser.id, constellationIds:constellationBrowser.ids, mode: constellationBrowser.mode,
       observer: constellationBrowser.observer, timeZone: constellationBrowser.timeZone,
       earthVisible: constellationBrowser.earthVisible, earthPerspective: state.context?.earthPerspective
     }));
@@ -1173,7 +1224,8 @@ document.addEventListener('click', async event => {
     savePreferences();
     return;
   }
-  if (button.dataset.constellation) return selectConstellation(button.dataset.constellation);
+  if (button.dataset.constellation) return toggleConstellation(button.dataset.constellation);
+  if (button.dataset.removeConstellation) return applyConstellationSelection(constellationBrowser.ids.filter(id=>id!==button.dataset.removeConstellation));
   if (button.dataset.searchScope) { searchBrowser.scope = button.dataset.searchScope; searchBrowser.page = 0; renderSearch(); return; }
   if (button.dataset.searchPage) { searchBrowser.page += button.dataset.searchPage === 'next' ? 1 : -1; renderSearch(); $('#search-results').scrollTop = 0; return; }
   if (button.dataset.catalogFilter) {
@@ -1216,20 +1268,14 @@ document.addEventListener('click', async event => {
     case 'earth-visible': universe?.setEarthVisible(!constellationBrowser.earthVisible); break;
     case 'earth-perspective': universe?.viewFromEarth(); break;
     case 'earth-orbit': universe?.resetView(); break;
-    case 'observer-orion-winter':
-      constellationBrowser.timeZone = 'Europe/Rome';
-      $('#observer-timezone').value = 'Europe/Rome';
-      $('#observer-latitude').value = '38\u00b006\u203251.98\u2033N';
-      $('#observer-longitude').value = '15\u00b039\u203200\u2033E';
-      $('#observer-datetime').value = '2026-12-11T20:00';
-      $('#observer-fields').querySelectorAll('input').forEach(field => field.setCustomValidity(''));
-      await selectConstellation('Ori', true);
-      break;
+    case 'view-constellations': await applyConstellationSelection(constellationBrowser.ids,{close:true}); break;
+    case 'all-constellations': await applyConstellationSelection(constellationBrowser.data.constellations.map(figure=>figure.id)); break;
+    case 'clear-constellations': await applyConstellationSelection([]); break;
     case 'cosmic-scales': changeScale(1); break;
-    case 'apply-observer': await selectConstellation(constellationBrowser.id); break;
     case 'observer-now':
       $('#observer-datetime').value = localDateInput(new Date().toISOString());
       $('#observer-datetime').setCustomValidity('');
+      await applyObserverChanges();
       break;
     case 'about': openAbout(); break;
     case 'search': openSearch(); break;
@@ -1372,7 +1418,7 @@ async function restoreLanguageView() {
     } else if (saved.scale >= 6) {
       constellationBrowser.timeZone = saved.timeZone || 'Europe/Rome';
       universe.setEarthVisible(saved.earthVisible !== false);
-      await universe.showConstellation(saved.constellationId, { mode: 'space', observer: saved.observer, earthPerspective: saved.earthPerspective || saved.mode === 'earth' });
+      await universe.showConstellations(saved.constellationIds || (saved.constellationId ? [saved.constellationId] : []), { mode: 'space', observer: saved.observer, earthPerspective: saved.earthPerspective || saved.mode === 'earth' });
     } else if (saved.scale === 5) {
       const planet = findPlanet(saved.objectId) || exoplanets.find(item => item.host === saved.host);
       if (planet) universe.focusObject(planet);
