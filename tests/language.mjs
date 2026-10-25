@@ -11,7 +11,7 @@ const errors = [], audit = [];
 const slogans = /Il nostro angolo di cosmo|Le luci più vicine|Isole nell.oscurità|Un viaggio verso l.infinito|Ogni viaggio inizia|Lasciati trasportare|Le linee sono convenzioni visive|Our corner of|A journey to infinity|Let yourself be carried/i;
 const italianLeak = /\b(?:pianeti|esopianeti|stelle|costellazioni|distanza|distanze|anni luce|sconosciuta|sconosciuto|latitudine|longitudine|orizzonte|griglia|etichette|particellari|rotazione|impostazioni|seleziona|chiudi|avvicina|allontana|cerca nel|trascina|terrestre|dalla Terra|Sistema Solare|Via Lattea|Gruppo Locale|scala di riferimento|magnitudine|ascensione|declinazione|orbite|illustrazione)\b/i;
 try {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 960 }, deviceScaleFactor: 1, locale: 'it-IT', timezoneId: 'UTC', reducedMotion: 'reduce' });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 960 }, deviceScaleFactor: 0.75, locale: 'it-IT', timezoneId: 'UTC', reducedMotion: 'reduce' });
   page.setDefaultTimeout(30000);
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error' && !message.text().includes('fonts.googleapis')) errors.push(message.text()); });
@@ -39,15 +39,15 @@ try {
   async function winterOrion() {
     await open('constellations');
     await expect(page.locator('#constellation-search')).toBeVisible();
-    await page.locator('#modal [data-constellation-mode="earth"]').click();
+    await page.locator('#observer-settings > summary').click();
     await page.locator('[data-action="observer-orion-winter"]').click();
     await expect(page.locator('#modal')).not.toBeVisible({ timeout: 60000 });
-    await expect(page.locator('.app-shell')).toHaveClass(/earth-sky-view/);
+    await expect(page.locator('.app-shell')).toHaveClass(/earth-perspective-view/);
     await expect(page.locator('#constellation-status time')).toHaveAttribute('datetime', '2026-12-11T19:00:00.000Z');
   }
   async function changeLanguage(language) {
     await open('settings');
-    await Promise.all([page.waitForEvent('load'),page.locator('#language-setting').selectOption(language)]);
+    await Promise.all([page.waitForEvent('load', {timeout:90000}),page.locator('#language-setting').selectOption(language)]);
     await page.waitForLoadState('networkidle');
     await ready();
     await expect(page.locator('html')).toHaveAttribute('lang', language);
@@ -61,7 +61,7 @@ try {
   await expect(page.locator('#scale-title')).toContainText('Combined map');
   await expect(page.locator('#combined-desktop-layers')).toBeVisible();
   await capture('English combined default with Italian browser locale');
-  await page.screenshot({ path: 'test-results/language-english-main.png' });
+  await page.screenshot({ timeout:60000, path: 'test-results/language-english-main.png' });
   await page.locator('[data-action="cosmic-scales"]').click();
   await page.locator('[data-scale="0"]').click();
   await expect(page.locator('#scale-title')).toContainText('Solar System');
@@ -103,7 +103,7 @@ try {
   await expect(page.locator('#constellation-results [data-constellation]')).toHaveCount(88);
   await expect(page.locator('#constellation-count')).toContainText('88 constellations');
   await capture('English constellation catalogue');
-  await page.screenshot({ path: 'test-results/language-english-constellations.png' });
+  await page.screenshot({ timeout:60000, path: 'test-results/language-english-constellations.png' });
   await page.locator('#constellation-search').fill('Orione');
   await expect(page.locator('#constellation-count')).toHaveText('1 constellation found');
   await expect(page.locator('#constellation-results [data-constellation]')).toHaveCount(1);
@@ -122,12 +122,12 @@ try {
 
   await changeLanguage('it');
   await expect(page.locator('#scale-title')).toHaveText('Orione.', { timeout: 60000 });
-  await expect(page.locator('.app-shell')).toHaveClass(/earth-sky-view/);
+  await expect(page.locator('.app-shell')).toHaveClass(/earth-perspective-view/);
   await expect(page.locator('#constellation-status time')).toHaveAttribute('datetime', '2026-12-11T19:00:00.000Z');
   await expect(page.locator('#constellation-status')).toContainText('21 stelle della figura');
   assert.equal(await page.evaluate(() => localStorage.getItem('aether.language')), 'it');
   await capture('Explicit Italian preserves Orion and observer time', false);
-  await page.screenshot({ path: 'test-results/language-italian-orion.png' });
+  await page.screenshot({ timeout:60000, path: 'test-results/language-italian-orion.png' });
   await open('about');
   await capture('Italian project copy', false);
   await close();
@@ -143,7 +143,7 @@ try {
   await winterOrion();
   await changeLanguage('en');
   await expect(page.locator('#scale-title')).toHaveText('Orion.', { timeout: 60000 });
-  await expect(page.locator('.app-shell')).toHaveClass(/earth-sky-view/);
+  await expect(page.locator('.app-shell')).toHaveClass(/earth-perspective-view/);
   await expect(page.locator('#constellation-status time')).toHaveAttribute('datetime', '2026-12-11T19:00:00.000Z');
   await expect(page.locator('#constellation-status')).toContainText('21 figure stars above the horizon');
   await capture('Switch back to English preserves Orion and observer time');

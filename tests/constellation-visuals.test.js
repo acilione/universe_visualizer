@@ -172,3 +172,54 @@ test('all 88 constellations produce finite nonempty 3D and Earth scenes with cli
     }
   }
 });
+
+
+test('unified Earth origin retains measured geometry and supplements angular references without inventing distances', () => {
+  const view=build('Sgr');
+  try {
+    const geometry=cloud(view).geometry, original=geometry.attributes.position.array.slice();
+    const measured=view.objects.map(star=>star.position.slice());
+    view.setEarthPerspective(true);
+    const extra=view.group.getObjectByName('earth-angular-stars');
+    assert.equal(geometry.attributes.position.count+extra.geometry.attributes.position.count,119625);
+    assert.equal(view.context.renderedStarCount,119625);
+    assert.equal(extra.material.uniforms.uHorizon.value,0,'3D origin retains the full sphere, including below-horizon directions');
+    assert.equal(view.group.getObjectByName('earth-ground'),undefined);
+    assert.equal(cloud(view).geometry,geometry);
+    assert.deepEqual(geometry.attributes.position.array,original);
+    assert.deepEqual(view.objects.map(star=>star.position),measured);
+    const polis=view.angularObjects.find(star=>star.hip===89341);
+    assert.equal(polis.distanceLy,null);
+    assert.equal(polis.positionKind,'sky-projection');
+    assert.equal(polis.earthAngularReference,true);
+    close(radial(polis.position),60);
+    closeVector(polis.position.map(value=>value/60),equatorialVector(polis.raDeg,polis.decDeg));
+    const segments=figure('Sgr').segments.filter(([a,b])=>catalog.byHip.get(a).distanceLy===null||catalog.byHip.get(b).distanceLy===null);
+    assert.equal(view.group.getObjectByName('angular-constellation-lines').userData.segmentCount,segments.length);
+    view.setEarthPerspective(false);
+    assert.equal(view.group.getObjectByName('earth-angular-reference').visible,false);
+    assert.equal(view.context.renderedStarCount,geometry.attributes.position.count);
+    view.setEarthPerspective(true);
+    assert.equal(view.angularObjects.length,1,'repeated entry does not duplicate unknown stars');
+  } finally { dispose(view); }
+});
+
+test('Reggio Calabria observer orientation agrees between fixed 3D stars and the former horizon projection', () => {
+  const observation={latitude:38.11443888888889,longitude:15.65,dateIso:'2026-12-11T19:00:00Z'};
+  const space=build('Ori','space',observation), former=build('Ori','earth',observation);
+  const later=build('Ori','space',{...observation,dateIso:'2026-12-12T01:00:00Z'});
+  try {
+    assert.equal(space.context.visibleStarCount,21);
+    for(const star of space.objects){
+      const comparison=former.objects.find(item=>item.hip===star.hip);
+      const local=space.skyTransform.fromEquatorial(star.position).map(value=>value/radial(star.position));
+      closeVector(local,comparison.position.map(value=>value/60));
+      close(star.altitudeDeg,comparison.altitudeDeg);
+      close(star.azimuthDeg,comparison.azimuthDeg);
+      closeVector(star.position,later.objects.find(item=>item.hip===star.hip).position);
+      assert.ok(star.altitudeDeg>12,'Orion is above the horizon at the reported winter time');
+    }
+    const first=space.objects.find(star=>star.hip===27989),second=later.objects.find(star=>star.hip===27989);
+    assert.ok(Math.abs(first.azimuthDeg-second.azimuthDeg)>60,'time changes local orientation without moving measured stellar positions');
+  } finally { dispose(space);dispose(former);dispose(later); }
+});

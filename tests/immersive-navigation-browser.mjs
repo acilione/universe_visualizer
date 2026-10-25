@@ -18,7 +18,7 @@ try{
   });
   const tick=seconds=>page.evaluate(seconds=>{const render=atlas.renderer.render;atlas.renderer.render=()=>{};try{for(let i=0;i<Math.ceil(seconds*20);i++)atlas.animate(window.testClock+=50);}finally{atlas.renderer.render=render;}atlas.scene.updateMatrixWorld(true);atlas.renderer.render(atlas.scene,atlas.camera);},seconds);
   const snapshot=()=>page.evaluate(()=>{atlas.scene.updateMatrixWorld(true);return {camera:[...atlas.camera.position.toArray(),...atlas.camera.quaternion.toArray()],map:atlas.mapRoot.matrixWorld.toArray(),scale:atlas.mapRoot.scale.x};});
-  const aim=async id=>{await page.evaluate(id=>{const object=atlas.objects.find(object=>object.id===id);if(!object)throw new Error('Missing object '+id);atlas.preview.lookAtObject(object);atlas.scene.updateMatrixWorld(true);},id);};
+  const aim=async id=>{await page.evaluate(id=>{const object=atlas.objects.find(object=>object.id===id);if(!object)throw new Error('Missing object '+id);atlas.preview.lookAtObject(object);atlas.scene.updateMatrixWorld(true);},id);await tick(.4);};
   const click=()=>page.locator('canvas').click({position:{x:720,y:450}});
   await tick(3.3);
   assert.equal(await page.evaluate(()=>atlas.index),9);
@@ -27,6 +27,32 @@ try{
   assert.ok(counts.stars>=118000&&counts.nebulae>=485&&counts.planets===8);
   await page.screenshot({path:output+'/combined-entry.png'});
   checkpoint('The room map includes all planets, stars and nebulae on entry');
+
+  const hiddenJump = await page.evaluate(() => {
+    const frames = [], oldRoot = atlas.mapRoot.matrixWorld.toArray(), oldCamera = atlas.camera.quaternion.toArray();
+    const render = atlas.renderer.render;
+    atlas.renderer.render = (scene, camera) => {
+      scene.updateMatrixWorld(true);
+      frames.push({ opacity: Number(atlas.canvas.style.opacity || 1), root: atlas.mapRoot.matrixWorld.toArray(), camera: camera.quaternion.toArray() });
+    };
+    try {
+      atlas.preview.focusObject(atlas.objects.find(object => object.id === 'earth'), atlas.spatialExtent(atlas.objects.find(object => object.id === 'earth')));
+      for (let frame = 0; frame < 10; frame++) atlas.animate(window.testClock += 40);
+      const placed = atlas.mapRoot.matrixWorld.toArray();
+      atlas.preview.lookAtObject(atlas.objects.find(object => object.id === 'jupiter'));
+      for (let frame = 0; frame < 10; frame++) atlas.animate(window.testClock += 40);
+      return { frames, oldRoot, oldCamera, placed };
+    } finally { atlas.renderer.render = render; }
+  });
+  let previousRoot=hiddenJump.oldRoot,previousCamera=hiddenJump.oldCamera,relocations=0,turns=0;
+  for(const frame of hiddenJump.frames){
+    if(JSON.stringify(frame.root)!==JSON.stringify(previousRoot)){assert.equal(frame.opacity,0,'Rendered map relocation must be completely hidden');relocations++;}
+    if(JSON.stringify(frame.camera)!==JSON.stringify(previousCamera)){assert.equal(frame.opacity,0,'Automatic gaze changes must hide the whole sky canvas');turns++;}
+    previousRoot=frame.root;previousCamera=frame.camera;
+  }
+  assert.equal(relocations,1);assert.equal(turns,1);
+  await page.evaluate(()=>atlas.preview.navigateBack());await tick(.4);
+  checkpoint('Actual renderer frames contain no visible automatic map sweep or camera whip');
 
   await aim('earth');const before=await snapshot();await click();await tick(.7);
   assert.equal(await page.evaluate(()=>atlas.selected?.id),'earth');assert.equal(await page.evaluate(()=>atlas.preview.isInspecting),true);
@@ -40,13 +66,15 @@ try{
 
   const anchor=()=>page.evaluate(()=>{atlas.mapRoot.updateMatrixWorld(true);const body=atlas.bodyVisuals.get('earth');return body.getWorldPosition(body.position.clone()).toArray();});
   const position=await anchor(),scale=(await snapshot()).scale;
-  await page.mouse.move(720,450);await page.mouse.wheel(0,-250);await tick(.1);
-  assert.ok((await snapshot()).scale>scale*2,'Wheel input covers large scale changes immediately');
+  await page.mouse.move(720,450);await page.mouse.wheel(0,-250);await tick(.05);
+  assert.ok((await snapshot()).scale>scale && (await snapshot()).scale<scale*1.14,'Wheel input is bounded per frame instead of snapping to the new size');
+  await tick(1.3);
+  assert.ok((await snapshot()).scale>scale*2,'Sustained zoom reaches the requested inspection scale');
   const enlarged=await anchor();assert.ok(position.every((v,i)=>Math.abs(v-enlarged[i])<1e-8),'Zoom stays centred on the inspected object');
-  await page.mouse.wheel(0,250);await tick(.1);
+  await page.mouse.wheel(0,250);await tick(1.4);
   assert.ok(Math.abs((await snapshot()).scale/scale-1)<1e-6);
   assert.deepEqual((await snapshot()).camera,before.camera);
-  checkpoint('Fast zoom is reversible and keeps the inspected body anchored');
+  checkpoint('Damped zoom is reversible and keeps the inspected body anchored');
   const localField=await page.evaluate(()=>atlas.environment.diagnostics);
   assert.equal(localField.nearFieldActive,true);
   const fixedNearMap=(await snapshot()).map;
@@ -93,7 +121,7 @@ try{
     atlas.preview.lookAtObject({id:'test-aim-background',position:atlas.mapRoot.worldToLocal(world).toArray()});
     atlas.scene.updateMatrixWorld(true);
   });
-  const starPose=(await snapshot()).camera;await click();await tick(.7);
+  await tick(.4);const starPose=(await snapshot()).camera;await click();await tick(.7);
   assert.equal(await page.evaluate(()=>atlas.index),9,'Selecting a sky reference opens its combined catalogue context');
   assert.equal(await page.evaluate(()=>atlas.selected?.id),'hip-32349');
   assert.deepEqual((await snapshot()).camera,starPose);
@@ -106,6 +134,19 @@ try{
   assert.deepEqual((await snapshot()).camera,beforeHost);
   assert.equal(await page.evaluate(()=>atlas.preview.isInspecting),true);
   checkpoint('Travelling to an exoplanet opens its host system without moving the observer');
+  await page.evaluate(()=>atlas.showConstellation('Ori',{mode:'space',earthPerspective:true,observer:{latitude:38+6/60+51.98/3600,longitude:15+39/60,dateIso:'2026-12-11T19:00:00.000Z'}}));
+  await tick(.4);
+  const earthReturn=await page.evaluate(()=>{
+    const camera=[...atlas.camera.position.toArray(),...atlas.camera.quaternion.toArray()],fov=atlas.camera.fov;
+    atlas.resetView(true);
+    return {beforeFov:fov,afterFov:atlas.camera.fov,opacity:Number(atlas.canvas.style.opacity||1),earthPerspective:atlas.earthPerspective,beforeCamera:camera,afterCamera:[...atlas.camera.position.toArray(),...atlas.camera.quaternion.toArray()]};
+  });
+  assert.equal(earthReturn.beforeFov,72);assert.equal(earthReturn.afterFov,72);
+  assert.equal(earthReturn.opacity,0,'Earth-to-orbit root change must be concealed before the next renderer frame');
+  assert.equal(earthReturn.earthPerspective,false);assert.deepEqual(earthReturn.afterCamera,earthReturn.beforeCamera);
+  await tick(.4);assert.equal(await page.evaluate(()=>atlas.camera.fov),72);
+  checkpoint('Returning from Earth perspective preserves preview field of view and hides the map relocation');
+
   await page.evaluate(()=>atlas.exitPreview());
   assert.equal(await page.evaluate(()=>atlas.preview.isActive),false);assert.equal(await page.evaluate(()=>atlas.controls.enabled),true);
   await page.evaluate(()=>atlas.dispose());checkpoint('Leaving immersive navigation restores ordinary map interaction');

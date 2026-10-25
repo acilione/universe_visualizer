@@ -185,3 +185,18 @@ test('late worker revisions cannot replace the working set after a quality chang
     assert.equal(f.view.resolve(proxy).gaiaSourceId,row(2).sourceId);
   }finally{f.view.dispose();}
 });
+
+
+test('preparing Gaia loads the requested bearing before scene handoff and completes on first sources',async()=>{
+  const f=fixture();const direction=new THREE.Vector3(...equatorialVector(83.8,-5.4));
+  const ready=f.view.prepare(direction,12,1.5,1000);
+  const request=f.worker.messages.find(message=>message.type==='view');
+  close(request.view.raDeg,83.8);close(request.view.decDeg,-5.4);assert.ok(request.view.radiusDeg<15);
+  f.worker.emit({records:[row()],metadataValidated:true,loading:true});await ready;
+  assert.equal(f.view.diagnostics.renderedSources,1);f.view.dispose();
+});
+
+test('leaving a prepared Gaia view releases the pending handoff instead of leaking a worker',async()=>{
+  const f=fixture();const ready=f.view.prepare(new THREE.Vector3(1,0,0),60,1,1000);
+  f.view.dispose();await ready;assert.equal(f.worker.terminated,1);
+});

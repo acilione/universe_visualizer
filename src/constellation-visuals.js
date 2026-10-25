@@ -59,19 +59,21 @@ function figureLines(figure, byHip, position, mode, renderer) {
     const starA=byHip.get(a),starB=byHip.get(b);
     if(mode==='space' && (starA.distanceLy===null || starB.distanceLy===null))continue;
     const start=new THREE.Vector3(...position(starA)),end=new THREE.Vector3(...position(starB));
-    const steps=mode==='earth'?24:1;
+    const steps=mode==='space'?1:24;
     for(let i=0;i<steps;i++) {
       let left=start.clone().lerp(end,i/steps),right=start.clone().lerp(end,(i+1)/steps);
-      if(mode==='earth') {
+      if(mode!=='space') {
         left.normalize().multiplyScalar(RADIUS);right.normalize().multiplyScalar(RADIUS);
-        if(left.y<0&&right.y<0)continue;
-        if(left.y<0)left.lerp(right,-left.y/(right.y-left.y));
-        if(right.y<0)right.lerp(left,-right.y/(left.y-right.y));
+        if(mode==='earth'){
+          if(left.y<0&&right.y<0)continue;
+          if(left.y<0)left.lerp(right,-left.y/(right.y-left.y));
+          if(right.y<0)right.lerp(left,-right.y/(left.y-right.y));
+        }
       }
       positions.push(...left.toArray(),...right.toArray());
       progress.push(i/steps,(i+1)/steps);
     }
-    if(mode==='space'||start.y>0||end.y>0)pulses.push({start,end,phase:segmentCount*.173});
+    if(mode!=='earth'||start.y>0||end.y>0)pulses.push({start,end,phase:segmentCount*.173});
     segmentCount++;
   }
   const group=new THREE.Group();group.name='constellation-lines';group.userData.segmentCount=segmentCount;
@@ -99,7 +101,7 @@ function figureLines(figure, byHip, position, mode, renderer) {
     const attribute=pulseGeometry.attributes.position;
     for(let i=0;i<pulses.length;i++){
       const pulse=pulses[i],p=pulse.start.clone().lerp(pulse.end,(time*.055+pulse.phase)%1);
-      if(mode==='earth')p.normalize().multiplyScalar(RADIUS);
+      if(mode!=='space')p.normalize().multiplyScalar(RADIUS);
       attribute.setXYZ(i,p.x,p.y,p.z);
     }
     attribute.needsUpdate=true;
@@ -113,7 +115,7 @@ export function createConstellationView({catalog,figure,mode,observer,renderer})
   const known=members.filter(s=>s.distanceLy!==null);
   const reach=Math.max(30,...known.map(s=>s.distanceLy));
   const factor=26/reach;
-  const transform=mode==='earth'?createSkyTransform(observer):null;
+  const transform=createSkyTransform(observer);
   const position=mode==='earth'?s=>transform.vector(s.raDeg,s.decDeg,RADIUS):s=>equatorialVector(s.raDeg,s.decDeg,s.distanceLy*factor);
   // Linear depth, centered on the Sun. Distant field stars outside this view's
   // volume are culled; selecting a different constellation changes that volume.
@@ -139,19 +141,20 @@ export function createConstellationView({catalog,figure,mode,observer,renderer})
     const reference=new THREE.Line(radial,material);reference.computeLineDistances();grid.add(reference);
   }
   group.add(grid);
-  const visibleStarCount=mode==='earth'?members.filter(s=>position(s)[1]>=0).length:known.length;
-  const objects=(mode==='earth'?members:known).map(s=>{
-    const horizontal=transform?.horizontal(s.raDeg,s.decDeg);
+  const visibleStarCount=members.filter(s=>transform.horizontal(s.raDeg,s.decDeg).altitudeDeg>=0).length;
+  const objectFor=(s,angularOnly=false)=>{
+    const horizontal=transform.horizontal(s.raDeg,s.decDeg);
     return {...s,bodyKind:'catalog-star',type:t('Star · ','Stella · ')+figure.name,measured:true,color:colorFor(s.colorIndex).getStyle(),size:.12,
       distance:s.distanceLy===null?t('Unknown distance','Distanza sconosciuta'):formatNumber(s.distanceLy,{maximumFractionDigits:1})+t(' light-years',' anni luce'),
-      position:position(s),altitudeDeg:horizontal?.altitudeDeg,azimuthDeg:horizontal?.azimuthDeg,
-      source:catalog.metadata.source,positionKind:mode==='earth'?'sky-projection':'measured',
+      position:angularOnly?equatorialVector(s.raDeg,s.decDeg,RADIUS):position(s),altitudeDeg:horizontal.altitudeDeg,azimuthDeg:horizontal.azimuthDeg,earthAngularReference:angularOnly,
+      source:catalog.metadata.source,positionKind:mode==='earth'||angularOnly?'sky-projection':'measured',
       detail:t(`HYG v4.1 star in ${figure.name}. Apparent magnitude ${formatNumber(s.mag)}.`,`Stella del catalogo HYG v4.1 in ${figure.name}. Magnitudine apparente ${formatNumber(s.mag)}.`)+(horizontal?t(` Altitude above the horizon: ${formatNumber(horizontal.altitudeDeg,{minimumFractionDigits:1,maximumFractionDigits:1})}°.`,` Altezza sull’orizzonte: ${formatNumber(horizontal.altitudeDeg,{minimumFractionDigits:1,maximumFractionDigits:1})}°.`):''),
-      positionNote:mode==='earth'
+      positionNote:angularOnly?t('Angular reference only: the distance is unknown. Visible only from Earth’s origin, not placed in the measured 3D volume.','Riferimento solo angolare: la distanza non è nota. Visibile solo dall’origine terrestre, non collocato nel volume 3D misurato.'):mode==='earth'
         ?t('Sky projection from J2000 coordinates, precessed to the selected date. Geometric horizon; refraction, proper motion and parallax are not included.','Proiezione del cielo da coordinate J2000, con precessione alla data scelta. Orizzonte geometrico; senza rifrazione, moto proprio o parallasse.')
         :t('J2000 coordinates and HYG distances. Linear scale in all directions; stellar sizes are enlarged.','Coordinate J2000 e distanze HYG. Scala lineare in tutte le direzioni; dimensioni stellari amplificate.')
     };
-  }).sort((a,b)=>(mode==='earth'?Number(b.altitudeDeg>=0)-Number(a.altitudeDeg>=0):0)||a.mag-b.mag);
+  };
+  const objects=(mode==='earth'?members:known).map(s=>objectFor(s)).sort((a,b)=>(mode==='earth'?Number(b.altitudeDeg>=0)-Number(a.altitudeDeg>=0):0)||a.mag-b.mag);
   const centroid=new THREE.Vector3();
   for(const star of (mode==='earth'?objects.filter(o=>o.altitudeDeg>=0):objects))centroid.add(new THREE.Vector3(...star.position));
   if(centroid.lengthSq()<.001)centroid.set(0,.2,-1);
@@ -163,10 +166,37 @@ export function createConstellationView({catalog,figure,mode,observer,renderer})
   const positionNote=mode==='earth'
     ? t(`Sky at ${coordinates} · ${observationDate}. ${visibleStarCount}/${members.length} figure stars above the horizon. Brightness is amplified; daylight is not simulated.`,`Cielo per ${coordinates} · ${observationDate}. ${visibleStarCount}/${members.length} stelle della figura sopra l’orizzonte. Luminosità amplificata; cielo diurno non simulato.`)
     : t(`Linear HYG distances · radius ${formatNumber(Math.round(reach*1.55))} light-years from the Sun.`,`Distanze lineari HYG · raggio di ${formatNumber(Math.round(reach*1.55))} anni luce dal Sole.`)+' '+(unknownDistanceCount
-      ? t(`${unknownDistanceCount} stars without distance measurements and their segments are available only in the Earth sky view.`,`${unknownDistanceCount} stelle senza distanza e relativi segmenti visibili solo dalla Terra.`)
+      ? t(`${unknownDistanceCount} stars without distance measurements appear as angular references only when viewing from Earth’s origin.`,`${unknownDistanceCount} stelle senza distanza e relativi segmenti visibili solo dalla Terra.`)
       : t('All figure stars have catalog distances.','Tutte le stelle della figura hanno una distanza di catalogo.'));
   const context={id:'constellations',constellationId:figure.id,mode,observer,name:figure.name,short:figure.abbr,extent:mode==='earth'?t('Sky from Earth’s surface','Cielo dalla superficie terrestre'):formatNumber(Math.round(reach))+t(' light-years',' anni luce'),metric:t('FIGURE STARS','STELLE DELLA FIGURA'),count:String(members.length),starCount:members.length,visibleStarCount,unknownDistanceCount,
     source:catalog.metadata.source,description:t('88 constellations with HYG v4.1 stellar coordinates.','88 costellazioni con coordinate stellari HYG v4.1.'),positionNote,overview:t('Constellations','Costellazioni'),renderedStarCount:visibleCatalog.length,catalogStarCount:catalog.stars.length};
-  return {group,objects,context,center,radius,lookDirection,mode,figure,observer};
+  // Supplement only missing/culled directions while the observer is exactly at
+  // the origin. These points never become invented radial distances in orbit.
+  let angularReference=null;
+  const angularObjects=[];
+  const spatialStars=new Set(visibleCatalog);
+  const earthLookDirection=new THREE.Vector3();
+  for(const star of members)earthLookDirection.add(new THREE.Vector3(...equatorialVector(star.raDeg,star.decDeg)));
+  if(earthLookDirection.lengthSq()<1e-8)earthLookDirection.set(0,0,-1);
+  earthLookDirection.normalize();
+  function setEarthPerspective(active){
+    if(mode!=='space')return;
+    if(active&&!angularReference){
+      angularReference=new THREE.Group();angularReference.name='earth-angular-reference';angularReference.userData.angularReferenceOnly=true;
+      const remainder=catalog.stars.filter(star=>!spatialStars.has(star));
+      const angularPosition=star=>equatorialVector(star.raDeg,star.decDeg,RADIUS);
+      const background=starCloud(remainder,angularPosition,renderer,'angular',memberIds);background.name='earth-angular-stars';background.userData.angularReferenceOnly=true;
+      angularReference.add(background);
+      const missingSegments=figure.segments.filter(([a,b])=>catalog.byHip.get(a).distanceLy===null||catalog.byHip.get(b).distanceLy===null);
+      const missingLines=figureLines({...figure,segments:missingSegments},catalog.byHip,angularPosition,'angular',renderer);
+      missingLines.name='angular-constellation-lines';missingLines.userData.angularReferenceOnly=true;angularReference.add(missingLines);
+      for(const star of members.filter(star=>star.distanceLy===null))angularObjects.push(objectFor(star,true));
+      group.add(angularReference);
+    }
+    if(angularReference)angularReference.visible=Boolean(active);
+    context.renderedStarCount=active?catalog.stars.length:visibleCatalog.length;
+    context.earthAngularReferenceCount=active?catalog.stars.length-visibleCatalog.length:0;
+  }
+  return {group,objects,angularObjects,context,center,radius,lookDirection,earthLookDirection,skyTransform:transform,mode,figure,observer,setEarthPerspective};
 }
 

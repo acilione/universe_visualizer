@@ -30,7 +30,8 @@
     "test:immersive-navigation": "node tests/immersive-navigation-browser.mjs",
     "test:immersive-entry": "node tests/immersive-entry-browser.mjs",
     "test:desktop-startup": "node tests/desktop-startup-browser.mjs",
-    "test:gaia-stream": "node tests/gaia-stream-browser.mjs"
+    "test:gaia-stream": "node tests/gaia-stream-browser.mjs",
+    "test:catalogue-handoff": "node tests/catalogue-handoff-browser.mjs"
   },
   "dependencies": {
     "@hscmap/healpix": "1.4.12",

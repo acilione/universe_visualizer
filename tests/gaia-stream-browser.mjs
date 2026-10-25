@@ -21,7 +21,7 @@ const tsv=[columns,['9007199254740993',266.4051,-28.936175,4.2,-2,.1,10000,5000,
 validateGaiaMetadata(properties,metadata);assert.equal(parseGaiaTile(tsv).length,3);
 const browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const context=await browser.newContext({viewport:{width:1280,height:900},reducedMotion:'reduce',locale:'en-US'}),page=await context.newPage();
-page.setDefaultTimeout(45000);const errors=[],checkpoints=[],requests=[],held=[];let mode='normal';
+page.setDefaultTimeout(45000);const errors=[],checkpoints=[],requests=[],held=[];let mode='normal',uiTsv=null;
 page.on('pageerror',error=>errors.push(error.message));page.on('console',message=>{if(message.type()==='error'&&/THREE\.WebGL|GL_INVALID|Shader Error/i.test(message.text()))errors.push(message.text());});
 const pass=label=>{assert.deepEqual(errors,[],label);checkpoints.push(label);console.log('PASS: '+label);};
 await context.route('https://fonts.googleapis.com/**',route=>route.fulfill({status:204,body:''}));
@@ -54,7 +54,7 @@ try{
     if(url.endsWith('/properties'))return route.fulfill({status:200,headers,contentType:'text/plain',body:properties});
     if(url.endsWith('/metadata.xml'))return route.fulfill({status:200,headers,contentType:'application/xml',body:mode==='error'?metadata.replace('epoch="2016.0"','epoch="2015.0"'):metadata});
     if(mode==='hold'){held.push(route);return;}
-    return route.fulfill({status:200,headers,contentType:'text/tab-separated-values',body:tsv});
+    return route.fulfill({status:200,headers,contentType:'text/tab-separated-values',body:uiTsv||tsv});
   });
   if(process.env.GAIA_UI_ONLY!=='1'){
     await page.goto(engineBase+'/tests/fixtures/engine.html',{waitUntil:'networkidle',timeout:90000});await page.waitForFunction(()=>window.atlas?.ready&&atlas.showGaiaSky);
@@ -81,7 +81,16 @@ try{
     mode='normal';await page.evaluate(()=>atlas.retryGaiaStream());await page.waitForFunction(()=>atlas.gaiaSkyView.diagnostics.renderedSources===3&&!atlas.gaiaSkyView.diagnostics.error&&!atlas.gaiaSkyView.diagnostics.loading);pass('Invalid remote astrometry metadata is rejected and an explicit retry recovers the real worker');
     await page.evaluate(()=>atlas.dispose());
   }
-  mode='error';await page.goto(base,{waitUntil:'networkidle',timeout:90000});await ready();await openUI();
+  mode='error';await page.goto(base,{waitUntil:'networkidle',timeout:90000});await ready();
+  // UI entry follows the actual atlas bearing; the engine fixture above still
+  // verifies the explicit default Galactic-centre entry and native epoch data.
+  await page.evaluate(async()=>{
+    const {Universe}=await import('/src/universe.js'),capture=Universe.prototype.captureAtlasView;
+    Universe.prototype.captureAtlasView=function(){window.testGaiaEntry=this.directionToGaia().toArray();return capture.call(this);};
+  });
+  await openUI();
+  const uiDirection=await page.evaluate(()=>window.testGaiaEntry),uiRa=(Math.atan2(-uiDirection[2],uiDirection[0])*180/Math.PI+360)%360,uiDec=Math.asin(uiDirection[1])*180/Math.PI;
+  uiTsv=tsv.split('\n').map((line,index)=>{if(!index)return line;const fields=line.split('\t');fields[1]=String(uiRa+Number(fields[1])-266.4051);fields[2]=String(uiDec+Number(fields[2])+28.936175);return fields.join('\t');}).join('\n');
   await expect(page.locator('#gaia-stream-retry')).toBeVisible();await expect(page.locator('#gaia-stream-status')).toContainText('could not be loaded');
   mode='normal';await page.locator('#gaia-stream-retry').click();
   await expect(page.locator('#gaia-stream-status')).toContainText('3 sources currently loaded.');await expect(page.locator('#gaia-stream-retry')).toBeHidden();

@@ -5,7 +5,7 @@ const observer={latitude:41.9028,longitude:12.4964,dateIso:'2026-01-15T21:00:00.
 try{
  const page=await browser.newPage({viewport:{width:1440,height:960},reducedMotion:'reduce'});
  const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
- await page.goto('http://localhost:5173/tests/fixtures/engine.html');
+ await page.goto((process.env.ENGINE_TEST_URL||'http://localhost:5173')+'/tests/fixtures/engine.html');
  await page.waitForFunction(()=>window.atlas?.ready);
  await page.evaluate(async observer=>atlas.showConstellation('Ori',{mode:'space',observer}),observer);
  await page.waitForFunction(()=>!atlas.cameraFlight);
@@ -13,17 +13,19 @@ try{
  assert.ok(await page.evaluate(()=>atlas.content.getObjectByName('constellation-lines').userData.segmentCount>10));
  await page.screenshot({path:'test-results/constellation-engine-space.png'});
  await page.evaluate(async observer=>atlas.showConstellation('Ori',{mode:'earth',observer}),observer);
- assert.equal(await page.evaluate(()=>atlas.index),7);
+ assert.equal(await page.evaluate(()=>atlas.index),6);
+ assert.equal(await page.evaluate(()=>atlas.earthPerspective),true);
  assert.equal(await page.evaluate(()=>atlas.controls.enabled),false);
  assert.ok(await page.evaluate(()=>atlas.camera.position.length()<1e-8));
- assert.equal(await page.evaluate(()=>atlas.content.getObjectByName('catalog-stars').geometry.attributes.position.count),119625);
- assert.ok(await page.evaluate(()=>atlas.targets.every(t=>t.userData.object.altitudeDeg>=0)));
+ assert.equal(await page.evaluate(()=>atlas.viewContext.renderedStarCount),119625);
+ assert.ok(await page.evaluate(()=>atlas.objects.every(star=>Number.isFinite(star.altitudeDeg)&&Number.isFinite(star.azimuthDeg))));
  await page.screenshot({path:'test-results/constellation-engine-earth.png'});
  const before=await page.evaluate(()=>atlas.camera.quaternion.toArray());
  await page.mouse.move(700,400);await page.mouse.down();await page.mouse.move(900,440,{steps:8});await page.mouse.up();
  assert.notDeepEqual(await page.evaluate(()=>atlas.camera.quaternion.toArray()),before);
  await page.evaluate(()=>atlas.zoom(.7));assert.equal(await page.evaluate(()=>atlas.camera.fov),49);
- await page.evaluate(()=>atlas.resetView(true));assert.equal(await page.evaluate(()=>atlas.camera.fov),70);
+ await page.evaluate(()=>atlas.resetView(true));assert.equal(await page.evaluate(()=>atlas.camera.fov),44);
+ assert.equal(await page.evaluate(()=>atlas.earthPerspective),false);
  await page.evaluate(()=>atlas.setImmersive(true));
  await expect(page.locator('.labels')).toBeHidden();
  assert.equal(await page.evaluate(()=>atlas.content.getObjectByName('constellation-lines').visible),true);
@@ -32,11 +34,19 @@ try{
  assert.equal(await page.evaluate(()=>atlas.objects.some(s=>s.hip===89341)),false);
  await page.evaluate(async observer=>atlas.showConstellation('Sgr',{mode:'earth',observer}),observer);
  assert.equal(await page.evaluate(()=>atlas.objects.some(s=>s.hip===89341)),true);
+ await page.evaluate(()=>{atlas.selectObject(atlas.objects.find(star=>star.hip===89341));atlas.navigateSpatialOut();});
+ assert.equal(await page.evaluate(()=>atlas.index===6&&!atlas.earthPerspective),true,'first spatial Back returns to the same constellation orbit');
+ assert.equal(await page.evaluate(()=>atlas.objects.some(star=>star.hip===89341)),false);
+ assert.equal(await page.evaluate(()=>atlas.selected.earthAngularReference||false),false);
+ assert.ok(await page.evaluate(()=>atlas.targets.filter(target=>target.userData.object.earthAngularReference).every(target=>!target.parent.parent.visible)));
+ assert.ok(await page.evaluate(()=>atlas.labels.filter(label=>label.data.earthAngularReference).every(label=>label.element.hidden)));
+ await page.evaluate(()=>atlas.viewFromEarth({immediate:true}));
  await page.evaluate(()=>atlas.navigateFromXR(1));
  await page.waitForFunction(()=>atlas.viewContext.constellationId!=='Sgr');
- assert.equal(await page.evaluate(()=>atlas.index),7);
+ assert.equal(await page.evaluate(()=>atlas.index),6);
+ assert.equal(await page.evaluate(()=>atlas.earthPerspective),true);
  await page.evaluate(()=>atlas.focusFromXR(atlas.selected));
- await page.waitForFunction(()=>atlas.index===6);
+ await page.waitForFunction(()=>atlas.index===6&&!atlas.earthPerspective);
  await page.evaluate(()=>atlas.setScale(0));
  assert.equal(await page.evaluate(()=>atlas.controls.enabled),true);
  assert.equal(await page.evaluate(()=>atlas.index),0);
@@ -44,6 +54,6 @@ try{
  assert.ok(await page.evaluate(()=>atlas.camera.position.length()>20));
  await page.evaluate(()=>atlas.dispose());
  assert.deepEqual(errors,[]);
- console.log('PASS constellation space, Earth, horizon, camera, pointer, FOV, immersive, unknown distance and solar restoration');
+ console.log('PASS constellation space, Earth, local orientation, camera, pointer, FOV, immersive, unknown distance and solar restoration');
 }finally{await browser.close();}
 

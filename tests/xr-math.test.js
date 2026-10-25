@@ -56,7 +56,8 @@ async function withXRHarness(run, requestError = null, options = {}) {
   const THREE = await import('three');
   const { createXR } = await import('../src/xr.js');
   const previous = ['window', 'document', 'navigator'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]);
-  const context = new Proxy({}, { get: () => () => {}, set: () => true });
+  const panelText = [];
+  const context = new Proxy({}, { get: (_, key) => key === 'fillText' ? text => panelText.push(text) : () => {}, set: () => true });
   let requests = 0;
   const requestArguments = [];
   const referenceSpace = new EventTarget();
@@ -102,8 +103,8 @@ async function withXRHarness(run, requestError = null, options = {}) {
   let clearAlpha = 0.8;
   const clearColor = new THREE.Color(0x123456);
   const renderer = { xr, getClearColor: color => color.copy(clearColor), getClearAlpha: () => clearAlpha, setClearColor(color, alpha) { clearColor.set(color); clearAlpha = alpha; } };
-  const app = createXR({ renderer, scene, camera, controls, mapRoot, getReducedMotion: () => Boolean(options.reducedMotion), getTargets: () => targets, getScale: () => scale, getBoundsRadius: () => 10, getEnvironment: () => [environment], onTravel: options.directTravel ? object => { traveled.push(object); if (options.changeScaleOnTravel) scale = 3; if (options.focusOnTravel) app.focusObject(object); } : undefined, onNavigateBack: options.handleBack ? () => { backRequests++; } : undefined, onSelect: object => selected.push(object), onFocus: object => focused.push(object), onImmersiveChange: value => immersiveChanges.push(value), onScale: delta => scaleDeltas.push(delta), onSessionEnd: details => endedStates.push({ ...details, presenting: xr.isPresenting, cameraPosition: camera.position.toArray() }), onMessage: message => messages.push(message) });
-  try { await run({ app, session, xr, endedStates, renderer, environment, referenceSpace, requestArguments, getReferenceSpaceType: () => referenceSpaceType, setScale: value => { scale = value; }, scene, camera, controls, mapRoot, messages, controllers, hands, targets, selected, focused, traveled, getBackRequests: () => backRequests, immersiveChanges, scaleDeltas, xrCamera, requests: () => requests, THREE }); }
+  const app = createXR({ renderer, scene, camera, controls, mapRoot, getReducedMotion: () => Boolean(options.reducedMotion), getPresentationMode: () => options.planetarium ? 'planetarium' : 'atlas', getSkyFrame: () => options.skyFrame || null, getTargets: () => targets, getScale: () => scale, getBoundsRadius: () => 10, getEnvironment: () => [environment], onTravel: options.directTravel ? object => { traveled.push(object); if (options.changeScaleOnTravel) scale = 3; if (options.focusOnTravel) app.focusObject(object); } : undefined, onNavigateBack: options.handleBack ? () => { backRequests++; } : undefined, onSelect: object => selected.push(object), onFocus: object => focused.push(object), onImmersiveChange: value => immersiveChanges.push(value), onScale: delta => scaleDeltas.push(delta), onSessionEnd: details => endedStates.push({ ...details, presenting: xr.isPresenting, cameraPosition: camera.position.toArray() }), onMessage: message => messages.push(message) });
+  try { await run({ app, panelText, session, xr, endedStates, renderer, environment, referenceSpace, requestArguments, getReferenceSpaceType: () => referenceSpaceType, setScale: value => { scale = value; }, scene, camera, controls, mapRoot, messages, controllers, hands, targets, selected, focused, traveled, getBackRequests: () => backRequests, immersiveChanges, scaleDeltas, xrCamera, requests: () => requests, THREE }); }
   finally {
     for (const [key, descriptor] of previous) {
       if (descriptor) Object.defineProperty(globalThis, key, descriptor);
@@ -958,4 +959,30 @@ test('Universe rendering applies comfort opacity to mesh and shader content and 
     assert.equal(relocations,1);assert.equal(effectGroup.visible,true,'temporary render masking does not alter the particle preference');
     assert.equal(records.at(-1).effects,true);await h.session.end();
   });
+});
+
+
+test('Earth observer orientation rotates the XR sky while the tracked viewer and unit angular scale remain unchanged', async () => {
+  const frame = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), .8);
+  await withXRHarness(async ({ app, session, mapRoot, xrCamera }) => {
+    const pose = [...xrCamera.position.toArray(), ...xrCamera.quaternion.toArray()];
+    await app.enter({ layout: 'room', handsFirst: true }); app.update(0);
+    assert.ok(mapRoot.getWorldQuaternion(new Quaternion()).angleTo(frame) < 1e-7, `observer quaternion ${mapRoot.getWorldQuaternion(new Quaternion()).toArray()} differs from ${frame.toArray()}`);
+    near(mapRoot.getWorldScale(new Vector3()).x, 1);
+    assert.deepEqual(mapRoot.getWorldPosition(new Vector3()).toArray(), xrCamera.getWorldPosition(new Vector3()).toArray());
+    assert.deepEqual([...xrCamera.position.toArray(), ...xrCamera.quaternion.toArray()], pose);
+    await session.end();
+  }, null, { planetarium: true, skyFrame: frame });
+});
+
+
+test('constellation XR focus action describes the current perspective rather than relying on the view index', async () => {
+  const options = { planetarium: false };
+  await withXRHarness(async ({ app, session, setScale, panelText }) => {
+    setScale(6); await app.enter(); app.update(0);
+    assert.ok(panelText.includes('VIEW FROM EARTH'));
+    panelText.length = 0; options.planetarium = true; app.update(.01);
+    assert.ok(panelText.includes('RETURN TO ORBIT'));
+    await session.end();
+  }, null, options);
 });

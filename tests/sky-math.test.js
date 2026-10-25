@@ -98,3 +98,23 @@ test('observer validation rejects impossible locations, ambiguous dates and none
   }
   assert.equal(validateObserver({ ...observer, dateIso: '2024-02-29T00:00:00Z' }).dateIso, '2024-02-29T00:00:00.000Z');
 });
+
+
+test('observer frame is an invertible proper rotation shared by fixed 3D stars and the local sky', () => {
+  for (const latitude of [-90, -38.11443888888889, 0, 38.11443888888889, 90]) {
+    const frame = createSkyTransform({ latitude, longitude: 15.65, dateIso: '2026-12-11T19:00:00Z' });
+    for (const [ra, dec] of [[0, 0], [90, 0], [88.79294, 7.40706], [359.99, -89.9]]) {
+      const scene = equatorialVector(ra, dec, 137);
+      const local = frame.fromEquatorial(scene);
+      vectorClose(local, frame.vector(ra, dec, 137));
+      vectorClose(frame.toEquatorial(local), scene);
+      close(Math.hypot(...local), 137);
+    }
+    vectorClose(frame.fromEquatorial(frame.up), [0,1,0]);
+    vectorClose(frame.fromEquatorial(frame.east), [1,0,0]);
+    vectorClose(frame.fromEquatorial(frame.north), [0,0,-1]);
+    const m=frame.equatorialToLocal;
+    close(m[0]*(m[4]*m[8]-m[5]*m[7])-m[1]*(m[3]*m[8]-m[5]*m[6])+m[2]*(m[3]*m[7]-m[4]*m[6]), 1);
+    for (const invalid of [[1,2], [1,NaN,0], [1,2,Infinity], null]) assert.throws(() => frame.fromEquatorial(invalid), RangeError);
+  }
+});

@@ -4,6 +4,7 @@ import './style.css';
 import { createIcons, Orbit, Search, Glasses, Maximize2, Minimize2, Plus, Minus, RotateCcw, Move, MousePointer2, Hand, Play, Pause, Volume2, VolumeX, Settings2, CircleHelp, X, ArrowUpRight, ArrowRight, Focus, Sparkles, Grid3X3, Tags, Layers, Info, Globe2, Star, Telescope, Check, ExternalLink } from 'lucide';
 import { catalog, scales } from './data.js';
 import { Universe } from './universe.js';
+import { fadeDesktopView } from './desktop-view-transition.js';
 import { exoplanets, planetCatalogMetadata, findPlanet } from './planets.js';
 import { solarMoons, moonsForPlanet, findMoon, moonCatalogMetadata } from './moons.js';
 import { loadConstellations } from './constellation-catalog.js';
@@ -47,7 +48,7 @@ let nasaSearchEntries = [];
 const nasaEnrichments = new Set();
 const planetBrowser = { query: '', filter: 'all', parentId: '', page: 0 };
 const constellationBrowser = {
-  query: '', mode: 'space', id: 'Ori', data: null, busy: false, earthVisible: true, timeZone: 'Europe/Rome',
+  query: '', mode: 'space', earthPerspective: false, id: 'Ori', data: null, busy: false, earthVisible: true, timeZone: 'Europe/Rome',
   observer: { latitude: 41.9028, longitude: 12.4964, dateIso: new Date().toISOString() }
 };
 let constellationModalRequest = 0;
@@ -62,6 +63,8 @@ let combinedLoading = false;
 let combinedError = '';
 let initialCombinedPending = false;
 let gaiaStreamStatus = null;
+let gaiaReturnView = null;
+let gaiaSwitchBusy = false;
 let imageObject = null;
 let imageController = null;
 let imageSearch = { records: null, loading: false, error: '' };
@@ -91,6 +94,10 @@ $('#app').innerHTML = `
       <div class="eyebrow">${t("ASTRONOMICAL CATALOGUES","CATALOGHI ASTRONOMICI")}</div>
       <h1 id="scale-title">${scales[0].title}</h1>
       <div class="subtitle" id="scale-subtitle">${scales[0].subtitle}</div>
+      <div class="catalogue-view-switch" role="group" aria-label="${t('Map and Gaia survey','Mappa e rilievo Gaia')}">
+        <button data-action="atlas-view" aria-pressed="true">${t('Map','Mappa')}</button>
+        <button data-action="gaia-stream" aria-pressed="false">Gaia DR3</button>
+      </div>
     </section>
     <aside class="left-panel" aria-label="${t("Map scale and layers","Scala e livelli della mappa")}">
       <div class="section-heading">${t("REFERENCE FRAME","SISTEMA DI RIFERIMENTO")} ${icon('layers')}</div>
@@ -102,10 +109,6 @@ $('#app').innerHTML = `
       </section>
       <section class="constellation-controls" id="constellation-controls" aria-label="${t("Constellation perspective","Prospettiva della costellazione")}" hidden>
         <button class="constellation-change" data-action="constellations"><span id="constellation-current">${t("Constellations","Costellazioni")}</span>${icon('search')}</button>
-        <div class="constellation-mode" role="group" aria-label="${t("Observer position","Punto di osservazione")}">
-          <button data-constellation-mode="space">${icon('orbit')}${t("3D space","Nello spazio 3D")}</button>
-          <button data-constellation-mode="earth">${icon('globe-2')}${t("Earth view","Dalla Terra")}</button>
-        </div>
         <div id="earth-space-controls" class="earth-space-controls" hidden>
           <div class="layer-row"><span>${icon('globe-2')}${t("Show Earth","Mostra la Terra")}</span><button class="toggle" role="switch" aria-label="${t("Show Earth","Mostra la Terra")}" aria-checked="true" data-action="earth-visible"></button></div>
           <button class="earth-perspective-button" data-action="earth-perspective">${icon('focus')}${t("View from Earth","Guarda dalla Terra")}</button>
@@ -176,6 +179,15 @@ $('#app').innerHTML = `
   <dialog id="modal" aria-labelledby="modal-title"><div class="dialog-head"><h2 id="modal-title"></h2><button data-action="close" aria-label="${t("Close dialog","Chiudi finestra")}">${icon('x')}</button></div><div id="modal-body"></div></dialog>
 `;
 
+function positionSidePanel(){
+  const intro=$('.intro');
+  if(intro.offsetHeight)$('.app-shell').style.setProperty('--atlas-sidebar-top',`${intro.offsetTop+intro.offsetHeight+18}px`);
+}
+const introResizeObserver=new ResizeObserver(positionSidePanel);
+introResizeObserver.observe($('.intro'));
+window.addEventListener('resize',positionSidePanel,{passive:true});
+positionSidePanel();
+
 function savePreferences() {
   const { labels, grid, particles, autoRotate, quality, objectLayers, gaiaDr3, mrDimming } = state;
   try { localStorage.setItem('aether.preferences', JSON.stringify({ labels, grid, particles, autoRotate, quality, objectLayers, gaiaDr3, mrDimming })); } catch { /* Storage can be unavailable in private browsers. */ }
@@ -225,7 +237,7 @@ function objectMarkup(object, isModal = false) {
     </div>` : catalogStar ? `<div class="planet-measurements star-measurements">
       <div><span>${t("RIGHT ASCENSION · J2000","ASCENSIONE RETTA · J2000")}</span><strong>${number(object.raDeg, '°')}</strong></div>
       <div><span>${t("DECLINATION · J2000","DECLINAZIONE · J2000")}</span><strong>${number(object.decDeg, '°')}</strong></div>
-      ${isModal ? `<div><span>${t("APPARENT MAGNITUDE","MAGNITUDINE APPARENTE")}</span><strong>${number(object.mag)}</strong></div><div><span>${t("HIPPARCOS IDENTIFIER","IDENTIFICATORE HIPPARCOS")}</span><strong>${object.hip ? 'HIP ' + escape(object.hip) : t("Not available","Non disponibile")}</strong></div>${state.scale === 7 ? `<div><span>${t("ALTITUDE ABOVE HORIZON","ALTEZZA SULL'ORIZZONTE")}</span><strong>${number(object.altitudeDeg, '°')}</strong></div>` : ''}` : ''}
+      ${isModal ? `<div><span>${t("APPARENT MAGNITUDE","MAGNITUDINE APPARENTE")}</span><strong>${number(object.mag)}</strong></div><div><span>${t("HIPPARCOS IDENTIFIER","IDENTIFICATORE HIPPARCOS")}</span><strong>${object.hip ? 'HIP ' + escape(object.hip) : t("Not available","Non disponibile")}</strong></div>${state.context?.earthPerspective ? `<div><span>${t("ALTITUDE ABOVE HORIZON","ALTEZZA SULL'ORIZZONTE")}</span><strong>${number(object.altitudeDeg, '°')}</strong></div><div><span>${t("AZIMUTH FROM NORTH","AZIMUT DA NORD")}</span><strong>${number(object.azimuthDeg, '°')}</strong></div>` : ''}` : ''}
     </div>` : '';
   return `<div class="card-top"><span>${nebula ? t("NEBULA DATA","DATI DELLA NEBULOSA") : nasa ? t("STAR DATA","DATI STELLARI") : moon ? t("MOON DATA","DATI DEL SATELLITE") : planet ? t("PLANET DATA","DATI DEL PIANETA") : isOverview ? t("CATALOGUE OVERVIEW","PANORAMICA DEL CATALOGO") : t("CELESTIAL OBJECT","OGGETTO CELESTE")}</span>${icon(planet || moon ? 'globe-2' : 'sparkles')}</div>
     <div class="card-content${planet || moon ? ' planet-card-content' : ''}"><h2>${escape(object.name)}</h2><div class="object-type">${escape(moon ? t("Natural satellite","Satellite naturale") : object.type || t("Catalogue star","Stella da catalogo"))}${exoplanet ? ' · ' + escape(object.host) : ''}</div>
@@ -234,7 +246,7 @@ function objectMarkup(object, isModal = false) {
       ${isOverview ? `<div class="card-stats"><span>${t("EXTENT","ESTENSIONE")}</span><strong>${escape(scale.extent)}</strong></div>` : ''}
       ${measurements}
       ${appearanceInformation(object, isModal)}
-      ${catalogStar && !object.nasaCatalogue && !object.gaiaCatalogue ? `<p class="illustration-note">${state.scale === 7 ? (object.altitudeDeg < 0 ? t("Below the horizon at the selected location and time.","Sotto l’orizzonte nel luogo e all’orario scelti.") : t("Sky direction at the selected location and time.","Direzione nel cielo dal luogo e all’orario scelti.")) : Number.isFinite(object.distanceLy) ? t("3D position from catalogue coordinates and distance.","Posizione 3D da coordinate e distanza di catalogo.") : t("Distance unavailable; included in the Earth sky view.","Distanza non disponibile: visibile nella vista dalla Terra.")}</p>${!isModal ? `<button class="planet-details-button" data-action="object">${t("Star data","Dati della stella")} ${icon('arrow-up-right')}</button>` : ''}` : ''}
+      ${catalogStar && !object.nasaCatalogue && !object.gaiaCatalogue ? `<p class="illustration-note">${object.earthAngularReference ? t("Angular reference from Earth; radial distance is not rendered.","Riferimento angolare dalla Terra; la distanza radiale non viene rappresentata.") : Number.isFinite(object.distanceLy) ? t("3D position from catalogue coordinates and distance.","Posizione 3D da coordinate e distanza di catalogo.") : t("Distance unavailable; shown as an angular direction from Earth.","Distanza non disponibile: direzione angolare osservata dalla Terra.")}</p>${!isModal ? `<button class="planet-details-button" data-action="object">${t("Star data","Dati della stella")} ${icon('arrow-up-right')}</button>` : ''}` : ''}
       ${(object.nasaCatalogue || object.gaiaCatalogue) && !isModal ? `<button class="planet-details-button" data-action="object">${t("Catalogue data","Dati di catalogo")} ${icon('arrow-up-right')}</button>` : ''}
       ${isModal && object.positionNote ? `<p class="illustration-note">${escape(object.positionNote)}</p>` : ''}
       ${(planet || moon || object.id === 'sun') && !isModal ? `<button class="planet-details-button" data-action="object">${moon ? t("Moon data","Dati del satellite") : object.id === 'sun' ? t("Sun data","Dati del Sole") : t("Planet data","Dati del pianeta")} ${icon('arrow-up-right')}</button>` : ''}
@@ -286,12 +298,13 @@ function updateScale(index, context = null) {
   const detached = index >= 5;
   if (constellationView) {
     constellationBrowser.id = context?.constellationId || constellationBrowser.id;
-    constellationBrowser.mode = index === 7 ? 'earth' : 'space';
+    constellationBrowser.mode = 'space';
+    constellationBrowser.earthPerspective = Boolean(context?.earthPerspective);
     if (typeof context?.earthVisible === 'boolean') constellationBrowser.earthVisible = context.earthVisible;
     if (context?.observer) constellationBrowser.observer = { ...constellationBrowser.observer, ...context.observer };
   }
   $('#scale-title').textContent = combined ? t('Combined map','Mappa combinata') : nasaView ? scale.name : constellationView ? `${scale.name}.` : hostView ? `${t("Host star: ","Stella ospite: ")}${scale.name}.` : scale.title;
-  $('#scale-subtitle').textContent = gaiaView ? t('Full-sky DR3 catalogue. Sources load progressively as you look and zoom.','Catalogo DR3 a tutto cielo. Le sorgenti vengono caricate progressivamente mentre osservi e ingrandisci.') : combined ? t('Solar System model and projected catalogue sky. Independent object layers.','Modello del Sistema Solare e cielo di catalogo proiettato. Categorie indipendenti.') : nasaView ? t("Catalogue sky positions; radial distance is not represented.","Posizioni celesti dai cataloghi; la distanza radiale non viene rappresentata.") : constellationView ? index === 7 ? t("Local sky coordinates for the selected observer and time.","Coordinate del cielo per l’osservatore e l’istante selezionati.") : t("J2000 stellar positions and catalogue distances.","Posizioni stellari J2000 e distanze di catalogo.") : hostView ? t("Confirmed planets around the selected host star.","Pianeti confermati intorno alla stella selezionata.") : scale.subtitle;
+  $('#scale-subtitle').textContent = gaiaView ? t('Full-sky DR3 catalogue. Sources load progressively as you look and zoom.','Catalogo DR3 a tutto cielo. Le sorgenti vengono caricate progressivamente mentre osservi e ingrandisci.') : combined ? t('Solar System model and projected catalogue sky. Independent object layers.','Modello del Sistema Solare e cielo di catalogo proiettato. Categorie indipendenti.') : nasaView ? t("Catalogue sky positions; radial distance is not represented.","Posizioni celesti dai cataloghi; la distanza radiale non viene rappresentata.") : constellationView ? context?.earthPerspective ? t("J2000 stars with the observer’s local sky orientation.","Stelle J2000 con orientamento locale dell’osservatore.") : t("J2000 stellar positions and catalogue distances.","Posizioni stellari J2000 e distanze di catalogo.") : hostView ? t("Confirmed planets around the selected host star.","Pianeti confermati intorno alla stella selezionata.") : scale.subtitle;
   $('#scale-readout').textContent = scale.extent;
   $('#scale-step').textContent = gaiaView ? t('GAIA DR3 \u00b7 STREAMED','GAIA DR3 \u00b7 PROGRESSIVO') : combined ? t('COMBINED VIEW','VISTA COMBINATA') : nasaView ? (state.gaiaDr3 ? 'NASA + ESA GAIA' : 'NASA HEASARC') : constellationView ? index === 7 ? t("EARTH VIEW","DALLA TERRA") : t("CONSTELLATIONS","COSTELLAZIONI") : hostView ? t("EXOPLANETS","ESOPIANETI") : `0${index + 1} / 05`;
   $('#region-name').textContent = scale.name.toLocaleUpperCase(locale());
@@ -310,17 +323,12 @@ function updateScale(index, context = null) {
   $('.app-shell').classList.toggle('constellation-view', constellationView);
   $('.app-shell').classList.toggle('nasa-sky-view', nasaView);
   $('.app-shell').classList.toggle('gaia-stream-view', gaiaView);
-  renderGaiaStreamStatus();
+  renderGaiaStreamStatus();renderCatalogueSwitch();
   $('.app-shell').classList.toggle('earth-sky-view', index === 7);
   $('.app-shell').classList.toggle('earth-perspective-view', index === 6 && Boolean(context?.earthPerspective));
   $('#constellation-controls').hidden = !constellationView;
   $('#constellation-current').textContent = scale.name;
-  document.querySelectorAll('#constellation-controls [data-constellation-mode]').forEach(button => {
-    const selected = button.dataset.constellationMode === constellationBrowser.mode;
-    button.classList.toggle('active', selected);
-    button.setAttribute('aria-pressed', selected);
-  });
-  $('#constellation-controls .observer-adjust').hidden = index !== 7;
+  $('#constellation-controls .observer-adjust').hidden = !constellationView;
   $('#earth-space-controls').hidden = index !== 6;
   $('[data-action="earth-visible"]').setAttribute('aria-checked', constellationBrowser.earthVisible);
   $('[data-action="earth-perspective"]').hidden = Boolean(context?.earthPerspective);
@@ -330,10 +338,8 @@ function updateScale(index, context = null) {
     const date = new Date(observer.dateIso);
     const when = Number.isFinite(date.getTime()) ? date.toLocaleString(locale(), { timeZone: constellationBrowser.timeZone, day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZoneName: 'short' }) : '';
     const visible = Number.isFinite(context?.visibleStarCount) ? `${context.visibleStarCount}${t(context.visibleStarCount === 1 ? " figure star above the horizon. " : " figure stars above the horizon. ", context.visibleStarCount === 1 ? " stella della figura sopra l’orizzonte. " : " stelle della figura sopra l’orizzonte. ")}` : '';
-    $('#constellation-status').textContent = index === 7
-      ? `${visible}${number(observer.latitude, '°')}, ${number(observer.longitude, '°')} · ${when}`
-      : `${Number.isFinite(context?.starCount) ? context.starCount + t(" stars in the figure. "," stelle nella figura. ") : ''}${context?.earthPerspective ? t("Earth origin · 3D view without horizon clipping. Drag to look around. ","Origine terrestre · vista 3D senza orizzonte. Trascina per orientarti. ") : ''}${t("Stellar distances use a common linear scale.","Le distanze stellari usano una scala lineare comune.")}${context?.unknownDistanceCount ? t(" Some distances are unavailable."," Alcune distanze non sono disponibili.") : ''}`;
-    if (index === 7) $('#constellation-status').innerHTML = `${escape(visible)}${escape(number(observer.latitude, '°'))}, ${escape(number(observer.longitude, '°'))} · <time datetime="${escape(observer.dateIso)}">${escape(when)}</time>`;
+    $('#constellation-status').textContent = `${context?.starCount || 0}${t(' figure stars. ',' stelle della figura. ')}${context?.earthPerspective ? t('Earth origin; local orientation, without horizon clipping. ','Origine terrestre; orientamento locale, senza oscuramento sotto l’orizzonte. ') : t('Measured distances on a common linear scale. ','Distanze misurate su una scala lineare comune. ')}`;
+    if(context?.earthPerspective)$('#constellation-status').innerHTML += `${escape(visible)}${escape(number(observer.latitude, '°'))}, ${escape(number(observer.longitude, '°'))} · <time datetime="${escape(observer.dateIso)}">${escape(when)}</time>`;
   }
   $('.footer-controls span:first-child').innerHTML = `${icon('mouse-pointer-2')} ${index === 7 || context?.earthPerspective ? t("Drag to look around","Trascina per guardarti intorno") : t("Drag to orbit","Trascina per orbitare")}`;
   $('#universe').setAttribute('aria-label', index === 6 && context?.earthPerspective ? t("3D stars viewed from Earth’s position. Drag to look around and scroll to zoom.","Stelle nello spazio 3D viste dalla posizione della Terra. Trascina per guardarti intorno e usa la rotellina per ingrandire.") : index === 7 ? t("Sky from Earth’s surface. Drag to look around and scroll to zoom.","Cielo dalla superficie terrestre. Trascina per guardarti intorno e usa la rotellina per ingrandire.") : t("Three-dimensional cosmic atlas. Drag to orbit and scroll to zoom.","Atlante cosmico tridimensionale. Trascina per orbitare e usa la rotellina per avvicinarti."));
@@ -676,18 +682,11 @@ function localDateInput(iso) {
   return dateInputInZone(iso, constellationBrowser.timeZone);
 }
 
-function constellationModeButtons() {
-  return `<div class="constellation-mode modal-constellation-mode" role="group" aria-label="${t("Constellation perspective","Prospettiva della costellazione")}">
-    <button data-constellation-mode="space" aria-pressed="${constellationBrowser.mode === 'space'}" class="${constellationBrowser.mode === 'space' ? 'active' : ''}">${icon('orbit')}<span>${t("3D space","Nello spazio 3D")}</span><small>${t("Measured stellar distances","Distanze stellari misurate")}</small></button>
-    <button data-constellation-mode="earth" aria-pressed="${constellationBrowser.mode === 'earth'}" class="${constellationBrowser.mode === 'earth' ? 'active' : ''}">${icon('globe-2')}<span>${t("Earth surface","Dalla superficie terrestre")}</span><small>${t("Local sky coordinates","Coordinate del cielo locale")}</small></button>
-  </div>`;
-}
-
 function observerFormMarkup() {
   const observer = constellationBrowser.observer;
   const deviceZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   const zones = [...new Set(['Europe/Rome', 'UTC', deviceZone])];
-  return `<fieldset id="observer-fields" class="observer-fields" ${constellationBrowser.mode === 'earth' ? '' : 'hidden'}>
+  return `<fieldset id="observer-fields" class="observer-fields">
     <legend>${t("Observer coordinates","Coordinate dell’osservatore")}</legend>
     <label for="observer-latitude">${t("Latitude","Latitudine")} <small>${t("North + / South −","Nord + / Sud −")}</small><input id="observer-latitude" type="text" inputmode="text" required autocomplete="off" spellcheck="false" aria-describedby="observer-coordinate-help" value="${observer.latitude}"/></label>
     <label for="observer-longitude">${t("Longitude","Longitudine")} <small>${t("East + / West −","Est + / Ovest −")}</small><input id="observer-longitude" type="text" inputmode="text" required autocomplete="off" spellcheck="false" aria-describedby="observer-coordinate-help" value="${observer.longitude}"/></label>
@@ -696,7 +695,7 @@ function observerFormMarkup() {
     <label for="observer-timezone" class="observer-zone">${t("Timezone","Fuso orario")}<select id="observer-timezone">${zones.map(zone => `<option value="${escape(zone)}" ${zone === constellationBrowser.timeZone ? 'selected' : ''}>${zone === 'Europe/Rome' ? t("Italy · Europe/Rome (CET / CEST)","Italia · Europe/Rome (CET / CEST)") : zone === 'UTC' ? 'UTC' : escape(zone) + t(" · device"," · dispositivo")}</option>`).join('')}</select></label>
     <div class="observer-actions"><button data-action="observer-now">${icon('rotate-ccw')}${t("Now","Adesso")}</button><button id="constellation-apply" data-action="apply-observer">${t("Update ","Aggiorna ")}${escape(constellationBrowser.data?.constellations.find(item => item.id === constellationBrowser.id)?.name || t("sky","il cielo"))}${icon('arrow-right')}</button></div>
     <button class="observer-preset" data-action="observer-orion-winter">${icon('sparkles')}${t("Orion example · 11 Dec 2026, 20:00 Italy","Esempio Orione · 11 dic 2026, 20:00 Italia")}<small>38°06′51.98″N · 15°39′00″E</small></button>
-    <p>${t("The timezone determines the instant: 20:00 in winter in Italy is 19:00 UTC. The sky remains fixed at the selected time. Stars below the horizon are hidden. Daylight, refraction and light pollution are not simulated.","Il fuso scelto determina l'istante: in Italia, 20:00 in inverno corrisponde a 19:00 UTC. Il cielo resta fermo all'istante scelto; le stelle sotto l'orizzonte non sono visibili. La luminosità diurna, la rifrazione e l'inquinamento luminoso non sono simulati.")}</p>
+    <p>${t("Location and time set the local orientation used by View from Earth. The 3D map remains visible in every direction, including below the geometric horizon. Daylight and atmospheric refraction are not simulated.","Luogo e orario definiscono l'orientamento locale di Guarda dalla Terra. La mappa 3D resta visibile in ogni direzione, anche sotto l'orizzonte geometrico. Luce diurna e rifrazione atmosferica non sono simulate.")}</p>
   </fieldset>`;
 }
 
@@ -717,15 +716,14 @@ function renderConstellationResults() {
 function renderConstellationModal() {
   const stars = constellationBrowser.data.metadata?.starCount || constellationBrowser.data.metadata?.catalogStarCount;
   $('#modal-body').innerHTML = `
-    <p class="catalog-introduction"><strong>${t("88 constellations · 3D and local sky views.","88 costellazioni · viste 3D e cielo locale.")}</strong> ${stars ? number(stars) : t("Over 119,000","Oltre 119.000")}${t(" HYG catalogue stars with equatorial coordinates and measured distances where available."," stelle HYG con coordinate equatoriali e distanze misurate quando disponibili.")}</p>
-    ${constellationModeButtons()}
-    ${observerFormMarkup()}
+    <p class="catalog-introduction"><strong>${t("88 constellations · spatial map and Earth-origin perspective.","88 costellazioni · mappa spaziale e prospettiva dalla Terra.")}</strong> ${stars ? number(stars) : t("Over 119,000","Oltre 119.000")}${t(" HYG catalogue stars with equatorial coordinates and measured distances where available."," stelle HYG con coordinate equatoriali e distanze misurate quando disponibili.")}</p>
+    <details id="observer-settings" ${constellationBrowser.editObserver ? 'open' : ''}><summary>${t('Location and time for View from Earth','Luogo e orario per Guarda dalla Terra')}</summary>${observerFormMarkup()}</details>
     <label for="constellation-search" class="readout-title">${t("SEARCH CONSTELLATIONS","CERCA UNA COSTELLAZIONE")}</label>
     <input id="constellation-search" class="search-input" type="search" value="${escape(constellationBrowser.query)}" placeholder="${t("Orion, Cassiopeia, Ursa Major…","Orione, Cassiopea, Orsa Maggiore…")}" autocomplete="off" spellcheck="false" aria-controls="constellation-results"/>
     <div id="constellation-count" class="result-count" role="status"></div>
     <div id="constellation-results" class="constellation-results"></div>
     <div id="constellation-progress" class="constellation-progress" role="status" aria-live="polite"></div>
-    <p class="catalog-provenance">${t("Stars without a measured distance appear in the Earth sky view. HYG is an observational catalogue with limited coverage. ","Le stelle prive di distanza misurata sono presenti nella vista del cielo terrestre. HYG è un catalogo osservativo con copertura limitata. ")}<a href="https://github.com/astronexus/HYG-Database" target="_blank" rel="noopener noreferrer">${t("HYG 4.1 · source and licence","HYG 4.1 · fonte e licenza")}</a></p>`;
+    <p class="catalog-provenance">${t("Stars without a measured distance are shown only as angular directions when viewing from Earth. HYG is an observational catalogue with limited coverage. ","Le stelle senza distanza misurata compaiono solo come direzioni angolari quando si guarda dalla Terra. HYG è un catalogo osservativo con copertura limitata. ")}<a href="https://github.com/astronexus/HYG-Database" target="_blank" rel="noopener noreferrer">${t("HYG 4.1 · source and licence","HYG 4.1 · fonte e licenza")}</a></p>`;
   renderConstellationResults();
   $('#constellation-search').addEventListener('input', event => { constellationBrowser.query = event.target.value; renderConstellationResults(); });
   $('#observer-fields').addEventListener('input', event => event.target.setCustomValidity?.(''));
@@ -737,7 +735,7 @@ function renderConstellationModal() {
 }
 
 async function openConstellations({ observer = false } = {}) {
-  if (observer) constellationBrowser.mode = 'earth';
+  constellationBrowser.editObserver = observer;
   const request = ++constellationModalRequest;
   openModal('constellations', t("Constellations","Costellazioni"), `<p class="constellation-loading" role="status">${t("Loading 88 constellations…","Caricamento delle 88 costellazioni…")}</p>`);
   try {
@@ -752,17 +750,17 @@ async function openConstellations({ observer = false } = {}) {
 }
 
 function readObserverForm() {
-  if (!$('#modal').open || $('#modal').dataset.kind !== 'constellations' || !$('#observer-fields') || constellationBrowser.mode !== 'earth') return true;
+  if (!$('#modal').open || $('#modal').dataset.kind !== 'constellations' || !$('#observer-fields')) return true;
   const fields = ['#observer-latitude', '#observer-longitude', '#observer-datetime'].map($);
   const values = [];
   for (const [index, field] of fields.entries()) {
     field.setCustomValidity('');
-    if (!field.reportValidity()) return false;
+    if (!field.checkValidity()) { $('#observer-settings').open=true;field.reportValidity();return false; }
     try {
       values[index] = index < 2 ? parseCoordinate(field.value, index === 0 ? 'latitude' : 'longitude') : zonedDateInputToIso(field.value, $('#observer-timezone').value);
     } catch (error) {
       field.setCustomValidity(error.message);
-      field.reportValidity();
+      $('#observer-settings').open=true;field.reportValidity();
       return false;
     }
   }
@@ -771,26 +769,25 @@ function readObserverForm() {
   return true;
 }
 
-async function selectConstellation(id, mode = constellationBrowser.mode) {
+async function selectConstellation(id, earthPerspective = constellationBrowser.earthPerspective) {
   if (constellationBrowser.busy) return;
   if (!readObserverForm()) return;
   if (!universe) return notify(t("Constellation views require WebGL. Enable hardware acceleration and reload.","La vista delle costellazioni richiede il motore grafico WebGL. Attiva l’accelerazione grafica e ricarica."));
   stopTour();
   constellationBrowser.busy = true;
-  const lastMode = state.scale === 7 ? 'earth' : 'space';
-  constellationBrowser.mode = mode;
-  const pending = document.querySelectorAll('[data-constellation], [data-constellation-mode], #constellation-apply');
+  const previousPerspective = constellationBrowser.earthPerspective;
+  const pending = document.querySelectorAll('[data-constellation], #constellation-apply');
   pending.forEach(button => { button.disabled = true; });
   if ($('#constellation-progress')) $('#constellation-progress').textContent = t("Loading stars and constellation geometry…","Caricamento di stelle e geometria delle costellazioni…");
   else notify(t("Loading stars…","Caricamento delle stelle…"));
   $('#constellation-controls').setAttribute('aria-busy', 'true');
   try {
-    const shown = await universe.showConstellation(id, { mode, observer: { ...constellationBrowser.observer } });
+    const shown = await universe.showConstellation(id, { mode: 'space', observer: { ...constellationBrowser.observer }, earthPerspective });
     if (shown === false) return;
     constellationBrowser.id = id;
     if ($('#modal').dataset.kind === 'constellations') closeModal();
   } catch (error) {
-    constellationBrowser.mode = lastMode;
+    constellationBrowser.earthPerspective = previousPerspective;
     const message = error?.message || t("Unable to open this constellation. Try again.","Impossibile aprire questa costellazione. Riprova tra un momento.");
     if ($('#constellation-progress')) $('#constellation-progress').textContent = message;
     else notify(message);
@@ -799,21 +796,6 @@ async function selectConstellation(id, mode = constellationBrowser.mode) {
     pending.forEach(button => { button.disabled = false; });
     $('#constellation-controls').removeAttribute('aria-busy');
   }
-}
-
-async function chooseConstellationMode(mode, button) {
-  if (button.closest('#modal')) {
-    if (!readObserverForm()) return;
-    constellationBrowser.mode = mode;
-    document.querySelectorAll('#modal [data-constellation-mode]').forEach(item => {
-      const selected = item.dataset.constellationMode === mode;
-      item.classList.toggle('active', selected);
-      item.setAttribute('aria-pressed', selected);
-    });
-    $('#observer-fields').hidden = mode !== 'earth';
-    return;
-  }
-  if ((state.scale === 7 ? 'earth' : 'space') !== mode) await selectConstellation(constellationBrowser.id, mode);
 }
 
 function openCollections() {
@@ -836,7 +818,7 @@ function openAbout() {
     <h3>${t("STELLAR CATALOGUES","CATALOGHI STELLARI")}</h3>
     <p>${t("NASA HEASARC supplies the complete Hipparcos and Bright Star archive entries and the nebular subset of NGC2000. Search names or HIP, HR, HD, NGC, IC and Messier identifiers. The NASA sky view represents angular directions, with catalogue measurements in the object panels.","NASA HEASARC fornisce i cataloghi Hipparcos e Bright Star completi e il sottoinsieme nebulare NGC2000. Cerca nomi o identificatori HIP, HR, HD, NGC, IC e Messier. La vista NASA rappresenta direzioni angolari; le schede riportano le misure di catalogo.")}</p>
     <p>${t("The nearby-star view includes 156 stars within 25 light-years from ","La vista stellare include 156 stelle entro 25 anni luce estratte da ")}<a href="https://github.com/astronexus/HYG-Database" target="_blank" rel="noopener noreferrer">HYG 4.1 · David Nash</a>${t(", in addition to the principal reference stars. The subset retains coordinates, distances and identifiers; selection, unit conversion and display names are atlas adaptations. Data licence: ",", oltre ai riferimenti principali. Il sottoinsieme conserva coordinate, distanze e identificatori: selezione, conversione in anni luce e nomi di visualizzazione sono adattamenti dell’atlante. Dati distribuiti con licenza ")}<a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener noreferrer">CC BY-SA 4.0</a>.</p>
-    <p>${t("Constellation views contain 119,625 HYG stars and all 88 constellations. The 3D view preserves measured stellar depth. The Earth view calculates sky directions and the geometric horizon for the selected location and time. HYG data: CC BY-SA 4.0.","Le viste delle costellazioni contengono 119.625 stelle HYG e tutte le 88 costellazioni. La vista 3D conserva la profondità stellare misurata. La vista terrestre calcola direzioni e orizzonte geometrico per luogo e istante selezionati. Dati HYG: CC BY-SA 4.0.")}</p>
+    <p>${t("Constellation views contain 119,625 HYG stars and all 88 constellations. The 3D view preserves measured stellar depth. View from Earth uses the selected location and time to orient the same map, without horizon clipping. HYG data: CC BY-SA 4.0.","Le viste delle costellazioni contengono 119.625 stelle HYG e tutte le 88 costellazioni. La vista 3D conserva la profondità stellare misurata. Guarda dalla Terra orienta la stessa mappa secondo luogo e istante selezionati, senza oscurare le stelle sotto l’orizzonte. Dati HYG: CC BY-SA 4.0.")}</p>
     <p>${t('Constellation geometry: ', 'Geometria delle costellazioni: ')}<a href="https://github.com/Stellarium/stellarium/tree/master/skycultures/modern" target="_blank" rel="noopener noreferrer">Stellarium modern skyculture</a> ${t('by the Stellarium team, CC BY-SA 4.0.', 'del team Stellarium, CC BY-SA 4.0.')}</p>
     <h3>${t("DATA SOURCES","FONTI DEI DATI")}</h3>
     <ul><li><a href="${scales[0].source}" target="_blank" rel="noopener noreferrer">${t("NASA · Solar System sizes and distances","NASA · Dimensioni e distanze del Sistema Solare")}</a></li>
@@ -847,7 +829,7 @@ function openAbout() {
 
 function openHelp() {
   openModal('help', t("Controls and navigation","Comandi e navigazione"), `
-    <div class="help-keys"><div><strong>${t("Drag","Trascina")}</strong>${t("Orbit the map","Orbita intorno alla mappa")}</div><div><strong>${t("Scroll / two fingers","Rotellina / due dita")}</strong>${t("Zoom in and out","Avvicina e allontana")}</div><div><strong>${t("Click / tap a planet or moon","Clic / tocco su un pianeta o satellite")}</strong>${t("Inspect the selected body","Osserva il corpo selezionato")}</div><div><strong>${t("Planets & moons","Pianeti e satelliti")}</strong>${t("Browse eight planets, confirmed exoplanets and major natural satellites","Sfoglia otto pianeti, esopianeti confermati e satelliti naturali principali")}</div><div><strong>${t("Constellations","Costellazioni")}</strong>${t("Select a constellation in 3D or Earth sky view. Location and time are configurable","Seleziona una costellazione in 3D o nel cielo terrestre. Luogo e orario sono configurabili")}</div><div><strong>${t("Immersive view","Vista immersiva")}</strong>${t("Hide all text. Press Esc or use the top-right icon to restore controls","Nasconde tutte le scritte. Esc o l’icona in alto a destra per tornare")}</div><div><strong>1 — 5</strong>${t("Change reference scale","Cambia scala di riferimento")}</div><div><strong>/</strong>${t("Search stars, planets and moons","Cerca stelle, pianeti e satelliti")}</div><div><strong>${t("Space","Spazio")}</strong>${t("Pause or resume rotation","Ferma o riprendi la rotazione")}</div><div><strong>R</strong>${t("Reset the camera","Ripristina l’inquadratura")}</div><div><strong>Esc</strong>${t("Close dialogs and immersive view","Chiudi finestre e vista immersiva")}</div></div>
+    <div class="help-keys"><div><strong>${t("Drag","Trascina")}</strong>${t("Orbit the map","Orbita intorno alla mappa")}</div><div><strong>${t("Scroll / two fingers","Rotellina / due dita")}</strong>${t("Zoom in and out","Avvicina e allontana")}</div><div><strong>${t("Click / tap a planet or moon","Clic / tocco su un pianeta o satellite")}</strong>${t("Inspect the selected body","Osserva il corpo selezionato")}</div><div><strong>${t("Planets & moons","Pianeti e satelliti")}</strong>${t("Browse eight planets, confirmed exoplanets and major natural satellites","Sfoglia otto pianeti, esopianeti confermati e satelliti naturali principali")}</div><div><strong>${t("Constellations","Costellazioni")}</strong>${t("Select a 3D constellation, then View from Earth. Location and time are configurable","Seleziona una costellazione 3D, poi Guarda dalla Terra. Luogo e orario sono configurabili")}</div><div><strong>${t("Immersive view","Vista immersiva")}</strong>${t("Hide all text. Press Esc or use the top-right icon to restore controls","Nasconde tutte le scritte. Esc o l’icona in alto a destra per tornare")}</div><div><strong>1 — 5</strong>${t("Change reference scale","Cambia scala di riferimento")}</div><div><strong>/</strong>${t("Search stars, planets and moons","Cerca stelle, pianeti e satelliti")}</div><div><strong>${t("Space","Spazio")}</strong>${t("Pause or resume rotation","Ferma o riprendi la rotazione")}</div><div><strong>R</strong>${t("Reset the camera","Ripristina l’inquadratura")}</div><div><strong>Esc</strong>${t("Close dialogs and immersive view","Chiudi finestre e vista immersiva")}</div></div>
     <h3>${t("VIRTUAL REALITY","NELLA REALTÀ VIRTUALE")}</h3><p>${t("Desktop preview provides a first-person view without a headset. WebXR supports room-scale VR and mixed reality with a compatible headset. Hand tracking requires device and browser support; controllers are also supported.","L’anteprima PC offre una visuale in prima persona senza visore. Un visore WebXR compatibile permette di usare VR e realtà mista alla scala dell’ambiente. Il tracciamento delle mani richiede un visore e un browser che lo supportino. Anche i controller sono utilizzabili.")}</p><button class="focus-button" data-action="vr">${icon('glasses')}${t("VR controls","Comandi VR")}</button>`);
 }
 
@@ -899,12 +881,54 @@ function renderGaiaStreamStatus(){
   if(label.textContent!==description)label.textContent=description;
   $('#gaia-stream-retry').hidden=!status?.error;
 }
+function renderCatalogueSwitch(){
+  const active=isGaiaStreamView();
+  document.querySelectorAll('.catalogue-view-switch button').forEach(button=>{
+    button.setAttribute('aria-pressed',String((button.dataset.action==='gaia-stream')===active));
+    button.disabled=gaiaSwitchBusy;
+  });
+  $('.catalogue-view-switch').setAttribute('aria-busy',String(gaiaSwitchBusy));
+}
+async function transitionCatalogue(commit){
+  if(universe.preview.isActive)return universe.preview.runTransition(commit);
+  if(universe.xr.isPresenting)return commit();
+  return fadeDesktopView($('#universe'),$('#map-labels'),commit,{reducedMotion});
+}
 async function openGaiaStream(){
-  if(!universe)return;
+  if(!universe||gaiaSwitchBusy||isGaiaStreamView())return;
   cancelInitialCombinedView();stopTour();closeModal();immersiveContent='current';
-  if(!isGaiaStreamView())gaiaStreamStatus=null;
-  try{await universe.showGaiaSky();}
-  catch(error){notify(t('Gaia sky could not be opened. Retry from Catalogue sections.','Impossibile aprire il cielo Gaia. Riprova da Sezioni del catalogo.'));}
+  gaiaSwitchBusy=true;renderCatalogueSwitch();
+  const request=universe.viewRequest,saved=universe.captureAtlasView();
+  const direction=universe.directionToGaia().toArray(),fov=universe.camera.fov;
+  let prepared;
+  $('#renderer-status').textContent=t('LOADING GAIA REGION','CARICAMENTO REGIONE GAIA');
+  try{
+    prepared=await universe.prepareGaiaSky({direction,fov});
+    if(!prepared||universe.viewRequest!==request){prepared?.dispose();return;}
+    await transitionCatalogue(async()=>{
+      if(universe.viewRequest!==request){prepared.dispose();return;}
+      gaiaStreamStatus=null;gaiaReturnView=saved;
+      await universe.showGaiaSky({direction,fov,preparedView:prepared});
+    });
+  }catch(error){
+    if(prepared&&universe.gaiaSkyView!==prepared)prepared.dispose();
+    notify(t('Gaia sky could not be opened. Try again.','Impossibile aprire il cielo Gaia. Riprova.'));
+  }finally{
+    if(prepared&&universe.gaiaSkyView!==prepared)prepared.dispose();
+    gaiaSwitchBusy=false;renderCatalogueSwitch();
+    $('#renderer-status').textContent=t('3D RENDERER ACTIVE','RENDERER 3D ATTIVO');
+  }
+}
+async function returnToAtlas(){
+  if(!universe||gaiaSwitchBusy||!isGaiaStreamView())return;
+  cancelInitialCombinedView();stopTour();closeModal();
+  gaiaSwitchBusy=true;renderCatalogueSwitch();
+  const request=universe.viewRequest;
+  try{
+    if(!gaiaReturnView)await prepareCombinedCatalogue();
+    await transitionCatalogue(async()=>{if(universe.viewRequest===request)await universe.restoreAtlasView(gaiaReturnView);});
+  }catch(error){notify(t('The map could not be restored. Select a reference scale to continue.','Impossibile ripristinare la mappa. Seleziona una scala di riferimento.'));}
+  finally{gaiaSwitchBusy=false;renderCatalogueSwitch();}
 }
 function gaiaStreamIntroduction(){
   return `<h3>${t('FULL GAIA DR3 SKY','CIELO GAIA DR3 COMPLETO')}</h3><p>${t('Browse the full-sky Gaia DR3 catalogue through progressive sky tiles. Only the visible regions and their current detail are downloaded; loaded source counts describe the current view, not the size of the entire catalogue. Internet access is required.','Consulta il catalogo Gaia DR3 a tutto cielo attraverso regioni caricate progressivamente. Vengono scaricate soltanto le regioni visibili e il loro dettaglio attuale; il numero di sorgenti caricate descrive la vista attuale, non la dimensione dell\u2019intero catalogo. Richiede accesso a Internet.')}</p><button class="focus-button" data-action="gaia-stream" ${universe?'':'disabled'}>${t('Open streamed Gaia DR3 sky','Apri cielo Gaia DR3 progressivo')}${icon('arrow-up-right')}</button><h3>${t('LOCAL BRIGHT-SOURCE COMPARISON','CONFRONTO LOCALE DELLE SORGENTI LUMINOSE')}</h3>`;
@@ -1149,7 +1173,6 @@ document.addEventListener('click', async event => {
     savePreferences();
     return;
   }
-  if (button.dataset.constellationMode) return chooseConstellationMode(button.dataset.constellationMode, button);
   if (button.dataset.constellation) return selectConstellation(button.dataset.constellation);
   if (button.dataset.searchScope) { searchBrowser.scope = button.dataset.searchScope; searchBrowser.page = 0; renderSearch(); return; }
   if (button.dataset.searchPage) { searchBrowser.page += button.dataset.searchPage === 'next' ? 1 : -1; renderSearch(); $('#search-results').scrollTop = 0; return; }
@@ -1200,7 +1223,7 @@ document.addEventListener('click', async event => {
       $('#observer-longitude').value = '15\u00b039\u203200\u2033E';
       $('#observer-datetime').value = '2026-12-11T20:00';
       $('#observer-fields').querySelectorAll('input').forEach(field => field.setCustomValidity(''));
-      await selectConstellation('Ori', 'earth');
+      await selectConstellation('Ori', true);
       break;
     case 'cosmic-scales': changeScale(1); break;
     case 'apply-observer': await selectConstellation(constellationBrowser.id); break;
@@ -1214,6 +1237,7 @@ document.addEventListener('click', async event => {
     case 'search-official-images': searchOfficialImages(); break;
     case 'gaia-info': openGaiaInfo(); break;
     case 'gaia-stream': await openGaiaStream(); break;
+    case 'atlas-view': await returnToAtlas(); break;
     case 'gaia-stream-retry': universe?.retryGaiaStream(); break;
     case 'toggle-gaia': state.gaiaDr3=!state.gaiaDr3;savePreferences();rememberCurrentView();location.reload();break;
     case 'nasa-stars': openSearch('stars'); break;
@@ -1348,8 +1372,7 @@ async function restoreLanguageView() {
     } else if (saved.scale >= 6) {
       constellationBrowser.timeZone = saved.timeZone || 'Europe/Rome';
       universe.setEarthVisible(saved.earthVisible !== false);
-      await universe.showConstellation(saved.constellationId, { mode: saved.mode, observer: saved.observer });
-      if (saved.earthPerspective) universe.viewFromEarth();
+      await universe.showConstellation(saved.constellationId, { mode: 'space', observer: saved.observer, earthPerspective: saved.earthPerspective || saved.mode === 'earth' });
     } else if (saved.scale === 5) {
       const planet = findPlanet(saved.objectId) || exoplanets.find(item => item.host === saved.host);
       if (planet) universe.focusObject(planet);

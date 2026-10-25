@@ -33,7 +33,7 @@ Modifiche ai dati originali: selezione delle colonne, nomi di ripiego per le ste
 
 Le linee sono convenzioni visive della cultura astronomica moderna di Stellarium. L'IAU stabilisce nomi e regioni della sfera celeste, non una figura obbligatoria fatta di segmenti. Le linee non rappresentano legami fisici fra stelle: quelle che appaiono vicine dalla Terra possono essere molto lontane fra loro nello spazio tridimensionale. Non sono stati copiati disegni delle figure, confini ufficiali o descrizioni mitologiche.
 
-Sette stelle delle figure hanno distanza ignota/dubbia in HYG: **HIP 5165, 22783, 31216, 33165, 54463, 89341 (Polis), 92202**. Le figure interessate sono Fenice, Giraffa, Unicorno, Cane Maggiore, Carena, Sagittario e Scudo. La vista del cielo conserva le figure complete; nello spazio 3D le connessioni verso queste stelle devono essere omesse e la lacuna dichiarata. Il Serpente resta un'unica costellazione con due gruppi separati di segmenti, coerentemente con la fonte.
+Sette stelle delle figure hanno distanza ignota/dubbia in HYG: **HIP 5165, 22783, 31216, 33165, 54463, 89341 (Polis), 92202**. Le figure interessate sono Fenice, Giraffa, Unicorno, Cane Maggiore, Carena, Sagittario e Scudo. Guarda dalla Terra completa la figura con riferimenti esclusivamente angolari per queste stelle; orbitando nel volume 3D le connessioni senza distanza rimangono omesse. L’orientamento locale usa luogo, data e orario dell’osservatore, senza tagliare la mappa all’orizzonte. Il Serpente resta un'unica costellazione con due gruppi separati di segmenti, coerentemente con la fonte.
 
 ## Riproduzione e verifica
 

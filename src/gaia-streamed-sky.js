@@ -67,8 +67,9 @@ export function createGaiaStreamedSky({pixelRatio=1,quality='high',onStatus=()=>
   material.userData.baseOpacity=1;
   const points=new THREE.Points(geometry,material);points.name='gaia-streamed-sources';points.frustumCulled=false;points.userData.particles=false;group.add(points);
   let records=[],objects=[],disposed=false,elapsed=0,lastCone=null,pendingCone=null,stableAge=0,lastStatus={};
+  const readyWaiters=new Set();
   const worker=workerFactory();
-  const status=values=>{lastStatus={...lastStatus,...values,release:'dr3',totalSources:GAIA_SURVEY.totalSources};onStatus(lastStatus);};
+  const status=values=>{lastStatus={...lastStatus,...values,release:'dr3',totalSources:GAIA_SURVEY.totalSources};onStatus(lastStatus);if(lastStatus.error||lastStatus.loadedSources>0||lastStatus.metadataValidated&&!lastStatus.loading)for(const resolve of [...readyWaiters])resolve();};
   worker.onmessage=({data})=>{
     if(disposed||data.revision!==undefined&&data.revision!==workerRevision)return;
     if(data.type==='error'){status({loading:false,error:data.error});return;}
@@ -100,6 +101,16 @@ export function createGaiaStreamedSky({pixelRatio=1,quality='high',onStatus=()=>
     detail:t('Full Gaia DR3 catalogue access through progressive sky tiles. Zoom to retrieve additional sources; only a bounded working set is rendered.','Accesso al catalogo completo Gaia DR3 tramite tasselli progressivi. Ingrandisci per caricare altre sorgenti; viene rappresentato solo un insieme limitato di dati.')};
   return {group,targets:[points],objects:[region],radius:RADIUS,fov:60,lookDirection:new THREE.Vector3(...region.position).normalize(),
     context:{id:'gaia-stream',mode:'catalogue-sky',name:t('Gaia DR3 streamed sky','Cielo Gaia DR3 in streaming'),short:'Gaia DR3',extent:t('Equatorial sky','Cielo equatoriale'),metric:t('ARCHIVE SOURCES','SORGENTI IN ARCHIVIO'),count:GAIA_SURVEY.totalSources.toLocaleString(locale()),source:GAIA_DR3_SOURCE,description:region.detail,overview:t('Progressive catalogue','Catalogo progressivo'),positionNote:t('Angular sky view. Detail loads on demand; this is not a complete 3D distance model.','Vista angolare del cielo. I dettagli si caricano su richiesta; non rappresenta un modello completo delle distanze 3D.')},
+    prepare(direction,fov=60,aspect=1,timeoutMs=3500){
+      const camera=new THREE.PerspectiveCamera(fov,aspect,.01,1000);camera.lookAt(direction);
+      lastCone=gaiaViewCone(camera,new THREE.Group());pendingCone=lastCone;stableAge=.24;
+      worker.postMessage({type:'view',view:lastCone});
+      return new Promise(resolve=>{
+        let timer;const finish=()=>{clearTimeout(timer);readyWaiters.delete(finish);resolve();};
+        readyWaiters.add(finish);timer=setTimeout(finish,timeoutMs);
+        if(disposed||lastStatus.error||lastStatus.loadedSources>0)finish();
+      });
+    },
     resolve(object){const row=object?.streamRecord||records[object?.streamIndex];return row&&'gaia-dr3-'+row.sourceId===object.id?streamedGaiaObject(row):object;},
     update(dt,camera,mapRoot){
       if(disposed)return;elapsed+=Math.max(0,dt);if(elapsed<.12)return;elapsed=0;
@@ -118,6 +129,6 @@ export function createGaiaStreamedSky({pixelRatio=1,quality='high',onStatus=()=>
       if(lastCone)worker.postMessage({type:'view',view:lastCone});
     },
     get diagnostics(){return {...lastStatus,renderedSources:objects.length,maxSources,drawCalls:objects.length?1:0,lastCone};},
-    dispose(){if(disposed)return;disposed=true;worker.terminate();geometry.dispose();material.dispose();group.removeFromParent();records=[];objects=[];}
+    dispose(){if(disposed)return;disposed=true;for(const resolve of [...readyWaiters])resolve();worker.terminate();geometry.dispose();material.dispose();group.removeFromParent();records=[];objects=[];}
   };
 }

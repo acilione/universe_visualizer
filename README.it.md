@@ -26,7 +26,9 @@ npm run preview -- --port 5174
 
 L'atlante normale e le viste immersive partono dalla mappa combinata di pianeti, satelliti, stelle e nebulose, rispettando i livelli scelti. Durante il caricamento rimane disponibile il Sistema Solare; la navigazione esplicita prevale su un caricamento tardivo.
 
-**Sezioni del catalogo > Gaia DR3 (Tutto cielo, dettaglio progressivo)** apre il catalogo completo CDS Gaia DR3 tramite tasselli progressivi. Trascina per guardare e usa la rotellina per restringere il campo. I dati vengono caricati su richiesta, con limiti di memoria e sorgenti rappresentate. La vista angolare resta separata dalla fusione con NASA e dall'esperimento locale sulle sorgenti luminose. Lo stato distingue le sorgenti caricate dalla copertura totale dell'archivio.
+**Gaia DR3**, accanto a **Mappa**, oppure **Sezioni del catalogo > Gaia DR3 (Tutto cielo, dettaglio progressivo)** apre il catalogo completo CDS Gaia DR3 tramite tasselli progressivi. Trascina per guardare e usa la rotellina per restringere il campo. I dati vengono caricati su richiesta, con limiti di memoria e sorgenti rappresentate. La vista angolare resta separata dalla fusione con NASA e dall'esperimento locale sulle sorgenti luminose. Lo stato distingue le sorgenti caricate dalla copertura totale dell'archivio.
+
+Il selettore **Mappa / Gaia DR3** prepara la regione osservata prima della dissolvenza; **Mappa** ripristina la precedente inquadratura. I cataloghi mantengono le rispettive epoche: non viene simulata una trasformazione fisica fra i due rilievi.
 
 [Studio per Gaia completo](GAIA_STREAMING_STUDY.md) e [note sui dati Gaia](DATA_GAIA_DR3.md).
 
@@ -46,6 +48,8 @@ Le schede indicano fonte delle immagini, bande osservative, copertura e dati di 
 
 [Confronto con immagini NASA per ciascun corpo](BODY_APPEARANCE_AUDIT.md) · [Fonti e copertura](REALISTIC_SURFACES.md) · [Crediti delle texture](TEXTURE_SOURCES.md).
 
+Nell’anteprima PC i salti fra oggetti e i cambi di direzione automatici avvengono durante una dissolvenza completa. Movimento manuale, rotazione e zoom sono smorzati per evitare scatti.
+
 ## Pianeti e zoom
 
 Clicca un oggetto collegato o la sua etichetta per entrare nella mappa dettagliata: **Gruppo Locale → Via Lattea → Sistema Solare**. Anche il Sole nella vista **Stelle vicine** apre il Sistema Solare. Basta un clic; funziona anche il doppio clic. Nell’anteprima PC e in VR/MR, la selezione apre la destinazione intorno all’osservatore mantenendone posizione e orientamento.
@@ -62,16 +66,15 @@ Clicca un oggetto collegato o la sua etichetta per entrare nella mappa dettaglia
 Il pulsante **Costellazioni** apre una selezione ricercabile delle **88 costellazioni**, con nomi italiani, latini e sigle. Il catalogo completo contiene **119.625 stelle reali HYG v4.1**; viene caricato localmente solo alla prima apertura di una figura. Non rappresenta tutte le stelle conosciute da ogni survey.
 
 - **Spazio 3D**: stelle e collegamenti occupano le loro posizioni J2000 con distanze HYG e una scala lineare comune. La figura cambia forma orbitandole attorno. La Terra è visibile di default all’origine, con dimensioni amplificate; **Mostra la Terra** permette di nasconderla. Il volume stellare mostrato si adatta alla distanza della costellazione.
-- **Guarda dalla Terra**, nella vista 3D, porta la camera all’origine terrestre mantenendo posizioni e profondità delle stelle. Cliccare il globo o la sua etichetta produce lo stesso effetto. Trascina per orientarti, usa lo zoom per ingrandire e **Torna a orbitare** o **Ricentra** per riprendere la navigazione. Il globo non viene disegnato mentre la camera è al suo centro; la preferenza di visibilità si conserva tornando a orbitare. A questa scala la separazione Terra–Sole è trascurata; superficie e dimensioni del globo sono illustrative.
-- **Dalla Terra**: cielo sferico con orizzonte geometrico, calcolato per latitudine, longitudine, data e ora. Il pannello mostra quante stelle della figura sono sopra l?orizzonte. Trascina per guardarti intorno, usa rotellina o due dita per ingrandire.
-- **Luogo e ora**: posizione iniziale Roma, orario iniziale corrente; coordinate modificabili senza richiedere geolocalizzazione. L?orario inserito usa il fuso indicato dal browser ed ? convertito in UTC. Intervallo 1900?2100. Il cielo rimane alla data scelta finch? non la cambi.
+- **Guarda dalla Terra**, nella vista 3D, porta la camera all’origine terrestre mantenendo posizioni e profondità delle stelle. Luogo e orario definiscono l’orientamento locale della visuale; la stessa mappa resta visibile anche sotto l’orizzonte, senza una schermata terrestre separata. Cliccare il globo o la sua etichetta produce lo stesso effetto. Trascina per orientarti, usa lo zoom per ingrandire e **Torna a orbitare** o **Ricentra** per riprendere la navigazione. Il globo non viene disegnato mentre la camera è al suo centro; la preferenza di visibilità si conserva tornando a orbitare. A questa scala la separazione Terra–Sole è trascurata; superficie e dimensioni del globo sono illustrative.
+- **Luogo e orario**: posizione iniziale Roma, coordinate modificabili senza richiedere geolocalizzazione. Il fuso orario è esplicito, inizialmente Europe/Rome; l’intervallo disponibile è 1900–2100. L’orientamento resta riferito all’istante scelto fino alla successiva modifica.
 - Le linee sottili ciano hanno alone e impulsi luminosi; la preferenza di movimento ridotto ferma gli effetti. Le figure rimangono visibili in **Spazio libero**.
-- Le **10.225 stelle senza distanza** sono presenti nel cielo terrestre e omesse dal volume 3D. Sette di queste appartengono alle figure: i relativi collegamenti 3D restano interrotti.
+- Le **10.225 stelle senza distanza** restano disponibili come direzioni angolari da Guarda dalla Terra e sono omesse dal volume fisico 3D. Sette di queste appartengono alle figure: i relativi collegamenti 3D restano interrotti.
 - **Torna alle scale cosmiche** riapre il percorso fra Sistema Solare e universo osservabile.
 
-Le figure sono convenzioni di Stellarium, non legami fisici n? bordi ufficiali IAU. Il cielo applica la precessione da J2000 ma omette moto proprio, parallasse, nutazione e rifrazione. Luminosit? e colori sono amplificati per esplorazione; illuminazione diurna, inquinamento luminoso e terreno non sono simulati. Una stella sotto l?orizzonte non ? spostata artificialmente sopra di esso.
+L’orientamento dalla Terra applica la precessione da J2000, ma omette moto proprio, parallasse, nutazione e rifrazione. Luminosità e colori sono amplificati; luce diurna, inquinamento luminoso e terreno non sono simulati.
 
-In VR, **Spazio 3D** conserva le prese della mappa con una o due mani. **Dalla Terra** circonda l'osservatore con una cupola: mani e controller selezionano le stelle, mentre l'orizzonte resta fisso. Scegli la costellazione e la prospettiva **Dalla Terra / Spazio 3D** nell'interfaccia desktop prima di entrare; seleziona **Mappa attuale** nel pannello di avvio VR/MR per mantenere quella vista. Il movimento del visore orienta lo sguardo e la navigazione avviene senza un pannello flottante.
+In VR lo spazio 3D conserva le prese della mappa con una o due mani. **Guarda dalla Terra** orienta la stessa geometria secondo l’osservatore locale; le stelle sotto l’orizzonte restano visibili. Scegli costellazione e prospettiva sul desktop, poi **Mappa attuale** nel pannello di avvio VR/MR. Il movimento del visore orienta lo sguardo.
 
 Provenienza, licenze CC BY-SA 4.0, revisioni e checksum: [DATA_CONSTELLATIONS.md](DATA_CONSTELLATIONS.md). Rigenerazione riproducibile:
 
@@ -155,7 +158,7 @@ Serve Chromium di Playwright (`npx playwright install chromium` se assente). `TE
 
 La verifica del renderer e dello zoom usa anche `npm run test:engine` con il server di sviluppo attivo su porta 5173 (oppure `ENGINE_TEST_URL`).
 
-La verifica delle costellazioni nel renderer usa `npm run test:constellations` con il server di sviluppo su porta 5173. Include proiezione del cielo, stelle sotto l?orizzonte, trascinamento, zoom, distanze ignote e ritorno ai pianeti. `npm run test:constellation-ui` verifica la navigazione desktop/mobile sull?anteprima di produzione (porta 5174).
+La verifica delle costellazioni nel renderer usa `npm run test:constellations` con il server di sviluppo su porta 5173. Include orientamento locale, trascinamento, zoom, distanze ignote e ritorno ai pianeti. `npm run test:constellation-ui` verifica la navigazione desktop/mobile. `npm run test:catalogue-handoff` controlla il passaggio Mappa/Gaia e il ripristino dell’inquadratura.
 
 La verifica del riferimento terrestre e della camera usa **npm run test:earth-reference** sul server di sviluppo. Comprende visibilità, persistenza fra figure, prospettiva dall’origine, transizione animata e ritorno all’orbita. I test astronomici includono il caso di Orione dell’11 dicembre 2026 alle 20:00 CET.
 

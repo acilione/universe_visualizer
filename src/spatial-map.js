@@ -8,10 +8,13 @@ export const SPATIAL_TABLETOP_DIAMETER = 2.1;
  * transform as the viewer walks: only explicit manipulation or recentering
  * changes the map. Catalogue coordinates and relative distances are preserved.
  */
-export function computeSpatialPlacement({ boundsRadius, viewerPosition, viewerQuaternion, layout = 'room', planetarium = false }) {
+export function computeSpatialPlacement({ boundsRadius, viewerPosition, viewerQuaternion, layout = 'room', planetarium = false, skyFrame = null }) {
   const position = viewerPosition.clone();
   const quaternion = new Quaternion();
-  if (planetarium) return { position, quaternion, scale: 1 };
+  if (planetarium) {
+    if(skyFrame?.isQuaternion&&skyFrame.toArray().every(Number.isFinite)&&skyFrame.lengthSq()>1e-12)quaternion.multiply(skyFrame).normalize();
+    return { position, quaternion, scale: 1 };
+  }
   const radius = Number.isFinite(boundsRadius) && boundsRadius > 0 ? boundsRadius : 30;
   if (layout === 'tabletop') {
     const forward = new Vector3(0, 0, -1).applyQuaternion(viewerQuaternion);

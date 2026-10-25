@@ -21,7 +21,7 @@ const openFixture = async (reducedMotion = 'reduce') => {
   return page;
 };
 const openOrion = async page => {
-  await page.evaluate(observer => atlas.showConstellation('Ori', { mode: 'space', observer }), observer);
+  await page.evaluate(observer => atlas.showConstellation('Ori', { mode: 'space', observer, earthPerspective: false }), observer);
   await page.waitForFunction(() => !atlas.cameraFlight);
 };
 const snapshot = page => page.evaluate(() => {
@@ -56,7 +56,7 @@ try {
   await page.evaluate(() => atlas.setEarthVisible(false));
   assert.equal((await snapshot(page)).earthShown, false);
   assert.equal((await snapshot(page)).linesShown, true);
-  await page.evaluate(observer => atlas.showConstellation('UMa', { mode: 'space', observer }), observer);
+  await page.evaluate(observer => atlas.showConstellation('UMa', { mode: 'space', observer, earthPerspective: false }), observer);
   await page.waitForFunction(() => !atlas.cameraFlight);
   assert.equal((await snapshot(page)).earthShown, false, 'visibility choice survives a new constellation');
   await openOrion(page);
@@ -95,6 +95,24 @@ try {
   assert.ok(perspective.sameGeometry && perspective.sameVertices && perspective.sameObjects, 'entering Earth perspective preserves real 3D stellar depth');
   assert.ok(perspective.depthRange > 10);
   assert.ok(perspective.allInFrame);
+  const orientation=await page.evaluate(async observer=>{
+    const {createSkyTransform}=await import('/src/sky-math.js');
+    const frame=createSkyTransform(observer), localCamera=atlas.camera.clone();
+    localCamera.position.set(0,0,0);localCamera.up.set(0,1,0);
+    localCamera.lookAt(localCamera.position.clone().fromArray(frame.fromEquatorial(atlas.constellationView.earthLookDirection.toArray())));
+    localCamera.updateMatrixWorld(true);atlas.camera.updateMatrixWorld(true);
+    let error=0;
+    for(const star of atlas.objects){
+      const actual=atlas.camera.position.clone().fromArray(star.position).project(atlas.camera);
+      const expected=atlas.camera.position.clone().fromArray(frame.fromEquatorial(star.position)).project(localCamera);
+      error=Math.max(error,Math.abs(actual.x-expected.x),Math.abs(actual.y-expected.y));
+    }
+    return {error,up:atlas.camera.up.toArray(),expectedUp:frame.up,altitudes:atlas.objects.map(star=>star.altitudeDeg)};
+  },observer);
+  assert.ok(orientation.error<1e-9,'same screen positions and roll as the independently rotated local horizon');
+  orientation.up.forEach((value,i)=>assert.ok(Math.abs(value-orientation.expectedUp[i])<1e-9));
+  assert.ok(orientation.altitudes.every(value=>value>12));
+
   await page.screenshot({ path: 'test-results/earth-reference-perspective.png' });
   const beforeDrag = await page.evaluate(() => atlas.camera.quaternion.toArray());
   await page.mouse.move(600, 350); await page.mouse.down();
@@ -121,7 +139,7 @@ try {
       return star.altitudeDeg > 12 && Math.abs(point.x) < 1 && Math.abs(point.y) < 1 && point.z > -1 && point.z < 1;
     }),
   }));
-  assert.equal(surface.index, 7); assert.equal(surface.count, 21);
+  assert.equal(surface.index, 6); assert.equal(surface.count, 21);
   assert.deepEqual(surface.observer, observer);
   assert.equal(surface.cameraRadius, 0); assert.equal(surface.controlsEnabled, false);
   assert.ok(surface.allInFrame, 'the reported winter observation keeps all of Orion visible above the horizon');

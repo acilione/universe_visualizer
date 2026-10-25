@@ -26,7 +26,7 @@ const SCALE_NAMES = [['Solar System','Sistema Solare'],['Nearby stars','Stelle v
  * onScale receives -1/+1; mapRoot transforms must be left to this module in VR.
  * XRInputSource.targetRaySpace works for both hands and handheld controllers.
  */
-export function createXR({ renderer, scene, camera, controls, mapRoot, getTargets, getBoundsRadius = () => 30, getEnvironment = () => [], onSelect, onFocus, onTravel, onNavigateBack, onScale, getScale, getPresentationMode = () => 'atlas', getReducedMotion = () => false, getObjectLayers = () => null, onObjectLayerChange = () => {}, onSessionEnd, onImmersiveChange, onMessage = () => {}, onMapAction = () => {} }) {
+export function createXR({ renderer, scene, camera, controls, mapRoot, getTargets, getBoundsRadius = () => 30, getEnvironment = () => [], onSelect, onFocus, onTravel, onNavigateBack, onScale, getScale, getPresentationMode = () => 'atlas', getSkyFrame = () => null, getReducedMotion = () => false, getObjectLayers = () => null, onObjectLayerChange = () => {}, onSessionEnd, onImmersiveChange, onMessage = () => {}, onMapAction = () => {} }) {
   renderer.xr.enabled = true;
   renderer.xr.setReferenceSpaceType('local-floor');
   const raycaster = new THREE.Raycaster();
@@ -190,7 +190,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       context.font = '600 23px sans-serif';
       context.textAlign = 'center';
       const label = constellationView
-        ? ({ previous: t("← FIGURE","← FIGURA"), next: t("FIGURE →","FIGURA →"), focus: value === 6 ? t("FROM EARTH","DALLA TERRA") : t("3D SPACE","SPAZIO 3D") }[b.action] || t(...b.label))
+        ? ({ previous: t("← FIGURE","← FIGURA"), next: t("FIGURE →","FIGURA →"), focus: isPlanetarium() ? t("RETURN TO ORBIT","TORNA A ORBITARE") : t("VIEW FROM EARTH","GUARDA DALLA TERRA") }[b.action] || t(...b.label))
         : t(...b.label);
       context.fillText(label, b.x + b.w / 2, b.y + b.h / 2);
       context.textAlign = 'left';
@@ -204,7 +204,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     context.fillText(constellationView
       ? t("Change the constellation or perspective using the panel.","Cambia figura o prospettiva dal pannello.")
       : isPlanetarium()
-      ? t("CONTROLLERS  ·  Trigger: select   /   Recenter: reposition the horizon","CONTROLLER  ·  Grilletto: seleziona   /   Ricentra: riposiziona l’orizzonte")
+      ? t("CONTROLLERS  ·  Trigger: select   /   Recenter: recenter the sky","CONTROLLER  ·  Grilletto: seleziona   /   Ricentra: ricentra il cielo")
       : t("CONTROLLERS  ·  Trigger: select   /   Grip: grab","CONTROLLER  ·  Grilletto: seleziona   /   Impugnatura: afferra"), 30, 375, 1090);
     texture.needsUpdate = true;
     paintLayers();
@@ -452,7 +452,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       boundsRadius: getBoundsRadius(),
       viewerPosition: viewer.getWorldPosition(new THREE.Vector3()),
       viewerQuaternion: viewer.getWorldQuaternion(new THREE.Quaternion()),
-      layout, planetarium: isPlanetarium(),
+      layout, planetarium: isPlanetarium(), skyFrame: getSkyFrame(),
     });
     baseScale = overviewScale = placement.scale;
     if (handsFirst && overviewPlaced) startTransition(() => applyTransform(placement));
@@ -900,7 +900,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
         }
       }
     }
-    // Keep the terrestrial horizon fixed: pinch/trigger still select, while
+    // Keep the angular sky orientation fixed: pinch/trigger still select, while
     // a held hand or controller grip cannot rotate, drag or resize the sky.
     const grabbing = isPlanetarium() ? [] : inputs.filter(input => input.press && !input.press.hit?.panel && inputPose(input));
     if (grabbing.length === 2) {

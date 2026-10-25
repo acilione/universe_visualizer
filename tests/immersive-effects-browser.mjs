@@ -86,11 +86,9 @@ try {
   await tick(3.3);
   assert.notEqual(await frame(), replay, 'Replay restarts the visible opening');
   assert.deepEqual(await placement(), beforeReplay, 'Replay never recentres or moves the viewer');
-  await page.evaluate(() => {
-    const earth = catalog.solar.find(object => object.id === 'earth');
-    atlas.preview.lookAtObject(earth);
-    atlas.selectObject(earth);
-  });
+  await page.evaluate(() => atlas.preview.lookAtObject(catalog.solar.find(object => object.id === 'earth')));
+  await tick(0.35); // Complete the hidden gaze change before measuring selection-only effects.
+  await page.evaluate(() => atlas.selectObject(catalog.solar.find(object => object.id === 'earth')));
   await tick(0.05, false);
   const selected = await frame(), afterSelect = await placement();
   await tick(0.5, false);

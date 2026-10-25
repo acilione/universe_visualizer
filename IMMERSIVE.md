@@ -25,6 +25,8 @@ Choose **Start desktop preview**. This works in a desktop browser with WebGL and
 | Esc | Release pointer lock, close a dialog or leave the preview, as applicable |
 | Exit preview | Return to the desktop atlas |
 
+Automatic jumps in the PC preview fade the entire rendered image, including the background sky, before the destination is applied. Mouse look, walking and wheel zoom use damped, bounded motion. Reduced-motion mode applies explicit destinations immediately.
+
 Movement pauses while a dialog is open or browser focus is lost. Exiting restores the desktop map controls. The reference level chosen during preview remains available on the desktop.
 
 ## Quest: walk inside the map
@@ -51,7 +53,9 @@ VR/MR jumps between bodies and returns to the overview use a short fade of the v
 
 The reference space is **session-local** (`local-floor`), with metre units and a floor-relative origin. It is not an absolute geographic coordinate system, and map placement is not saved as a persistent room anchor between sessions. If the platform resets its tracking origin and supplies a transform, the map placement is compensated to preserve its physical location. Otherwise the application recentres it and reports the change.
 
-Earth sky and NASA catalogue sky views are angular projections. They remain centred as a sky around the observer: walking through them would imply distances that those projections do not contain. Desktop translation is disabled for these views; looking and selecting still work. Use a spatial map level or a constellation's **3D space** view to explore a volume.
+The constellation observer basis combines precession, local sidereal time and observer latitude/longitude. Preview and XR apply this rotation to map placement while preserving the viewer pose. North is a virtual reference direction; there is no automatic calibration to physical north. The enlarged Earth globe is an origin marker, not a literal surface on which the camera is placed.
+
+The NASA catalogue sky is an angular projection. The constellation **View from Earth** uses the same 3D positions with an observer-local viewing basis and an angular background for stars without known depth; it does not introduce a separate horizon scene. These observer-centred presentations keep the viewpoint at the reference origin. Desktop translation is disabled while looking and selecting remain available; exit View from Earth to walk through the measured stellar volume. Use a spatial map level or a constellation's **3D space** view to explore a volume.
 
 Selecting a linked marker opens its detailed map within the current immersive session. For example, select **Milky Way** in the Local Group, then **Solar System** inside the Milky Way. Use a click in PC preview, a brief hand pinch, or a controller trigger in VR/MR. The destination uses the current room/tabletop layout while your viewer position and orientation stay unchanged.
 

@@ -165,7 +165,24 @@ export function createSkyTransform(input) {
     if (distance < 0) throw new RangeError(t("Distance cannot be negative.","La distanza non può essere negativa."));
     return matrixVector(combined, raDeg, decDeg, distance);
   };
-  return { observer, siderealDeg, vector, horizontal: (raDeg, decDeg) => horizontalResult(vector(raDeg, decDeg)) };
+  // Catalogue scene coordinates are [equatorial X, equatorial Z, -equatorial Y].
+  // Expose the SAME rotation for camera orientation and spatial/XR placement.
+  const equatorialToLocal = [combined[0],combined[2],-combined[1],combined[3],combined[5],-combined[4],combined[6],combined[8],-combined[7]];
+  const checked = value => {
+    if(!Array.isArray(value)||value.length!==3||!value.every(Number.isFinite))throw new RangeError(t('Invalid direction vector.','Vettore direzione non valido.'));
+    return value;
+  };
+  const fromEquatorial = value => {
+    const [x,y,z]=checked(value), m=equatorialToLocal;
+    return [m[0]*x+m[1]*y+m[2]*z,m[3]*x+m[4]*y+m[5]*z,m[6]*x+m[7]*y+m[8]*z];
+  };
+  const toEquatorial = value => {
+    const [x,y,z]=checked(value), m=equatorialToLocal;
+    return [m[0]*x+m[3]*y+m[6]*z,m[1]*x+m[4]*y+m[7]*z,m[2]*x+m[5]*y+m[8]*z];
+  };
+  return { observer, siderealDeg, vector, equatorialToLocal, fromEquatorial, toEquatorial,
+    east:toEquatorial([1,0,0]), up:toEquatorial([0,1,0]), north:toEquatorial([0,0,-1]),
+    horizontal: (raDeg, decDeg) => horizontalResult(vector(raDeg, decDeg)) };
 }
 
 /** J2000 RA/Dec to a geometric Earth-surface direction at the supplied location and UTC instant. */

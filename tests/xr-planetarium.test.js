@@ -193,7 +193,7 @@ test('constellation world panel exposes figure cycling and perspective switching
   h.xr.update();
   assert.ok(h.text.includes('\u2190 FIGURE'));
   assert.ok(h.text.includes('FIGURE \u2192'));
-  assert.ok(h.text.includes('3D SPACE'));
+  assert.ok(h.text.includes('RETURN TO ORBIT'));
   assert.ok(h.text.includes('Change the constellation or perspective using the panel.'));
   const panel = h.mapRoot.parent.getObjectByName('XR navigation panel');
   const clickPanel = (x, y) => {
@@ -211,7 +211,7 @@ test('constellation world panel exposes figure cycling and perspective switching
   assert.equal(h.focusActions.length, 1);
   h.setMode('atlas');
   h.xr.update();
-  assert.ok(h.text.includes('FROM EARTH'));
+  assert.ok(h.text.includes('VIEW FROM EARTH'));
 });
 
 
@@ -223,11 +223,11 @@ test('VR uses English by default and renders Italian only after an explicit lang
   await h.xr.enter();
   h.xr.update();
   assert.ok(h.text.includes('← FIGURA'));
-  assert.ok(h.text.includes('SPAZIO 3D'));
+  assert.ok(h.text.includes('TORNA A ORBITARE'));
   assert.ok(h.text.includes('RICENTRA'));
   assert.ok(h.text.includes('ESCI VR'));
   assert.match(h.messages.at(-1), /VR attiva/);
-  assert.ok(!h.text.includes('3D SPACE'));
+  assert.ok(!h.text.includes('RETURN TO ORBIT'));
 });
 
 

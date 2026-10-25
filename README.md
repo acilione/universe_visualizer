@@ -1,6 +1,6 @@
 # ÆTHER — Scientific cosmic atlas
 
-An interactive astronomical atlas with five reference scales, 3D constellations, an Earth sky view, and WebXR support. **English is the default language.** Choose **Settings → Interface language → Italiano** to use Italian. The language choice is saved, and the current map is restored when the interface reloads.
+An interactive astronomical atlas with five reference scales, 3D constellations, an Earth-origin perspective, and WebXR support. **English is the default language.** Choose **Settings → Interface language → Italiano** to use Italian. The language choice is saved, and the current map is restored when the interface reloads.
 
 [Open the atlas](https://acilione.github.io/universe_visualizer/) · [Documentazione italiana](README.it.md)
 
@@ -26,7 +26,9 @@ The application needs no account, API key or backend. Core catalogues and planet
 
 The normal atlas and immersive entry default to the combined planets, moons, stars and nebulae view. Saved object-layer choices remain in effect. The Solar System is available while the local catalogues load; an explicit navigation action takes precedence over delayed loading.
 
-**Catalogue sections > Gaia DR3 (Full sky, streamed detail)** opens on-demand access to the full CDS Gaia DR3 catalogue. Drag to look and scroll to resolve a smaller field. A worker loads only relevant progressive sky tiles, with fixed source and memory budgets. Source information preserves exact Gaia identifiers and native astrometry; the status distinguishes loaded sources from total archive coverage. This angular survey is separate from NASA catalogue merging and the optional bundled bright-source experiment.
+**Gaia DR3** beside **Map**, or **Catalogue sections > Gaia DR3 (Full sky, streamed detail)**, opens on-demand access to the full CDS Gaia DR3 catalogue. Drag to look and scroll to resolve a smaller field. A worker loads only relevant progressive sky tiles, with fixed source and memory budgets. Source information preserves exact Gaia identifiers and native astrometry; the status distinguishes loaded sources from total archive coverage. This angular survey is separate from NASA catalogue merging and the optional bundled bright-source experiment.
+
+The **Map / Gaia DR3** switch prepares the requested sky region before a short fade. It keeps the viewing direction or selected astronomical source, and **Map** restores the previous view and camera. Catalogue epochs remain unchanged; this is not a cross-match or a 3D interpolation between surveys.
 
 [Full-Gaia architecture study](GAIA_STREAMING_STUDY.md) covers static hosting, service limits, level of detail, 3D distance uncertainty, and preparation for DR4. [Gaia data notes](DATA_GAIA_DR3.md) describe the implemented modes.
 
@@ -69,16 +71,16 @@ The **NASA catalogue sky** places objects by equatorial direction on a reference
 
 Hipparcos ICRS positions at J1991.25 are propagated to J2000 with tangent-vector proper motion when both components exist. Otherwise their original position epoch is shown. Positive parallaxes with known relative uncertainty at most 20% permit a labelled inverse-parallax distance estimate. Original source uncertainties, photometric bands and catalogue-specific spectral measurements are retained.
 
-In **Constellations**, choose **3D space** or **Earth surface**:
+In **Constellations**, choose a figure in the 3D map:
 
 - **Show Earth** is enabled by default in 3D. The reference globe is enlarged at the origin.
-- **View from Earth**, or selecting the globe, places the camera at the Earth origin while retaining stellar depth. Drag to look around; **Return to orbit** restores spatial navigation.
+- **View from Earth**, or selecting the globe, places the camera at the Earth origin while retaining stellar depth. Its local up direction follows the selected location and time. The same map stays visible above and below the geometric horizon; there is no separate horizon screen. Drag to look around; **Return to orbit** restores spatial navigation.
 - **Location and time** accepts decimal degrees, decimal commas and degrees/minutes/seconds. The observer timezone is explicit; the default is Europe/Rome, with daylight-saving rules. Dates span 1900–2100.
-- Observer edits are preserved when switching between the 3D and Earth tabs.
+- Observer edits are preserved when entering or leaving the Earth-origin perspective.
 - The Orion example uses **38°06′51.98″ N, 15°39′00″ E, 11 December 2026 at 20:00 CET** (19:00 UTC). All 21 stars in the figure are above the geometric horizon.
-- The **10,225 stars without usable distance** remain in the sky view and are omitted from the 3D volume. Seven figure stars have unknown depth.
+- The **10,225 stars without usable distance** remain available as angular directions from Earth and are omitted from the physical 3D volume. Seven figure stars have unknown depth.
 
-The Earth sky model includes J2000 precession. Proper motion, parallax, nutation, atmospheric refraction, daylight, light pollution and terrain are not simulated. Earth–Sun separation is negligible at the constellation scale and is omitted. The sky stays at the selected instant until changed.
+The Earth-origin orientation includes J2000 precession. Proper motion, parallax, nutation, atmospheric refraction, daylight, light pollution and terrain are not simulated. Earth–Sun separation is negligible at the constellation scale and is omitted. The sky stays at the selected instant until changed.
 
 **Immersive view** hides interface text and labels. Press **Esc**, or use the textless restore control, to return. Reduced-motion preferences disable decorative animation. Short desktop windows use independently scrollable side panels above the reference-scale bar.
 
@@ -87,6 +89,8 @@ Shortcuts: **1–5** reference scale, **R** reset, **/** search, **Space** auto-
 ## Immersive preview, VR and mixed reality
 
 Open **VR / MR**. The default **Combined map** loads planets, moons, catalogue stars and nebulae together. PC preview and headset modes start with their control panels hidden. The **Planets**, **Stars** and **Nebulae** switches are independent and remember their state; set them before entering or use the optional preview controls. Choose **Current map** to retain another reference view.
+
+Programmatic preview jumps fade the complete image before changing the map or viewing direction. Manual look, walking and zoom use damped motion; reduced-motion mode changes destinations directly.
 
 **Start desktop preview** provides a first-person view without a headset: W A S D to walk, Q / E to change height, drag to look around, click an object to travel to it, and use the wheel for fast zoom. **B** or **Backspace** returns to the overview; repeating it moves one reference level outward. A small restore control opens optional map, search and placement controls.
 
@@ -99,7 +103,7 @@ On Quest, choose **Enter mixed reality** for passthrough or **Enter VR atlas** f
 
 VR/MR object jumps fade the virtual map out and back in at its destination, with no camera flight or sweeping map movement. Headset tracking and room passthrough remain continuous; reduced-motion mode jumps immediately.
 
-Controllers remain supported, and the headset system gesture ends the session. **Tabletop** can be selected before entry. Choose constellations, their Earth or 3D perspective, and object layers in the desktop interface, then use **Current map** to enter that view. Earth sky views preserve their geometric horizon.
+Controllers remain supported, and the headset system gesture ends the session. **Tabletop** can be selected before entry. Choose constellations, their Earth or 3D perspective, and object layers in the desktop interface, then use **Current map** to enter that view. The Earth-origin perspective preserves the observer’s local orientation without clipping the map at the horizon.
 
 **Dim room in mixed reality** defaults to **56%** and can be set from **0–80%** before entry. It darkens the background through black alpha composition only when WebXR reports `alpha-blend`, without changing native passthrough settings. Additive sessions do not dim. The dimmer leaves nearer opaque objects unchanged and is removed on exit.
 
@@ -149,6 +153,7 @@ npm run test:drilldown
 npm run test:experiments
 npm run test:desktop-startup
 npm run test:gaia-stream
+npm run test:catalogue-handoff
 npm run test:realism
 npm run audit:gaia
 ```

@@ -105,7 +105,7 @@ function desktopFixture() {
   const object={id:'body',position:[4,.5,-3],size:.2};
   const target=new THREE.Object3D();target.position.fromArray(object.position);target.userData.object=object;mapRoot.add(target);
   const preview=createDesktopImmersive({canvas,camera,controls,mapRoot,getBoundsRadius:()=>30,getTargets:()=>[target]});
-  preview.enter({directTravel:true});
+  preview.enter({directTravel:true}); for(let frame=0;frame<10;frame++)preview.update(.05);
   return {preview,camera,mapRoot,target,object,canvas};
 }
 
@@ -122,9 +122,11 @@ test('desktop arrival uses world coordinates under a transformed parent and zoom
     const initialScale=h.mapRoot.getWorldScale(new THREE.Vector3()).x;
     assert.ok(Math.abs(initialScale*.2-.3)<1e-8);
     h.canvas.fire('wheel',{deltaY:-200});
+    assert.ok(Math.abs(h.mapRoot.getWorldScale(new THREE.Vector3()).x-initialScale)<1e-8, 'wheel queues zoom without an immediate scale snap');
+    for(let frame=0;frame<50;frame++)h.preview.update(.05);
     assert.ok(h.mapRoot.getWorldScale(new THREE.Vector3()).x>initialScale*1.9);
     assert.ok(h.target.getWorldPosition(new THREE.Vector3()).distanceTo(anchor)<1e-8);
-    h.canvas.fire('wheel',{deltaY:200});
+    h.canvas.fire('wheel',{deltaY:200});for(let frame=0;frame<50;frame++)h.preview.update(.05);
     assert.ok(Math.abs(h.mapRoot.getWorldScale(new THREE.Vector3()).x-initialScale)<1e-8);
     assert.deepEqual([...h.camera.position.toArray(),...h.camera.quaternion.toArray()],pose);
     h.preview.navigateBack();for(let i=0;i<12;i++)h.preview.update(.05);
@@ -149,19 +151,23 @@ test('pixel, line and page wheel inputs produce equivalent zoom with the same ph
     const h=desktopFixture();
     try{
       const initialScale=h.mapRoot.getWorldScale(new THREE.Vector3()).x;
-      h.canvas.fire('wheel',{deltaY,deltaMode});
+      h.canvas.fire('wheel',{deltaY,deltaMode});for(let frame=0;frame<50;frame++)h.preview.update(.05);
       scales.push(h.mapRoot.getWorldScale(new THREE.Vector3()).x/initialScale);
     }finally{h.preview.dispose();}
   }
   for(const value of scales)assert.ok(Math.abs(value-Math.exp(32*.0035))<1e-8);
 });
 
-test('manually rotating during a focus flight cancels its animation without snapping the map back',()=>{
+test('manual rotation cancels a pending hidden jump and settles without returning to its destination',()=>{
   const h=desktopFixture();
   try{
     h.preview.focusObject(h.object,.2);h.preview.update(.1);
     const before=h.mapRoot.getWorldQuaternion(new THREE.Quaternion());
+    const oldPosition=h.mapRoot.getWorldPosition(new THREE.Vector3()).clone();
     h.preview.rotateMap(.4);
+    assert.ok(before.angleTo(h.mapRoot.getWorldQuaternion(new THREE.Quaternion()))<1e-8, 'manual rotation is damped too');
+    for(let frame=0;frame<50;frame++)h.preview.update(.05);
+    assert.ok(oldPosition.distanceTo(h.mapRoot.getWorldPosition(new THREE.Vector3()))<1e-8, 'the cancelled destination is never applied');
     const after=h.mapRoot.getWorldQuaternion(new THREE.Quaternion());
     assert.ok(Math.abs(before.angleTo(after)-.4)<1e-8);
     const manuallyPlaced=h.mapRoot.matrixWorld.toArray();

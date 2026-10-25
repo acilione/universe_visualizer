@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Group, Quaternion, Vector3 } from 'three';
+import { Group, Matrix4, Quaternion, Vector3 } from 'three';
+import { createSkyTransform, equatorialVector } from '../src/sky-math.js';
 import { computeSpatialPlacement, spatialWorldToLocal } from '../src/spatial-map.js';
 
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} != ${b}`);
@@ -51,4 +52,22 @@ test('world placement survives a translated, rotated and scaled parent', () => {
   near(child.getWorldPosition(new Vector3()).distanceTo(world.position), 0);
   near(child.getWorldScale(new Vector3()).x, world.scale);
   near(child.getWorldQuaternion(new Quaternion()).angleTo(world.quaternion), 0);
+});
+
+
+test('Earth-origin spatial placement uses the same local horizon rotation as desktop without changing distance or tracking', () => {
+  const frame = createSkyTransform({latitude:38.11443888888889,longitude:15.65,dateIso:'2026-12-11T19:00:00Z'});
+  const m=frame.equatorialToLocal;
+  const skyFrame=new Quaternion().setFromRotationMatrix(new Matrix4().set(m[0],m[1],m[2],0,m[3],m[4],m[5],0,m[6],m[7],m[8],0,0,0,0,1));
+  const eye=new Vector3(2,1.67,-4), tracked=new Quaternion().setFromAxisAngle(new Vector3(0,1,0),1.3);
+  const placement=computeSpatialPlacement({viewerPosition:eye,viewerQuaternion:tracked,planetarium:true,skyFrame});
+  assert.deepEqual(placement.position.toArray(),eye.toArray());
+  assert.equal(placement.scale,1);
+  const star=new Vector3(...equatorialVector(88.79294,7.40706,26));
+  const local=star.clone().applyQuaternion(placement.quaternion);
+  near(local.distanceTo(new Vector3(...frame.vector(88.79294,7.40706,26))),0);
+  near(local.length(),star.length());
+  assert.deepEqual(tracked.toArray(),new Quaternion().setFromAxisAngle(new Vector3(0,1,0),1.3).toArray());
+  const ordinary=computeSpatialPlacement({boundsRadius:26,viewerPosition:eye,viewerQuaternion:tracked,skyFrame});
+  assert.deepEqual(ordinary.quaternion.toArray(),[0,0,0,1]);
 });
