@@ -20,7 +20,15 @@ npm run build
 npm run preview -- --port 5174
 ```
 
-`dist/` può essere pubblicata su un hosting statico HTTPS. Nessun backend, account o chiave API. Dati e texture sono locali; i font esterni hanno un fallback di sistema.
+`dist/` può essere pubblicata su un hosting statico HTTPS. Nessun backend, account o chiave API. I cataloghi di base e le texture sono locali; il rilievo Gaia completo richiede una connessione Internet. I font esterni hanno un fallback di sistema.
+
+## Vista iniziale e Gaia in streaming
+
+L'atlante normale e le viste immersive partono dalla mappa combinata di pianeti, satelliti, stelle e nebulose, rispettando i livelli scelti. Durante il caricamento rimane disponibile il Sistema Solare; la navigazione esplicita prevale su un caricamento tardivo.
+
+**Sezioni del catalogo > Gaia DR3 (Tutto cielo, dettaglio progressivo)** apre il catalogo completo CDS Gaia DR3 tramite tasselli progressivi. Trascina per guardare e usa la rotellina per restringere il campo. I dati vengono caricati su richiesta, con limiti di memoria e sorgenti rappresentate. La vista angolare resta separata dalla fusione con NASA e dall'esperimento locale sulle sorgenti luminose. Lo stato distingue le sorgenti caricate dalla copertura totale dell'archivio.
+
+[Studio per Gaia completo](GAIA_STREAMING_STUDY.md) e [note sui dati Gaia](DATA_GAIA_DR3.md).
 
 ## Esperimento immagini ufficiali e Gaia DR3
 

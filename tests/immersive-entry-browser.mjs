@@ -10,7 +10,10 @@ await page.addInitScript(()=>{if(!localStorage.getItem('aether.preferences'))loc
 const ready=()=>expect(page.locator('.loading')).toBeHidden({timeout:90000});
 const open=async()=>{await page.locator('[data-action="vr"]').first().click();await expect(page.locator('#xr-dimming')).toBeVisible();};
 try{
- await page.goto(base,{waitUntil:'networkidle',timeout:90000});await ready();await open();
+ await page.goto(base,{waitUntil:'networkidle',timeout:90000});await ready();
+ await expect(page.locator('.app-shell')).toHaveClass(/combined-view/,{timeout:90000});
+ await expect(page.locator('#combined-desktop-layers')).toBeVisible();
+ await expect(page.locator('#modal')).not.toBeVisible();await open();
  await expect(page.locator('#xr-content')).toHaveValue('combined');
  await expect(page.locator('#xr-dimming')).toHaveValue('0.56');await expect(page.locator('#xr-dimming-value')).toHaveText('56%');
  await page.locator('#xr-dimming').focus();await page.keyboard.press('Home');await expect(page.locator('#xr-dimming-value')).toHaveText('0%');

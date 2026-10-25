@@ -47,6 +47,8 @@ A small progress indicator confirms the left-fist hold. The gesture fires once p
 
 After releasing a manipulation, the map keeps its resulting position, orientation and scale. The camera always follows headset tracking. Catalogue positions stay unchanged; interaction transforms their common map coordinate frame.
 
+VR/MR jumps between bodies and returns to the overview use a short fade of the virtual map: 120 ms out, one invisible frame to apply the destination, then 160 ms in. The map never sweeps or grows through the viewer during a jump. Headset tracking, the distant reference sky and room passthrough continue throughout; reduced-motion mode applies the destination immediately. Hand manipulation remains direct and intentional.
+
 The reference space is **session-local** (`local-floor`), with metre units and a floor-relative origin. It is not an absolute geographic coordinate system, and map placement is not saved as a persistent room anchor between sessions. If the platform resets its tracking origin and supplies a transform, the map placement is compensated to preserve its physical location. Otherwise the application recentres it and reports the change.
 
 Earth sky and NASA catalogue sky views are angular projections. They remain centred as a sky around the observer: walking through them would imply distances that those projections do not contain. Desktop translation is disabled for these views; looking and selecting still work. Use a spatial map level or a constellation's **3D space** view to explore a volume.
@@ -62,6 +64,8 @@ Use the object-layer controls to show or hide each category independently. The d
 This view combines different presentation scales. The Solar System and its supported moons occupy the foreground using the atlas's schematic planetary model. Exoplanets are shown at their catalogue host directions. The NASA stellar and nebular catalogues provide the surrounding equatorial sky; these directions are not a common physical-distance model with the foreground planets. Nebular extents use the available angular-size data, and the scientific object panels retain the catalogue measurements and sources. The combined view does not invent distances for objects whose distance is unknown.
 
 In the room layout, the combined map stays fixed in the tracked space as you walk. Changing object layers only changes visibility; it does not recenter, rotate or resize the map. During close-up inspection, a distant catalogue sky remains around the viewer so that enlarging a planet does not remove the stellar surroundings. Its stars and nebula centres remain selectable. This is an angular reference sky, with no invented stellar parallax or radial distance.
+
+The separate **Gaia DR3 streamed sky** can be opened from **Catalogue sections** before headset entry. It keeps **Current map** selected in the chooser. This is a native J2016.0 angular survey: tracked looking and source selection work, while detailed angular zoom is available in the normal desktop sky view. A bounded set of progressive tiles is loaded from CDS; it is not a full spatial Gaia Galaxy. See [Gaia data access](DATA_GAIA_DR3.md) and the [full-catalogue study](GAIA_STREAMING_STUDY.md).
 
 ## Animated map projection
 

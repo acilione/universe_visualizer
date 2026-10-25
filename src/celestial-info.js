@@ -91,7 +91,7 @@ function gaiaMeasurements(info, isModal) {
       row('BP\u2212RP',number(gaia.bpRp,5)),row('RUWE',number(gaia.ruwe,4)),
       row(t('DUPLICATED_SOURCE FLAG','INDICATORE DUPLICATED_SOURCE'),typeof gaia.duplicatedSource==='boolean'?String(gaia.duplicatedSource):unavailable()),
       row(t('COORDINATE FRAME','SISTEMA DI COORDINATE'),gaia.coordinateFrame),
-      row(t('ASSOCIATION','ASSOCIAZIONE'),info.gaiaMatchStatus==='official-hipparcos-match'?t('Official Gaia\u2013Hipparcos-2 association','Associazione ufficiale Gaia\u2013Hipparcos-2'):t('Additional Gaia source','Sorgente Gaia aggiuntiva')));
+      row(t('ASSOCIATION','ASSOCIAZIONE'),info.gaiaMatchStatus==='streamed-independent'?t('Independent streamed Gaia entry','Voce Gaia indipendente in streaming'):info.gaiaMatchStatus==='official-hipparcos-match'?t('Official Gaia\u2013Hipparcos-2 association','Associazione ufficiale Gaia\u2013Hipparcos-2'):t('Additional Gaia source','Sorgente Gaia aggiuntiva')));
     for(const match of gaia.hipMatches||[])rows.push(row('HIP '+match.hip,t('Separation: ','Separazione: ')+number(match.angularDistanceArcsec,5,'arcsec')+'; '+t('neighbours: ','vicini: ')+text(match.numberOfNeighbours)+'; xm_flag: '+text(match.xmFlag)));
   }
   return `<section class="gaia-measurements" aria-label="Gaia DR3"><h3>ESA GAIA DR3</h3><div class="planet-measurements">${rows.join('')}</div>${isModal?`<p class="illustration-note">${t('Native Gaia measurements at J2016.0. G/BP/RP photometry uses different passbands from V. RUWE and duplicated_source are processing-quality indicators.','Misure native Gaia a J2016.0. La fotometria G/BP/RP usa bande diverse da V. RUWE e duplicated_source sono indicatori di qualit\u00e0 del trattamento dei dati.')}</p>`:''}</section>`;
@@ -100,7 +100,7 @@ function gaiaMeasurements(info, isModal) {
 function sourceKey(value) {
   try {
     const url = new URL(value);
-    if (url.protocol !== 'https:' || url.username || url.password || !(url.hostname === 'nasa.gov' || url.hostname.endsWith('.nasa.gov') || ['www.cosmos.esa.int','gea.esac.esa.int'].includes(url.hostname))) return null;
+    if (url.protocol !== 'https:' || url.username || url.password || !(url.hostname === 'nasa.gov' || url.hostname.endsWith('.nasa.gov') || ['www.cosmos.esa.int','gea.esac.esa.int','cdsarc.cds.unistra.fr'].includes(url.hostname))) return null;
     const name = url.pathname.match(/\/(hipparcos|bsc5p|ngc2000)\.html$/)?.[1];
     return name ? 'heasarc:' + name : url.href;
   } catch {return null;}
@@ -118,7 +118,7 @@ export function celestialSourceLinks(object) {
     if (!key || seen.has(key)) continue;
     seen.add(key);
     const catalogue = key.startsWith('heasarc:') ? key.slice(8) : null;
-    const label = new URL(source).hostname.endsWith('.esa.int') ? 'ESA Gaia DR3' : catalogue ? 'NASA HEASARC \u00b7 ' + catalogueName(catalogue) : t('NASA scientific source', 'Fonte scientifica NASA');
+    const label = new URL(source).hostname==='cdsarc.cds.unistra.fr'?'CDS / VizieR':new URL(source).hostname.endsWith('.esa.int') ? 'ESA Gaia DR3' : catalogue ? 'NASA HEASARC \u00b7 ' + catalogueName(catalogue) : t('NASA scientific source', 'Fonte scientifica NASA');
     links.push(`<a class="object-source" href="${escape(source)}" target="_blank" rel="noopener noreferrer">${escape(label)} ↗</a>`);
   }
   return links.join('');

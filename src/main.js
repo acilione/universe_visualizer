@@ -60,6 +60,8 @@ let combinedData = null;
 let combinedPromise = null;
 let combinedLoading = false;
 let combinedError = '';
+let initialCombinedPending = false;
+let gaiaStreamStatus = null;
 let imageObject = null;
 let imageController = null;
 let imageSearch = { records: null, loading: false, error: '' };
@@ -83,7 +85,7 @@ $('#app').innerHTML = `
         <button data-action="collections">${t("Catalogue sections","Sezioni del catalogo")}</button>
         <button data-action="about">${t("The project","Il progetto")} ${icon('arrow-up-right')}</button>
       </nav>
-      <div class="top-actions"><button class="constellation-browser-button" data-action="constellations" aria-label="${t("Browse constellations","Esplora le costellazioni")}" title="${t("Constellations","Costellazioni")}">${icon('sparkles')}<span>${t("Constellations","Costellazioni")}</span></button><button class="planet-browser-button" data-action="planets" aria-label="${t("Browse planets and moons","Esplora pianeti e satelliti")}" title="${t("Planets & moons","Pianeti e satelliti")}">${icon('globe-2')}<span>${t("Planets & moons","Pianeti e satelliti")}</span></button><span class="live"><span class="status-dot"></span><span id="renderer-status">${t("3D RENDERER ACTIVE","RENDERER 3D ATTIVO")}</span></span><button class="vr-button" data-action="vr">${icon('glasses')} VR / MR</button></div>
+      <div class="top-actions"><button class="constellation-browser-button" data-action="constellations" aria-label="${t("Browse constellations","Esplora le costellazioni")}" title="${t("Constellations","Costellazioni")}">${icon('sparkles')}<span>${t("Constellations","Costellazioni")}</span></button><button class="planet-browser-button" data-action="planets" aria-label="${t("Browse planets and moons","Esplora pianeti e satelliti")}" title="${t("Planets & moons","Pianeti e satelliti")}">${icon('globe-2')}<span>${t("Planets & moons","Pianeti e satelliti")}</span></button><span class="live"><span class="status-dot"></span><span id="renderer-status" role="status">${t("3D RENDERER ACTIVE","RENDERER 3D ATTIVO")}</span></span><button class="vr-button" data-action="vr">${icon('glasses')} VR / MR</button></div>
     </header>
     <section class="intro" aria-label="${t("Selected region","Regione esplorata")}">
       <div class="eyebrow">${t("ASTRONOMICAL CATALOGUES","CATALOGHI ASTRONOMICI")}</div>
@@ -93,6 +95,11 @@ $('#app').innerHTML = `
     <aside class="left-panel" aria-label="${t("Map scale and layers","Scala e livelli della mappa")}">
       <div class="section-heading">${t("REFERENCE FRAME","SISTEMA DI RIFERIMENTO")} ${icon('layers')}</div>
       <div id="combined-desktop-layers" class="object-layer-switches" role="group" aria-label="${t("Object categories","Categorie di oggetti")}" hidden>${objectLayerButtons()}</div>
+      <section id="gaia-stream-controls" hidden aria-label="${t('Gaia survey status','Stato del rilievo Gaia')}">
+        <p id="gaia-stream-status" class="combined-status" role="status"></p>
+        <button id="gaia-stream-retry" class="planet-details-button" data-action="gaia-stream-retry" hidden>${t('Retry sky loading','Riprova caricamento cielo')}</button>
+        <button class="planet-details-button" data-action="gaia-info">${t('Gaia coverage and sources','Copertura e fonti Gaia')}${icon('info')}</button>
+      </section>
       <section class="constellation-controls" id="constellation-controls" aria-label="${t("Constellation perspective","Prospettiva della costellazione")}" hidden>
         <button class="constellation-change" data-action="constellations"><span id="constellation-current">${t("Constellations","Costellazioni")}</span>${icon('search')}</button>
         <div class="constellation-mode" role="group" aria-label="${t("Observer position","Punto di osservazione")}">
@@ -186,8 +193,9 @@ function notify(message) {
 const isPlanet = object => object?.isPlanet || object?.bodyKind === 'exoplanet' || catalog.solar.slice(1).some(planet => planet.id === object?.id);
 const isMoon = object => object?.isMoon || object?.bodyKind === 'moon';
 const number = (value, unit = '') => Number.isFinite(value) ? `${value.toLocaleString(locale(), { maximumFractionDigits: 2 })}${unit ? ' ' + unit : ''}` : t("Not available","Non disponibile");
+const isGaiaStreamView = () => state.scale === 8 && state.context?.id === 'gaia-stream';
 const currentScale = () => scales[state.scale] || {
-  id: state.scale === 9 ? 'combined-map' : state.scale === 8 ? 'nasa-sky' : state.scale >= 6 ? 'constellations' : 'exoplanets',
+  id: state.scale === 9 ? 'combined-map' : state.scale === 8 ? isGaiaStreamView() ? 'gaia-stream' : 'nasa-sky' : state.scale >= 6 ? 'constellations' : 'exoplanets',
   name: state.context?.name || state.object?.host || t("Exoplanet system","Sistema esoplanetario"),
   source: state.scale >= 6 ? 'https://github.com/astronexus/HYG-Database' : 'https://exoplanetarchive.ipac.caltech.edu/',
   extent: state.scale >= 6 ? t("HYG star catalogue","Catalogo stellare HYG") : t("Exoplanet system","Sistema esoplanetario"),
@@ -244,7 +252,7 @@ function renderObject(object) {
   state.object = object;
   updatePreviewHud();
   $('#object-card').innerHTML = objectMarkup(object);
-  $('.coordinates').innerHTML = `<span>${state.scale === 9 ? t("COMBINED DISPLAY SCALES","SCALE VISIVE COMBINATE") : state.scale === 8 ? t("EQUATORIAL SKY DIRECTIONS","DIREZIONI CELESTI EQUATORIALI") : state.scale === 7 ? t("LOCAL HORIZON","ORIZZONTE LOCALE") : state.scale === 6 ? t("J2000 · HYG DISTANCES","J2000 · DISTANZE HYG") : ['stars','local'].includes(currentScale().id) ? t("J2000 · APPROXIMATE","J2000 · APPROSSIMATA") : t("SCHEMATIC VIEW","VISTA SCHEMATICA")}</span><span>${state.scale === 9 ? (state.gaiaDr3 ? 'NASA / JPL / ESA GAIA' : 'NASA / JPL / HEASARC') : state.scale === 8 ? (state.gaiaDr3 ? 'NASA HEASARC + ESA GAIA' : 'NASA HEASARC') : state.scale >= 6 ? t("HYG 4.1 CATALOGUE","CATALOGO HYG 4.1") : t("COSMIC ATLAS","ATLANTE COSMICO")}</span>`;
+  $('.coordinates').innerHTML = `<span>${isGaiaStreamView() ? 'ICRS \u00b7 J2016.0' : state.scale === 9 ? t("COMBINED DISPLAY SCALES","SCALE VISIVE COMBINATE") : state.scale === 8 ? t("EQUATORIAL SKY DIRECTIONS","DIREZIONI CELESTI EQUATORIALI") : state.scale === 7 ? t("LOCAL HORIZON","ORIZZONTE LOCALE") : state.scale === 6 ? t("J2000 · HYG DISTANCES","J2000 · DISTANZE HYG") : ['stars','local'].includes(currentScale().id) ? t("J2000 · APPROXIMATE","J2000 · APPROSSIMATA") : t("SCHEMATIC VIEW","VISTA SCHEMATICA")}</span><span>${state.scale === 9 ? (state.gaiaDr3 ? 'NASA / JPL / ESA GAIA' : 'NASA / JPL / HEASARC') : state.scale === 8 ? (isGaiaStreamView() ? 'ESA GAIA DR3 / CDS' : state.gaiaDr3 ? 'NASA HEASARC + ESA GAIA' : 'NASA HEASARC') : state.scale >= 6 ? t("HYG 4.1 CATALOGUE","CATALOGO HYG 4.1") : t("COSMIC ATLAS","ATLANTE COSMICO")}</span>`;
   if ($('#modal').open && $('#modal').dataset.kind === 'object') $('#modal-body').innerHTML = objectMarkup(object, true);
   refreshIcons();
   enrichStellarInformation(object);
@@ -272,6 +280,8 @@ function updateScale(index, context = null) {
   const hostView = index === 5;
   const constellationView = index === 6 || index === 7;
   const nasaView = index === 8;
+  const gaiaView = isGaiaStreamView();
+  $('.footer-right > span').textContent=gaiaView?'ICRS \u00b7 J2016.0':t('J2000 \u00b7 CATALOGUE COORDINATES','J2000 \u00b7 COORDINATE DI CATALOGO');
   const combined = index === 9;
   const detached = index >= 5;
   if (constellationView) {
@@ -281,11 +291,11 @@ function updateScale(index, context = null) {
     if (context?.observer) constellationBrowser.observer = { ...constellationBrowser.observer, ...context.observer };
   }
   $('#scale-title').textContent = combined ? t('Combined map','Mappa combinata') : nasaView ? scale.name : constellationView ? `${scale.name}.` : hostView ? `${t("Host star: ","Stella ospite: ")}${scale.name}.` : scale.title;
-  $('#scale-subtitle').textContent = combined ? t('Solar System model and projected catalogue sky. Independent object layers.','Modello del Sistema Solare e cielo di catalogo proiettato. Categorie indipendenti.') : nasaView ? t("Catalogue sky positions; radial distance is not represented.","Posizioni celesti dai cataloghi; la distanza radiale non viene rappresentata.") : constellationView ? index === 7 ? t("Local sky coordinates for the selected observer and time.","Coordinate del cielo per l’osservatore e l’istante selezionati.") : t("J2000 stellar positions and catalogue distances.","Posizioni stellari J2000 e distanze di catalogo.") : hostView ? t("Confirmed planets around the selected host star.","Pianeti confermati intorno alla stella selezionata.") : scale.subtitle;
+  $('#scale-subtitle').textContent = gaiaView ? t('Full-sky DR3 catalogue. Sources load progressively as you look and zoom.','Catalogo DR3 a tutto cielo. Le sorgenti vengono caricate progressivamente mentre osservi e ingrandisci.') : combined ? t('Solar System model and projected catalogue sky. Independent object layers.','Modello del Sistema Solare e cielo di catalogo proiettato. Categorie indipendenti.') : nasaView ? t("Catalogue sky positions; radial distance is not represented.","Posizioni celesti dai cataloghi; la distanza radiale non viene rappresentata.") : constellationView ? index === 7 ? t("Local sky coordinates for the selected observer and time.","Coordinate del cielo per l’osservatore e l’istante selezionati.") : t("J2000 stellar positions and catalogue distances.","Posizioni stellari J2000 e distanze di catalogo.") : hostView ? t("Confirmed planets around the selected host star.","Pianeti confermati intorno alla stella selezionata.") : scale.subtitle;
   $('#scale-readout').textContent = scale.extent;
-  $('#scale-step').textContent = combined ? t('COMBINED VIEW','VISTA COMBINATA') : nasaView ? (state.gaiaDr3 ? 'NASA + ESA GAIA' : 'NASA HEASARC') : constellationView ? index === 7 ? t("EARTH VIEW","DALLA TERRA") : t("CONSTELLATIONS","COSTELLAZIONI") : hostView ? t("EXOPLANETS","ESOPIANETI") : `0${index + 1} / 05`;
+  $('#scale-step').textContent = gaiaView ? t('GAIA DR3 \u00b7 STREAMED','GAIA DR3 \u00b7 PROGRESSIVO') : combined ? t('COMBINED VIEW','VISTA COMBINATA') : nasaView ? (state.gaiaDr3 ? 'NASA + ESA GAIA' : 'NASA HEASARC') : constellationView ? index === 7 ? t("EARTH VIEW","DALLA TERRA") : t("CONSTELLATIONS","COSTELLAZIONI") : hostView ? t("EXOPLANETS","ESOPIANETI") : `0${index + 1} / 05`;
   $('#region-name').textContent = scale.name.toLocaleUpperCase(locale());
-  $('#region-type').textContent = combined ? t('PLANETS, STARS AND NEBULAE','PIANETI, STELLE E NEBULOSE') : nasaView ? t("STARS AND NEBULAE","STELLE E NEBULOSE") : constellationView ? index === 7 ? t("LOCAL SKY · GEOMETRIC HORIZON","CIELO LOCALE · ORIZZONTE GEOMETRICO") : t("HYG STELLAR COORDINATES","COORDINATE STELLARI HYG") : hostView ? t("EXOPLANET SYSTEM · SCHEMATIC ORBITS","SISTEMA ESOPLANETARIO · ORBITE ILLUSTRATIVE") : index === 0 ? t("SUN, PLANETS AND MAJOR MOONS","SOLE, PIANETI E SATELLITI PRINCIPALI") : index === 4 ? t("CONCEPTUAL MODEL","RICOSTRUZIONE CONCETTUALE") : catalog[scale.id][0].type.toLocaleUpperCase(locale());
+  $('#region-type').textContent = gaiaView ? t('GAIA SOURCES \u00b7 PROGRESSIVE DETAIL','SORGENTI GAIA \u00b7 DETTAGLIO PROGRESSIVO') : combined ? t('PLANETS, STARS AND NEBULAE','PIANETI, STELLE E NEBULOSE') : nasaView ? t("STARS AND NEBULAE","STELLE E NEBULOSE") : constellationView ? index === 7 ? t("LOCAL SKY · GEOMETRIC HORIZON","CIELO LOCALE · ORIZZONTE GEOMETRICO") : t("HYG STELLAR COORDINATES","COORDINATE STELLARI HYG") : hostView ? t("EXOPLANET SYSTEM · SCHEMATIC ORBITS","SISTEMA ESOPLANETARIO · ORBITE ILLUSTRATIVE") : index === 0 ? t("SUN, PLANETS AND MAJOR MOONS","SOLE, PIANETI E SATELLITI PRINCIPALI") : index === 4 ? t("CONCEPTUAL MODEL","RICOSTRUZIONE CONCETTUALE") : catalog[scale.id][0].type.toLocaleUpperCase(locale());
   const slider = $('#scale-slider');
   slider.disabled = detached;
   slider.hidden = detached;
@@ -299,6 +309,8 @@ function updateScale(index, context = null) {
   $('#combined-desktop-layers').hidden=!combined;
   $('.app-shell').classList.toggle('constellation-view', constellationView);
   $('.app-shell').classList.toggle('nasa-sky-view', nasaView);
+  $('.app-shell').classList.toggle('gaia-stream-view', gaiaView);
+  renderGaiaStreamStatus();
   $('.app-shell').classList.toggle('earth-sky-view', index === 7);
   $('.app-shell').classList.toggle('earth-perspective-view', index === 6 && Boolean(context?.earthPerspective));
   $('#constellation-controls').hidden = !constellationView;
@@ -336,6 +348,7 @@ function updateScale(index, context = null) {
 
 function changeScale(index, manual = true) {
   index = Number(index);
+  if (index === 9 || Number.isInteger(index) && scales[index]) cancelInitialCombinedView();
   if(index===9){stopTour();showCombinedView();return;}
   if (!Number.isInteger(index) || !scales[index]) return;
   if (manual) stopTour();
@@ -345,6 +358,7 @@ function changeScale(index, manual = true) {
 }
 
 function pickObject(index, object) {
+  cancelInitialCombinedView();
   if(state.scale===9&&universe?.combinedView.getObject(object.id)){
     stopTour();closeModal();universe.focusObject(universe.combinedView.getObject(object.id));return;
   }
@@ -809,7 +823,7 @@ function openCollections() {
     { scale:3, id:'andromeda', icon:'orbit', name:t("Local Group","Gruppo Locale"), subtitle:t("Milky Way, Andromeda and satellite galaxies","Via Lattea, Andromeda e galassie satelliti") },
     { scale:4, id:'laniakea', icon:'sparkles', name:t("Large-scale structure","Struttura a grande scala"), subtitle:t("Galaxy clusters and cosmic web","Ammassi galattici e rete cosmica") }
   ];
-  openModal('collections', t("Catalogue sections","Sezioni del catalogo"), `<p>${t("Browse objects by astronomical scale.","Consulta gli oggetti per scala astronomica.")}</p><div class="collection-grid"><button class="collection-item" data-action="gaia-info">${icon('star')}<strong>Gaia DR3</strong><small>${t("ESA bright-source experiment","Esperimento ESA: sorgenti luminose")}</small></button><button class="collection-item" data-action="nasa-stars">${icon('star')}<strong>${t("NASA star catalogues","Cataloghi stellari NASA")}</strong><small>Hipparcos · Bright Star Catalogue</small></button><button class="collection-item" data-action="nasa-nebulae">${icon('sparkles')}<strong>${t("Nebulae","Nebulose")}</strong><small>NGC2000 · NASA HEASARC</small></button>${featured.map(item => `<button class="collection-item" data-object="${item.id}" data-object-scale="${item.scale}">${icon(item.icon)}<strong>${item.name}</strong><small>${item.subtitle}</small></button>`).join('')}</div>`);
+  openModal('collections', t("Catalogue sections","Sezioni del catalogo"), `<p>${t("Browse objects by astronomical scale.","Consulta gli oggetti per scala astronomica.")}</p><div class="collection-grid"><button class="collection-item" data-action="gaia-stream">${icon('star')}<strong>Gaia DR3</strong><small>${t('Full sky, streamed detail','Tutto cielo, dettaglio progressivo')}</small></button><button class="collection-item" data-action="gaia-info">${icon('star')}<strong>${t('Gaia DR3 data sources','Fonti dati Gaia DR3')}</strong><small>${t("ESA bright-source experiment","Esperimento ESA: sorgenti luminose")}</small></button><button class="collection-item" data-action="nasa-stars">${icon('star')}<strong>${t("NASA star catalogues","Cataloghi stellari NASA")}</strong><small>Hipparcos · Bright Star Catalogue</small></button><button class="collection-item" data-action="nasa-nebulae">${icon('sparkles')}<strong>${t("Nebulae","Nebulose")}</strong><small>NGC2000 · NASA HEASARC</small></button>${featured.map(item => `<button class="collection-item" data-object="${item.id}" data-object-scale="${item.scale}">${icon(item.icon)}<strong>${item.name}</strong><small>${item.subtitle}</small></button>`).join('')}</div>`);
 }
 
 function openAbout() {
@@ -860,6 +874,41 @@ async function searchOfficialImages() {
   }
   if($('#modal').open&&$('#modal').dataset.kind==='images'&&imageObject===object)$('#modal-body').innerHTML=imageGalleryMarkup(object,imageSearch);
 }
+function onGaiaStreamStatus(value){
+  gaiaStreamStatus=value;
+  renderGaiaStreamStatus();
+}
+function renderGaiaStreamStatus(){
+  const controls=$('#gaia-stream-controls');
+  if(!controls)return;
+  controls.hidden=!isGaiaStreamView();
+  if(controls.hidden)return;
+  const status=gaiaStreamStatus;
+  let description=t('Loading Gaia DR3 sky detail\u2026','Caricamento del dettaglio celeste Gaia DR3\u2026');
+  if(status){
+    const loaded=Number.isFinite(status.loadedSources)?status.loadedSources:0;
+    description=loaded.toLocaleString(locale())+t(' sources currently loaded.',' sorgenti attualmente caricate.');
+    if(status.loading||status.pending)description+=' '+t('Loading sky detail\u2026','Caricamento del dettaglio celeste\u2026');
+    else if(!status.error)description+=' '+t('Look around or zoom to load another region.','Osserva intorno o ingrandisci per caricare un\u2019altra regione.');
+    if(status.sourceLimited||status.cacheLimited)description+=' '+t('Display limit reached; zoom into a smaller region for more detail.','Limite di visualizzazione raggiunto; ingrandisci una regione pi\u00f9 piccola per maggiore dettaglio.');
+    else if(status.limited)description+=' '+t('Zoom into a smaller region to load more detail.','Ingrandisci una regione pi\u00f9 piccola per caricare maggiore dettaglio.');
+    if(status.retryAfterMs>0)description+=' '+t('Archive temporarily busy. Retry after ','Archivio temporaneamente occupato. Riprova tra ')+Math.ceil(status.retryAfterMs/1000)+t(' seconds.',' secondi.');
+    if(status.error)description+=' '+t('Some sky data could not be loaded.','Non \u00e8 stato possibile caricare alcuni dati celesti.');
+  }
+  const label=$('#gaia-stream-status');
+  if(label.textContent!==description)label.textContent=description;
+  $('#gaia-stream-retry').hidden=!status?.error;
+}
+async function openGaiaStream(){
+  if(!universe)return;
+  cancelInitialCombinedView();stopTour();closeModal();immersiveContent='current';
+  if(!isGaiaStreamView())gaiaStreamStatus=null;
+  try{await universe.showGaiaSky();}
+  catch(error){notify(t('Gaia sky could not be opened. Retry from Catalogue sections.','Impossibile aprire il cielo Gaia. Riprova da Sezioni del catalogo.'));}
+}
+function gaiaStreamIntroduction(){
+  return `<h3>${t('FULL GAIA DR3 SKY','CIELO GAIA DR3 COMPLETO')}</h3><p>${t('Browse the full-sky Gaia DR3 catalogue through progressive sky tiles. Only the visible regions and their current detail are downloaded; loaded source counts describe the current view, not the size of the entire catalogue. Internet access is required.','Consulta il catalogo Gaia DR3 a tutto cielo attraverso regioni caricate progressivamente. Vengono scaricate soltanto le regioni visibili e il loro dettaglio attuale; il numero di sorgenti caricate descrive la vista attuale, non la dimensione dell\u2019intero catalogo. Richiede accesso a Internet.')}</p><button class="focus-button" data-action="gaia-stream" ${universe?'':'disabled'}>${t('Open streamed Gaia DR3 sky','Apri cielo Gaia DR3 progressivo')}${icon('arrow-up-right')}</button><h3>${t('LOCAL BRIGHT-SOURCE COMPARISON','CONFRONTO LOCALE DELLE SORGENTI LUMINOSE')}</h3>`;
+}
 function gaiaSummary(metadata) {
   const matches=metadata?.matching;
   if(!matches)return '';
@@ -867,14 +916,14 @@ function gaiaSummary(metadata) {
 }
 async function openGaiaInfo() {
   const request=++gaiaInspectionRequest;
-  openModal('gaia',t('Gaia DR3 catalogue experiment','Esperimento catalogo Gaia DR3'),`<p role="status">${t('Loading catalogue comparison\u2026','Caricamento confronto cataloghi\u2026')}</p>`);
+  openModal('gaia',t('Gaia DR3 data access','Accesso ai dati Gaia DR3'),`${gaiaStreamIntroduction()}<p role="status">${t('Loading catalogue comparison\u2026','Caricamento confronto cataloghi\u2026')}</p>`);
   try {
     const data=await loadCelestialCatalog({includeGaia:true});
     if(request!==gaiaInspectionRequest||!$('#modal').open||$('#modal').dataset.kind!=='gaia')return;
     const metadata=data.metadata.gaiaDr3;
     const matches=metadata.matching;
     const labels={matchedCount:t('Associated with NASA records','Associate a voci NASA'),addedCount:t('Additional displayed sources','Sorgenti aggiuntive visualizzate'),quarantinedCount:t('Withheld ambiguous sources','Sorgenti ambigue escluse'),repeatedRowCount:t('Repeated source rows','Righe di sorgenti ripetute')};
-    $('#modal-body').innerHTML=`<p>${t('ESA Gaia DR3: all archive sources with mean G magnitude \u2264 6. This is a bright-source subset, not the full Gaia release.','ESA Gaia DR3: tutte le sorgenti di archivio con magnitudine media G \u2264 6. \u00c8 un sottoinsieme di sorgenti luminose, non l\u2019intero rilascio Gaia.')}</p>
+    $('#modal-body').innerHTML=`${gaiaStreamIntroduction()}<p>${t('ESA Gaia DR3: all archive sources with mean G magnitude \u2264 6. This is a bright-source subset, not the full Gaia release.','ESA Gaia DR3: tutte le sorgenti di archivio con magnitudine media G \u2264 6. \u00c8 un sottoinsieme di sorgenti luminose, non l\u2019intero rilascio Gaia.')}</p>
       <p id="gaia-summary">${escape(gaiaSummary(metadata))}</p>
       <div class="planet-measurements gaia-audit">${Object.entries(labels).map(([key,label])=>`<div><span>${escape(label)}</span><strong data-gaia-count="${key}">${number(matches[key])}</strong></div>`).join('')}</div>
       <p>${t('Unique official Hipparcos associations add Gaia measurements to the existing star. NASA identifiers, coordinates and visual magnitudes are retained. Ambiguous matches and close unlinked sources are withheld from the map for review.','Le associazioni Hipparcos ufficiali univoche aggiungono le misure Gaia alla stella esistente. Identificatori NASA, coordinate e magnitudini visuali sono conservati. Corrispondenze ambigue e sorgenti vicine non collegate sono escluse dalla mappa in attesa di verifica.')}</p>
@@ -883,7 +932,7 @@ async function openGaiaInfo() {
       <a href="${import.meta.env.BASE_URL}catalog/gaia-match-audit.json" target="_blank" rel="noopener noreferrer">${t('Cross-match audit (JSON)','Verifica corrispondenze (JSON)')} \u2197</a>
       <a href="https://www.cosmos.esa.int/web/gaia/dr3" target="_blank" rel="noopener noreferrer">ESA Gaia DR3 \u2197</a></div>`;
   } catch(error) {
-    if(request===gaiaInspectionRequest&&$('#modal').dataset.kind==='gaia')$('#modal-body').innerHTML=`<p role="status">${escape(error.message)}</p><button class="focus-button" data-action="gaia-info">${t('Retry comparison','Riprova confronto')}</button>`;
+    if(request===gaiaInspectionRequest&&$('#modal').dataset.kind==='gaia')$('#modal-body').innerHTML=`${gaiaStreamIntroduction()}<p role="status">${escape(error.message)}</p><button class="focus-button" data-action="gaia-info">${t('Retry comparison','Riprova confronto')}</button>`;
   }
 }
 
@@ -895,6 +944,8 @@ function openSettings() {
       <option value="en" ${getLanguage() === 'en' ? 'selected' : ''}>English</option>
       <option value="it" ${getLanguage() === 'it' ? 'selected' : ''}>Italiano</option>
     </select>
+    <h3>${t('GAIA DR3 SKY','CIELO GAIA DR3')}</h3>
+    <button class="planet-details-button" data-action="gaia-stream">${t('Open full sky with streamed detail','Apri tutto il cielo con dettaglio progressivo')}${icon('arrow-up-right')}</button>
     <h3>${t("EXPERIMENTAL CATALOGUE","CATALOGO SPERIMENTALE")}</h3>
     <div class="layer-row"><span>Gaia DR3 \u00b7 G \u2264 6</span><button class="toggle" role="switch" data-action="toggle-gaia" aria-label="Gaia DR3" aria-checked="${state.gaiaDr3}"></button></div>
     <p>${t("Adds Gaia measurements and unmatched sources from the bright-star subset. Changing this setting reloads the current map.","Aggiunge misure Gaia e sorgenti non corrispondenti dal sottoinsieme di stelle luminose. Il cambio ricarica la mappa attuale.")}</p>
@@ -919,6 +970,27 @@ function refreshCombinedLoading(){
   const status=$('#combined-preview-status');
   status.hidden=!combinedLoading&&!combinedError;
   status.textContent=combinedLoading?t('Loading combined NASA catalogues…','Caricamento dei cataloghi NASA combinati…'):combinedError;
+}
+function cancelInitialCombinedView(){
+  if(!initialCombinedPending)return;
+  initialCombinedPending=false;
+  if(universe)$('#renderer-status').textContent=t('3D RENDERER ACTIVE','RENDERER 3D ATTIVO');
+}
+async function showInitialCombinedView(){
+  if(!universe)return;
+  initialCombinedPending=true;
+  const request=universe.viewRequest, selection=state.object?.id;
+  $('#renderer-status').textContent=t('LOADING COMBINED MAP','CARICAMENTO MAPPA COMBINATA');
+  try{
+    const data=await prepareCombinedCatalogue();
+    // Loading the default must never override navigation made while data arrive.
+    if(initialCombinedPending&&universe.viewRequest===request&&state.object?.id===selection&&!universe.disposed)universe.buildCombinedMap(data);
+  }catch(error){
+    if(initialCombinedPending)notify(t('Combined catalogues are unavailable. The Solar System remains available; select the atlas title to retry.','I cataloghi combinati non sono disponibili. Il Sistema Solare resta disponibile; seleziona il titolo dell\u2019atlante per riprovare.'));
+  }finally{
+    initialCombinedPending=false;
+    if(universe)$('#renderer-status').textContent=t('3D RENDERER ACTIVE','RENDERER 3D ATTIVO');
+  }
 }
 function prepareCombinedCatalogue(){
   if(combinedData)return Promise.resolve(combinedData);
@@ -1024,7 +1096,9 @@ function startPreview() {
 function rememberCurrentView() {
   try {
     sessionStorage.setItem('aether.languageView', JSON.stringify({
-      scale: state.scale, objectId: state.object.id, host: state.object.host,
+      scale: state.scale, catalogueView: state.context?.id,
+      gaiaDirection:isGaiaStreamView()&&universe?universe.camera.getWorldDirection(universe.camera.position.clone()).toArray():undefined,
+      gaiaFov:isGaiaStreamView()?universe?.camera.fov:undefined, objectId: state.object.id, host: state.object.host,
       constellationId: constellationBrowser.id, mode: constellationBrowser.mode,
       observer: constellationBrowser.observer, timeZone: constellationBrowser.timeZone,
       earthVisible: constellationBrowser.earthVisible, earthPerspective: state.context?.earthPerspective
@@ -1059,7 +1133,8 @@ document.addEventListener('change', event => {
 document.addEventListener('click', async event => {
   const button = event.target.closest('button, a.brand');
   if (!button || button.disabled) return;
-  if (button.matches('a.brand')) { event.preventDefault(); closeModal(); changeScale(0); universe?.resetView(); return; }
+  if(button.closest('.view-controls'))cancelInitialCombinedView();
+  if (button.matches('a.brand')) { event.preventDefault(); closeModal(); changeScale(9); return; }
   if (button.dataset.scale !== undefined) return changeScale(button.dataset.scale);
   if(button.dataset.objectLayer){universe?.setObjectLayer(button.dataset.objectLayer,!state.objectLayers[button.dataset.objectLayer]);return;}
   if (button.dataset.layer) return setLayer(button.dataset.layer, !state[button.dataset.layer]);
@@ -1138,6 +1213,8 @@ document.addEventListener('click', async event => {
     case 'official-images': openImages(); break;
     case 'search-official-images': searchOfficialImages(); break;
     case 'gaia-info': openGaiaInfo(); break;
+    case 'gaia-stream': await openGaiaStream(); break;
+    case 'gaia-stream-retry': universe?.retryGaiaStream(); break;
     case 'toggle-gaia': state.gaiaDr3=!state.gaiaDr3;savePreferences();rememberCurrentView();location.reload();break;
     case 'nasa-stars': openSearch('stars'); break;
     case 'nasa-nebulae': openSearch('nebulae'); break;
@@ -1171,6 +1248,7 @@ document.addEventListener('click', async event => {
     case 'tour': toggleTour(); break;
     case 'object': openModal('object', t("Object data","Dati dell’oggetto"), objectMarkup(state.object, true)); break;
     case 'focus':
+      cancelInitialCombinedView();
       if (Number.isInteger(state.object.targetScale) && scales[state.object.targetScale]) { if(universe)universe.focusObject(state.object);else changeScale(state.object.targetScale); }
       else { universe?.focusObject(state.object); notify(`${t("Focus: ","Messa a fuoco: ")}${state.object.name}.`); }
       closeModal();
@@ -1199,11 +1277,13 @@ document.addEventListener('keydown', event => {
   if (event.target.matches('input, textarea, select, [contenteditable="true"]') || event.ctrlKey || event.metaKey || event.altKey || $('#modal').open) return;
   if (event.key === '/') { event.preventDefault(); openSearch(); }
   else if (/^[1-5]$/.test(event.key)) { event.preventDefault(); changeScale(Number(event.key) - 1); }
-  else if (event.key.toLowerCase() === 'r') { universe?.resetView(); }
+  else if (event.key.toLowerCase() === 'r') { cancelInitialCombinedView();universe?.resetView(); }
   else if (event.code === 'Space' && !universe?.preview.isActive && !event.target.closest('button, a')) { event.preventDefault(); setRotation(!state.autoRotate); }
 });
 document.addEventListener('pointermove', revealImmersionControl, { passive: true });
 document.addEventListener('pointerdown', revealImmersionControl, { passive: true });
+document.addEventListener('pointerdown',event=>{if(event.target.closest('#universe,.view-controls,#map-labels'))cancelInitialCombinedView();},{capture:true,passive:true});
+$('#universe').addEventListener('wheel',cancelInitialCombinedView,{capture:true,passive:true});
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { stopTour(); audioContext?.suspend().catch(() => {}); }
   else if (state.sound) audioContext?.resume().catch(() => {});
@@ -1225,7 +1305,8 @@ try {
     onPreviewChange,
     onNavigate:stopTour,
     objectLayers:state.objectLayers,
-    onObjectLayersChange
+    onObjectLayersChange,
+    onGaiaStreamStatus
   });
   ['labels','grid','particles'].forEach(name => universe.setLayer(name, state[name]));
   universe.setAutoRotate(state.autoRotate);
@@ -1255,10 +1336,11 @@ async function restoreLanguageView() {
     const value = sessionStorage.getItem('aether.languageView');
     sessionStorage.removeItem('aether.languageView');
     saved = value ? JSON.parse(value) : null;
-  } catch { return; }
-  if (!saved || !universe) return;
+  } catch { return false; }
+  if (!saved || !universe || !Number.isInteger(saved.scale) || ![5,6,7,8,9].includes(saved.scale) && !scales[saved.scale]) return false;
   try {
     if(saved.scale===9){await universe.showCombinedMap();combinedData=universe.catalogueData;const selected=universe.combinedView.getObject(saved.objectId);if(selected&&state.objectLayers[selected.combinedLayer])universe.selectObject(selected);}
+    else if(saved.scale===8&&saved.catalogueView==='gaia-stream'){immersiveContent='current';await universe.showGaiaSky({direction:saved.gaiaDirection,fov:saved.gaiaFov});}
     else if (saved.scale === 8) {
       const data = await ensureNasaSearch();
       const object = data.byId.get(saved.objectId) || data.stars[0];
@@ -1280,5 +1362,6 @@ async function restoreLanguageView() {
       }
     }
   } catch (error) { notify(error.message); }
+  return true;
 }
-restoreLanguageView();
+restoreLanguageView().then(restored=>{if(!restored)showInitialCombinedView();});

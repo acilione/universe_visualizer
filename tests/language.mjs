@@ -47,7 +47,7 @@ try {
   }
   async function changeLanguage(language) {
     await open('settings');
-    await page.locator('#language-setting').selectOption(language);
+    await Promise.all([page.waitForEvent('load'),page.locator('#language-setting').selectOption(language)]);
     await page.waitForLoadState('networkidle');
     await ready();
     await expect(page.locator('html')).toHaveAttribute('lang', language);
@@ -58,10 +58,15 @@ try {
   assert.equal(await page.evaluate(() => navigator.language), 'it-IT');
   assert.equal(await page.evaluate(() => localStorage.getItem('aether.language')), null);
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.locator('#scale-title')).toContainText('Combined map');
+  await expect(page.locator('#combined-desktop-layers')).toBeVisible();
+  await capture('English combined default with Italian browser locale');
+  await page.screenshot({ path: 'test-results/language-english-main.png' });
+  await page.locator('[data-action="cosmic-scales"]').click();
+  await page.locator('[data-scale="0"]').click();
   await expect(page.locator('#scale-title')).toContainText('Solar System');
   await expect(page.locator('#scale-readout')).toHaveText('60 AU');
-  await capture('English default with Italian browser locale');
-  await page.screenshot({ path: 'test-results/language-english-main.png' });
+  await capture('English Solar System reference scale');
 
   for (const action of ['about', 'help', 'settings', 'collections', 'vr']) {
     await open(action);
@@ -116,7 +121,7 @@ try {
   await close();
 
   await changeLanguage('it');
-  await expect(page.locator('#scale-title')).toHaveText('Orione.');
+  await expect(page.locator('#scale-title')).toHaveText('Orione.', { timeout: 60000 });
   await expect(page.locator('.app-shell')).toHaveClass(/earth-sky-view/);
   await expect(page.locator('#constellation-status time')).toHaveAttribute('datetime', '2026-12-11T19:00:00.000Z');
   await expect(page.locator('#constellation-status')).toContainText('21 stelle della figura');
@@ -129,11 +134,15 @@ try {
   await page.reload({ waitUntil: 'networkidle' });
   await ready();
   await expect(page.locator('html')).toHaveAttribute('lang', 'it');
+  await expect(page.locator('#scale-title')).toContainText('Mappa combinata');
+  await capture('Italian combined default persists after reload', false);
+  await page.locator('[data-action="cosmic-scales"]').click();
+  await page.locator('[data-scale="0"]').click();
   await expect(page.locator('#scale-title')).toContainText('Sistema Solare');
   await capture('Italian preference persists after reload', false);
   await winterOrion();
   await changeLanguage('en');
-  await expect(page.locator('#scale-title')).toHaveText('Orion.');
+  await expect(page.locator('#scale-title')).toHaveText('Orion.', { timeout: 60000 });
   await expect(page.locator('.app-shell')).toHaveClass(/earth-sky-view/);
   await expect(page.locator('#constellation-status time')).toHaveAttribute('datetime', '2026-12-11T19:00:00.000Z');
   await expect(page.locator('#constellation-status')).toContainText('21 figure stars above the horizon');

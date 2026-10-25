@@ -296,7 +296,7 @@ test('FOCUS forwards the complete selected planet and host context to the engine
   });
 });
 
-test('planet inspection animates its rendered center and radius without moving the viewer, and reset restores overview', async () => {
+test('planet inspection fades between fixed placements without moving the viewer, and reset restores overview', async () => {
   await withXRHarness(async ({ app, targets, mapRoot, controllers, camera, xrCamera, session, THREE }) => {
     const planet = { id: 'earth', name: 'Terra', position: [5, 0.2, -2], size: 0.25 };
     const content = new THREE.Group();
@@ -320,11 +320,9 @@ test('planet inspection animates its rendered center and radius without moving t
     assert.equal(app.focusObject(planet, 0.25), true);
     const initialScale = mapRoot.scale.x;
     app.update(0.05);
-    assert.ok(mapRoot.scale.x > initialScale && mapRoot.scale.x < 1.12, 'inspection begins gradually');
-    for (let i = 0; i < 35; i++) {
-      content.scale.setScalar(Math.min(1, 0.92 + i * 0.004));
-      app.update(0.05);
-    }
+    near(mapRoot.scale.x, initialScale);
+    assert.ok(app.transitionOpacity > 0 && app.transitionOpacity < 1, 'map fades without moving');
+    for (let i = 0; i < 8; i++) app.update(0.05);
     near(target.getWorldPosition(new THREE.Vector3()).distanceTo(destination), 0);
     near(target.getWorldScale(new THREE.Vector3()).x * 0.25, 0.28);
     assert.deepEqual(camera.position.toArray(), cameraPosition.toArray());
@@ -344,7 +342,7 @@ test('planet inspection animates its rendered center and radius without moving t
     app.update(0);
     near(mapRoot.scale.x, inspectionScale * 1.5);
     assert.equal(app.recenter(), true);
-    app.update();
+    for (let i = 0; i < 8; i++) app.update(.05);
     near(mapRoot.scale.x, overviewScale);
     await session.end();
   });
@@ -828,4 +826,136 @@ test('enabling reduced motion during XR arrival finishes it and disabling the pr
     options.reducedMotion=false;h.app.update(0);
     h.mapRoot.matrixWorld.toArray().forEach((value,index)=>near(value,finished[index]));
   }, null, options);
+});
+
+
+for (const mode of ['immersive-vr', 'immersive-ar']) {
+  test(`${mode} travel and overview commit only while the map is invisible, without sweeping or changing passthrough`, async () => {
+    await withXRHarness(async h => {
+      h.xrCamera.position.set(.4,1.6,-.3);
+      h.xrCamera.rotation.set(.1,.3,0);
+      await h.app.enter({mode,handsFirst:true});h.app.update(0);
+      const before=h.mapRoot.matrixWorld.toArray();
+      const cameraPose=[...h.camera.position.toArray(),...h.camera.quaternion.toArray()];
+      const viewerPose=[...h.xrCamera.position.toArray(),...h.xrCamera.quaternion.toArray()];
+      const background=h.scene.background, fog=h.scene.fog, alpha=h.renderer.getClearAlpha();
+      const object={id:'earth',size:.1,position:[16,2,-24]};
+      h.app.focusObject(object,.1);
+      const matrices=[];let relocations=0, prior=before;
+      for(let frame=0;frame<15;frame++) {
+        h.app.update(.03);
+        const matrix=h.mapRoot.matrixWorld.toArray();matrices.push(matrix);
+        if(matrix.some((value,index)=>Math.abs(value-prior[index])>1e-10)) {
+          relocations++;
+          assert.equal(h.app.transitionOpacity,0,'relocation has a fully faded frame');
+          assert.equal(h.mapRoot.visible,false,'no geometry can render at the relocation');
+        }
+        assert.deepEqual([...h.camera.position.toArray(),...h.camera.quaternion.toArray()],cameraPose);
+        assert.deepEqual([...h.xrCamera.position.toArray(),...h.xrCamera.quaternion.toArray()],viewerPose);
+        assert.equal(h.scene.background,background);assert.equal(h.scene.fog,fog);assert.equal(h.renderer.getClearAlpha(),alpha);
+        prior=matrix;
+      }
+      assert.equal(relocations,1);
+      const arrived=h.mapRoot.matrixWorld.toArray();
+      for(const matrix of matrices)assert.ok(JSON.stringify(matrix)===JSON.stringify(before)||JSON.stringify(matrix)===JSON.stringify(arrived),'no intermediate trajectory');
+      assert.equal(h.app.isTransitioning,false);assert.equal(h.app.transitionOpacity,1);assert.equal(h.mapRoot.visible,true);
+      const destination=new h.THREE.Vector3(0,0,-1).applyQuaternion(h.xrCamera.quaternion).add(h.xrCamera.position);
+      near(h.mapRoot.localToWorld(new h.THREE.Vector3(...object.position)).distanceTo(destination),0);
+      h.app.navigateBack();prior=arrived;relocations=0;
+      for(let frame=0;frame<15;frame++) {
+        h.app.update(.03);const matrix=h.mapRoot.matrixWorld.toArray();
+        if(matrix.some((value,index)=>Math.abs(value-prior[index])>1e-10)) {
+          relocations++;assert.equal(h.app.transitionOpacity,0);assert.equal(h.mapRoot.visible,false);
+        }
+        prior=matrix;
+      }
+      assert.equal(relocations,1);h.mapRoot.matrixWorld.toArray().forEach((value,index)=>near(value,before[index]));
+      assert.deepEqual([...h.xrCamera.position.toArray(),...h.xrCamera.quaternion.toArray()],viewerPose);
+      await h.session.end();
+    });
+  });
+}
+
+test('replacing a pending XR jump discards its destination and suppresses controller selection during the fade', async () => {
+  await withXRHarness(async h => {
+    await h.app.enter({handsFirst:true});h.app.update(0);
+    const first={id:'first',position:[24,0,0],size:.1}, second={id:'second',position:[-42,5,8],size:.2};
+    const before=h.mapRoot.matrixWorld.toArray();
+    h.app.focusObject(first,.1);h.app.update(.06);
+    const opacity=h.app.transitionOpacity;
+    h.app.focusObject(second,.2);
+    assert.equal(h.app.transitionOpacity,opacity,'replacement continues the fade without flashing');
+    assert.deepEqual(h.mapRoot.matrixWorld.toArray(),before);
+    const controller=h.controllers[0];controller.visible=true;
+    controller.dispatchEvent({type:'connected',data:{handedness:'right'}});
+    controller.dispatchEvent({type:'selectstart'});controller.dispatchEvent({type:'selectend'});
+    assert.deepEqual(h.selected,[]);assert.deepEqual(h.traveled,[]);
+    for(let frame=0;frame<10;frame++)h.app.update(.04);
+    const destination=new h.THREE.Vector3(0,0,-1).applyQuaternion(h.xrCamera.quaternion).add(h.xrCamera.position);
+    near(h.mapRoot.localToWorld(new h.THREE.Vector3(...second.position)).distanceTo(destination),0);
+    assert.ok(h.mapRoot.localToWorld(new h.THREE.Vector3(...first.position)).distanceTo(destination)>1);
+    assert.equal(h.app.transitionOpacity,1);await h.session.end();
+  },null,{directTravel:true});
+});
+
+test('ending XR on the hidden relocation frame restores map visibility and cannot replay a pending jump', async () => {
+  await withXRHarness(async h => {
+    const original=h.mapRoot.position.clone();
+    await h.app.enter({mode:'immersive-ar',handsFirst:true});h.app.update(0);
+    h.app.focusObject({id:'body',position:[8,4,-3],size:.1});
+    h.app.update(.06);h.app.update(.06);
+    assert.equal(h.mapRoot.visible,false);assert.equal(h.app.transitionOpacity,0);
+    await h.session.end();
+    assert.equal(h.mapRoot.visible,true);assert.equal(h.app.isTransitioning,false);assert.equal(h.app.transitionOpacity,1);
+    assert.deepEqual(h.mapRoot.position.toArray(),original.toArray());
+    h.app.update(1);assert.deepEqual(h.mapRoot.position.toArray(),original.toArray());
+  });
+});
+
+
+test('Universe rendering applies comfort opacity to mesh and shader content and freezes retired XR geometry', async () => {
+  const {Universe}=await import('../src/universe.js');
+  await withXRHarness(async h => {
+    await h.app.enter({mode:'immersive-ar',handsFirst:true});h.app.update(0);
+    const object={id:'earth',position:[15,0,5],size:.1};
+    const content=new h.THREE.Group();content.userData.born=0;
+    const planet=new h.THREE.Mesh(new h.THREE.SphereGeometry(.1),new h.THREE.MeshBasicMaterial({opacity:.8}));
+    planet.position.fromArray(object.position);planet.userData.object=object;
+    const shader=new h.THREE.ShaderMaterial({uniforms:{uOpacity:{value:.6}}});shader.userData.baseOpacity=.6;
+    content.add(planet,new h.THREE.Mesh(new h.THREE.SphereGeometry(.1),shader));h.mapRoot.add(content);h.targets.push(planet);
+    const retired=new h.THREE.Group();retired.scale.setScalar(1.15);
+    const retiredMaterial=new h.THREE.ShaderMaterial({uniforms:{uOpacity:{value:.4}}});retiredMaterial.userData.baseOpacity=.4;
+    retired.add(new h.THREE.Mesh(new h.THREE.SphereGeometry(.1),retiredMaterial));h.mapRoot.add(retired);
+    const effectGroup=new h.THREE.Group();h.mapRoot.add(effectGroup);
+    const roomReference=new h.THREE.Group();roomReference.position.set(2,0,3);h.scene.add(roomReference);h.scene.updateMatrixWorld(true);
+    const roomPose=roomReference.matrixWorld.toArray(),records=[];
+    const universe=Object.assign(Object.create(Universe.prototype),{
+      camera:h.camera,renderer:h.renderer,scene:h.scene,mapRoot:h.mapRoot,xr:h.app,preview:{isActive:false},
+      lastTime:0,elapsed:3,lastLabelTime:3,content,retiring:[{group:retired,start:3}],
+      effects:{group:effectGroup,setActive:()=>{},update:()=>{}},layers:{particles:false},spatialRevealAge:null,
+      reducedMotion:false,autoRotate:false,spinning:[],isSkyNavigation:()=>false,
+      updateImmersiveEnvironment:()=>{},updateBodyLighting:()=>{},updateLabels:()=>{},
+    });
+    h.renderer.render=()=>{
+      h.scene.updateMatrixWorld(true);
+      records.push({matrix:h.mapRoot.matrixWorld.toArray(),visible:h.mapRoot.visible,opacity:h.app.transitionOpacity,
+        mesh:planet.material.opacity,shader:shader.uniforms.uOpacity.value,retired:retiredMaterial.uniforms.uOpacity.value,
+        retiredScale:retired.scale.x,effects:effectGroup.visible,room:roomReference.matrixWorld.toArray(),alpha:h.renderer.getClearAlpha()});
+    };
+    const before=h.mapRoot.matrixWorld.toArray();h.app.focusObject(object,.1);
+    for(let frame=1;frame<=12;frame++)universe.animate(frame*40);
+    assert.ok(records.some(record=>record.opacity>0&&record.opacity<1));
+    let previous=before,relocations=0;
+    for(const record of records){
+      near(record.mesh,.8*record.opacity);near(record.shader,.6*record.opacity);near(record.retiredScale,1.15);
+      assert.deepEqual(record.room,roomPose);assert.equal(record.alpha,0);
+      if(record.opacity<1)assert.equal(record.effects,false,'map effects are hidden during the fade');
+      if(record.matrix.some((value,index)=>Math.abs(value-previous[index])>1e-10)){
+        relocations++;assert.equal(record.visible,false);assert.equal(record.mesh,0);assert.equal(record.shader,0);assert.equal(record.retired,0);
+      }
+      previous=record.matrix;
+    }
+    assert.equal(relocations,1);assert.equal(effectGroup.visible,true,'temporary render masking does not alter the particle preference');
+    assert.equal(records.at(-1).effects,true);await h.session.end();
+  });
 });

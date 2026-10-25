@@ -20,7 +20,15 @@ npm run build
 npm run preview -- --port 5174
 ```
 
-The application needs no account, API key or backend. Data and planet textures are bundled locally. The relevant stellar catalogue loads when a constellation or combined immersive map is first opened.
+The application needs no account, API key or backend. Core catalogues and planet textures are bundled locally; the full Gaia survey requires an internet connection. The combined catalogue loads at startup.
+
+## Default view and Gaia streaming
+
+The normal atlas and immersive entry default to the combined planets, moons, stars and nebulae view. Saved object-layer choices remain in effect. The Solar System is available while the local catalogues load; an explicit navigation action takes precedence over delayed loading.
+
+**Catalogue sections > Gaia DR3 (Full sky, streamed detail)** opens on-demand access to the full CDS Gaia DR3 catalogue. Drag to look and scroll to resolve a smaller field. A worker loads only relevant progressive sky tiles, with fixed source and memory budgets. Source information preserves exact Gaia identifiers and native astrometry; the status distinguishes loaded sources from total archive coverage. This angular survey is separate from NASA catalogue merging and the optional bundled bright-source experiment.
+
+[Full-Gaia architecture study](GAIA_STREAMING_STUDY.md) covers static hosting, service limits, level of detail, 3D distance uncertainty, and preparation for DR4. [Gaia data notes](DATA_GAIA_DR3.md) describe the implemented modes.
 
 ## Official imagery and Gaia DR3 experiment
 
@@ -89,6 +97,8 @@ On Quest, choose **Enter mixed reality** for passthrough or **Enter VR atlas** f
 - Pinch with both hands and spread or bring them together for fast zoom.
 - Hold a closed left fist for about **0.65 seconds** to return to the overview; release and repeat to move one level outward.
 
+VR/MR object jumps fade the virtual map out and back in at its destination, with no camera flight or sweeping map movement. Headset tracking and room passthrough remain continuous; reduced-motion mode jumps immediately.
+
 Controllers remain supported, and the headset system gesture ends the session. **Tabletop** can be selected before entry. Choose constellations, their Earth or 3D perspective, and object layers in the desktop interface, then use **Current map** to enter that view. Earth sky views preserve their geometric horizon.
 
 **Dim room in mixed reality** defaults to **56%** and can be set from **0–80%** before entry. It darkens the background through black alpha composition only when WebXR reports `alpha-blend`, without changing native passthrough settings. Additive sessions do not dim. The dimmer leaves nearer opaque objects unchanged and is removed on exit.
@@ -137,6 +147,8 @@ npm run test:immersive-entry
 npm run test:combined
 npm run test:drilldown
 npm run test:experiments
+npm run test:desktop-startup
+npm run test:gaia-stream
 npm run test:realism
 npm run audit:gaia
 ```

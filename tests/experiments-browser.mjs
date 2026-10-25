@@ -103,6 +103,8 @@ try {
 
   await page.goto(base, { waitUntil: 'networkidle', timeout: 60000 });
   await ready();
+  await expect(page.locator('.app-shell')).toHaveClass(/combined-view/, { timeout: 90000 });
+  await page.locator('[data-action="cosmic-scales"]').click();
   assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('aether.preferences') || '{}').gaiaDr3 === true), false);
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await search('nebulae', 'M42');
@@ -145,7 +147,7 @@ try {
   await delayedResponse(); delayedResponse = null;
   await expect(modal).toHaveAttribute('data-kind', 'settings');
   await expect(page.locator('.archive-gallery')).toHaveCount(0);
-  await page.locator('[data-action="gaia-info"]').click();
+  await modal.locator('[data-action="gaia-info"]').click();
   await expect(page.locator('#gaia-summary')).toContainText(audit.counts.uniqueSourceCount.toLocaleString('en-US'));
   for (const key of ['matchedCount','addedCount','quarantinedCount','repeatedRowCount']) {
     await expect(page.locator('[data-gaia-count="' + key + '"]')).toHaveText(audit.counts[key].toLocaleString('en-US'));
@@ -211,7 +213,7 @@ try {
   await page.screenshot({ path: 'test-results/experiments-images-mobile-it.png' });
   await close();
   await settings();
-  await page.locator('[data-action="gaia-info"]').click();
+  await modal.locator('[data-action="gaia-info"]').click();
   await expect(page.locator('#gaia-summary')).toContainText(audit.counts.uniqueSourceCount.toLocaleString('it-IT'));
   await expect(page.locator('#gaia-summary')).toContainText('sorgenti');
   assert.equal(await modal.evaluate(element => element.scrollWidth <= element.clientWidth + 1), true);

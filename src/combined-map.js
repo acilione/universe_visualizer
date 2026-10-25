@@ -240,7 +240,7 @@ export function createCombinedMap({catalogue = {}, planets = [], exoplanets = []
   const patches = nebulaPatches(nebulae, quality);
   layers.nebulae.add(patches);
   const context = {
-    id: 'combined-map', mode: 'combined-map', name: t('Combined immersive map', 'Mappa immersiva combinata'), short: t('Combined map', 'Mappa combinata'),
+    id: 'combined-map', mode: 'combined-map', name: t('Combined map', 'Mappa combinata'), short: t('Combined map', 'Mappa combinata'),
     extent: t('Solar System + equatorial sky', 'Sistema Solare + cielo equatoriale'), metric: t('PLACED OBJECTS', 'OGGETTI POSIZIONATI'), count: formatNumber(objects.length),
     description: t('Solar System bodies, NASA catalogue stars, nebulae and confirmed exoplanet host directions in one view.', 'Corpi del Sistema Solare, stelle dei cataloghi NASA, nebulose e direzioni delle stelle con esopianeti confermati in una vista.'),
     source: 'https://heasarc.gsfc.nasa.gov/W3Browse/star-catalog/hipparcos.html', positionNote, gaiaDr3: catalogue.metadata?.gaiaDr3 || null,

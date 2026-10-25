@@ -1,10 +1,26 @@
-# Gaia DR3 experiment
+# Gaia DR3 access
+
+## Streamed access to the full catalogue
+
+Open **Catalogue sections > Gaia DR3 (Full sky, streamed detail)**. The static application reads progressive catalogue tiles from the official CDS/VizieR mirror of Gaia DR3, whose advertised coverage is 1,811,709,771 sources. This view is independent of the bundled bright-source experiment below. It does not merge uncertain Gaia and NASA identities or place two competing stellar catalogues over each other.
+
+Drag to change sky direction and use the wheel to narrow the field. Ancestor tiles retain brighter sources while deeper tiles add detail. Only the requested regions are downloaded; there is no bulk download or local archive. The interface reports the currently loaded working set and any incomplete detail or service error. High and low quality use budgets of 12,000 and 6,000 rendered sources, respectively. The geometry is one GPU batch; fetching, parsing and tile scheduling run in a worker.
+
+Positions are angular. Native J2016.0 observations remain in each source card, including null and negative parallax values. Display directions remain at native J2016.0 so that high-proper-motion sources stay consistent with the remote tile coverage; the separate bright-source merge still uses its documented J2000 propagation. An optional inverse-parallax estimate is information only, requires quantified precision and acceptable RUWE, and is never used to invent a 3D sky distance. Quasar and galaxy candidates retain their classification flags. Gaia source IDs stay exact decimal strings.
+
+Full archive access does not mean that every record is loaded or resolved simultaneously. Public-service availability, progressive tiling and explicit memory limits apply. The implementation is an initial streamed-sky client, not a full spatial Gaia Galaxy or an exhaustive scientific export. Full three-dimensional streaming, distant unresolved light and DR4 migration are covered in the [architecture and feasibility study](GAIA_STREAMING_STUDY.md).
+
+Service: [CDS Gaia DR3 HiPS catalogue](https://hipscat.cds.unistra.fr/HiPSCatService/I/355/gaiadr3), [VizieR catalogue documentation](https://cdsarc.cds.unistra.fr/viz-bin/cat/I/355).
+
+HEALPix tile geometry uses [`@hscmap/healpix`](https://github.com/michitaro/healpix), with its [MIT notice](public/licenses/healpix.txt) included in static builds.
+
+## Bundled bright-source experiment
 
 The optional Gaia integration uses the **official ESA Gaia Archive**, independently of the existing NASA HEASARC Hipparcos and Bright Star Catalogue snapshots. The bundled file is `public/catalog/gaia-dr3.json`.
 
 ## Use and compare
 
-Gaia is disabled by default. Enable **Settings → Gaia DR3** to include the subset in star search, catalogue sky and the combined immersive map; changing the setting reloads the current map. **Gaia coverage and cross-matches** opens the comparison without changing the setting. The same comparison is available from **Catalogue sections → Gaia DR3**. Native values appear in the **ESA GAIA DR3** section of object data. Search accepts the complete Gaia DR3 source identifier; safely matched sources retain their NASA display identity.
+The bundled bright-source experiment is disabled by default. Enable **Settings → Gaia DR3** to include the subset in star search, catalogue sky and the combined immersive map; changing the setting reloads the current map. **Gaia coverage and cross-matches** opens the comparison without changing the setting. The same comparison is available from **Catalogue sections → Gaia DR3**. Native values appear in the **ESA GAIA DR3** section of object data. Search accepts the complete Gaia DR3 source identifier; safely matched sources retain their NASA display identity.
 
 The bundled cross-match audit yields **4,986 enriched NASA records**, **83 added Gaia-only sources**, and **1,695 withheld sources**, accounting for all 6,764 Gaia rows exactly once. Reasons overlap: 514 processing duplicate flags, 1,241 close unlinked NASA candidates, 38 extragalactic candidate flags, and 10 ambiguous neighbour counts. Withheld sources are unresolved cases, not necessarily duplicate physical stars. The map contains 118,439 stellar records with the experiment enabled, versus 118,356 from the NASA-only merge.
 

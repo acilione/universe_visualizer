@@ -82,7 +82,9 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   let immersive = false;
   let handsFirst = false;
   let inspecting = false;
-  let overviewState = null;
+  let transitionState = null;
+  let transitionOpacity = 1;
+  let transitionVisibility = null;
   let overviewPlaced = false;
   let overviewScale = 0.04;
   let focusState = null;
@@ -229,6 +231,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   }
 
   function pick(input) {
+    if (transitionState) return null;
     if (!input.controller.visible || (input.source?.hand && !inputPose(input))) return null;
     input.controller.updateWorldMatrix(true, false);
     rotationMatrix.extractRotation(input.controller.matrixWorld);
@@ -322,12 +325,12 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   }
 
   function startInput(input, kind) {
-    if (!active || input.press) return;
+    if (!active || input.press || transitionState) return;
     const pose = inputPose(input);
     if (!pose) return;
     input.press = { kind, time: performance.now(), pose, hit: pick(input), manipulated: kind === 'squeeze', maxDistance: 0, maxAngle: 0 };
     gesture = null;
-    if (!input.press.hit?.panel) { focusState = null; overviewState = null; }
+    if (!input.press.hit?.panel) focusState = null;
   }
 
   // Feedback follows the whole grab, including transitions between one and two
@@ -452,8 +455,8 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       layout, planetarium: isPlanetarium(),
     });
     baseScale = overviewScale = placement.scale;
-    if (handsFirst && overviewPlaced) overviewState = { from: rootTransform(), to: placement, elapsed: 0 };
-    else { overviewState = null; applyTransform(placement); }
+    if (handsFirst && overviewPlaced) startTransition(() => applyTransform(placement));
+    else { cancelTransition(); applyTransform(placement); }
     overviewPlaced = true;
     positionPanel();
     recenterPending = false;
@@ -465,7 +468,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   function referenceReset(event) {
     for (const input of inputs) cancelInput(input);
     focusState = null;
-    overviewState = null;
+    cancelTransition();
     if (!event.transform?.matrix) {
       recenter();
       onMessage(t('Tracking origin changed. The map has been recentered.', 'Origine del tracciamento cambiata. La mappa è stata ricentrata.'));
@@ -527,7 +530,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   function recenter() {
     if (!active) return false;
     focusState = null;
-    overviewState = null;
+    cancelTransition();
     recenterPending = true;
     for (const input of inputs) cancelInput(input);
     return true;
@@ -544,18 +547,42 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     return true;
   }
 
-  function updateOverview(delta) {
-    if (!overviewState) return;
-    const state = overviewState;
-    state.elapsed += Math.max(0, Math.min(Number.isFinite(delta) ? delta : 1 / 60, 0.1));
-    const progress = getReducedMotion() ? 1 : Math.min(1, state.elapsed / 0.55);
+  function cancelTransition() {
+    transitionState = null;
+    transitionOpacity = 1;
+    if (transitionVisibility !== null) mapRoot.visible = transitionVisibility;
+    transitionVisibility = null;
+  }
+
+  // Fade the virtual map only. The tracked camera, room and distant sky remain
+  // stationary; no intermediate translation, rotation or scale is ever drawn.
+  function startTransition(commit) {
+    if (getReducedMotion()) { cancelTransition(); commit(); return; }
+    if (transitionVisibility === null) transitionVisibility = mapRoot.visible;
+    transitionState = { commit, phase: 'out', age: 0, fromOpacity: transitionOpacity };
+  }
+
+  function updateTransition(delta) {
+    const state = transitionState;
+    if (!state) return;
+    if (getReducedMotion()) {
+      state.commit?.();
+      cancelTransition();
+      return;
+    }
+    state.age += Math.max(0, Math.min(Number.isFinite(delta) ? delta : 1 / 60, .1));
+    const progress = Math.min(1, state.age / (state.phase === 'out' ? .12 : .16));
     const eased = progress * progress * (3 - 2 * progress);
-    applyTransform({
-      position: state.from.position.clone().lerp(state.to.position, eased),
-      quaternion: state.from.quaternion.clone().slerp(state.to.quaternion, eased),
-      scale: Math.exp(THREE.MathUtils.lerp(Math.log(state.from.scale), Math.log(state.to.scale), eased)),
-    });
-    if (progress === 1) overviewState = null;
+    transitionOpacity = state.phase === 'out' ? state.fromOpacity * (1 - eased) : eased;
+    mapRoot.visible = Boolean(transitionVisibility) && transitionOpacity > 0;
+    if (state.phase === 'out' && progress === 1) {
+      // Retain a complete invisible frame even after a long frame; the next
+      // frame starts the fade-in at the final, already stationary placement.
+      state.commit();
+      state.commit = null;
+      state.phase = 'in';
+      state.age = 0;
+    } else if (state.phase === 'in' && progress === 1) cancelTransition();
   }
 
   function objectAnchor(object, extent) {
@@ -580,50 +607,35 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     return { center, radius };
   }
 
-  /** Bring a body to the viewer by transforming the map, never the XR camera. */
+  /** Reposition the map between fades, never fly the map past the XR viewer. */
   function focusObject(object, extent) {
     if (!active || !object || isPlanetarium()) return false;
     if (recenterPending) placeOverview();
-    overviewState = null;
     const anchor = objectAnchor(object, extent);
     if (!anchor) return false;
     const viewer = renderer.xr.getCamera();
     const viewerPosition = viewer.getWorldPosition(new THREE.Vector3());
     const destination = new THREE.Vector3(0, 0, -1)
       .applyQuaternion(viewer.getWorldQuaternion(new THREE.Quaternion())).add(viewerPosition);
-    const fromCenter = mapRoot.localToWorld(anchor.center.clone());
     const radius = THREE.MathUtils.clamp(extent?.displayRadius ?? 0.28, 0.2, 0.35);
+    const parentScale = mapRoot.parent?.getWorldScale(new THREE.Vector3()) || new THREE.Vector3(1, 1, 1);
+    const scaleFactor = Math.max(Math.abs(parentScale.x), Math.abs(parentScale.y), Math.abs(parentScale.z));
+    const nextScale = radius / (anchor.radius * scaleFactor);
+    if (!Number.isFinite(nextScale) || nextScale < 1e-8 || nextScale > 1000) return false;
+    const quaternion = mapRoot.quaternion.clone();
+    const center = mapRoot.parent ? mapRoot.parent.worldToLocal(destination.clone()) : destination.clone();
+    const position = center.sub(anchor.center.clone().multiplyScalar(nextScale).applyQuaternion(quaternion));
     for (const input of inputs) cancelInput(input);
     inspecting = true;
-    focusState = {
-      object, extent, radius, destination, fromCenter, fromScale: mapRoot.scale.x,
-      quaternion: mapRoot.quaternion.clone(), elapsed: 0, duration: handsFirst ? 0.55 : 0.85,
-    };
+    focusState = { object, extent };
+    startTransition(() => {
+      applyLocalTransform({ position, quaternion, scale: nextScale });
+      // Grabs continue from this inspection scale without an overview snap.
+      baseScale = nextScale * scaleFactor;
+    });
     onMapAction({ type: 'focus', object });
     if (handsFirst) onMapAction({ type: 'travel', object });
     return true;
-  }
-
-  function updateFocus(delta) {
-    if (!focusState) return;
-    const state = focusState;
-    const anchor = objectAnchor(state.object, state.extent);
-    if (!anchor) { focusState = null; return; }
-    const parentScale = mapRoot.parent?.getWorldScale(new THREE.Vector3()) || new THREE.Vector3(1, 1, 1);
-    const scaleFactor = Math.max(Math.abs(parentScale.x), Math.abs(parentScale.y), Math.abs(parentScale.z));
-    const nextScale = state.radius / (anchor.radius * scaleFactor);
-    if (!Number.isFinite(nextScale) || nextScale < 1e-8 || nextScale > 1000) { focusState = null; return; }
-    state.elapsed = getReducedMotion() ? state.duration : state.elapsed + Math.max(0, Math.min(Number.isFinite(delta) ? delta : 1 / 60, 0.1));
-    const progress = Math.min(1, state.elapsed / state.duration);
-    const eased = progress * progress * (3 - 2 * progress);
-    const scale = Math.exp(THREE.MathUtils.lerp(Math.log(state.fromScale), Math.log(nextScale), eased));
-    const center = state.fromCenter.clone().lerp(state.destination, eased);
-    if (mapRoot.parent) mapRoot.parent.worldToLocal(center);
-    const position = center.sub(anchor.center.clone().multiplyScalar(scale).applyQuaternion(state.quaternion));
-    applyLocalTransform({ position, quaternion: state.quaternion, scale });
-    // Grabs start from the current inspection scale, without snapping back to
-    // the overview's much smaller limits when the second hand joins.
-    baseScale = scale * scaleFactor;
   }
 
   function restoreDesktop() {
@@ -635,7 +647,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
     const viewChanged = snapshot ? snapshot.scale !== getScale?.() : false;
     active = false;
     entering = false;
-    overviewState = null;
+    cancelTransition();
     overviewPlaced = false;
     inspecting = false;
     panel.visible = false;
@@ -820,8 +832,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       if (frame && referenceSpace && !frame.getViewerPose(referenceSpace)) return;
       placeOverview();
     }
-    updateOverview(delta);
-    updateFocus(delta);
+    updateTransition(delta);
     if (immersive && !handsFirst) positionRestoreOrb();
     const time = performance.now();
     let nextHover = -1;
@@ -962,5 +973,5 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   }
 
   paintPanel();
-  return { enter, setLayout, update, setInfo, focusObject, recenter, navigateBack, setImmersive, dispose, get handsFirst() { return handsFirst; }, get isInspecting() { return inspecting; }, get environmentBlendMode() { return renderer.xr.getSession()?.environmentBlendMode || null; }, get layout() { return layout; }, get mode() { return sessionMode; }, get isPresenting() { return active; }, get isImmersive() { return immersive; } };
+  return { enter, setLayout, update, setInfo, focusObject, recenter, navigateBack, setImmersive, dispose, get transitionOpacity() { return transitionOpacity; }, get isTransitioning() { return Boolean(transitionState); }, get handsFirst() { return handsFirst; }, get isInspecting() { return inspecting; }, get environmentBlendMode() { return renderer.xr.getSession()?.environmentBlendMode || null; }, get layout() { return layout; }, get mode() { return sessionMode; }, get isPresenting() { return active; }, get isImmersive() { return immersive; } };
 }
