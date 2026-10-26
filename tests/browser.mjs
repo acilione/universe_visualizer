@@ -1,20 +1,36 @@
-import { chromium, expect } from '@playwright/test';
+import { chromium, expect as playwrightExpect } from '@playwright/test';
 import assert from 'node:assert/strict';
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 await mkdir('test-results',{recursive:true});
 const snapshot=JSON.parse(await readFile(new URL('../src/exoplanets.json',import.meta.url),'utf8'));
 const browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const base=process.env.TEST_URL||'http://localhost:5174';
 const errors=[];
+const expect=playwrightExpect.configure({timeout:30000});
+let page;
 try {
- const page=await browser.newPage({viewport:{width:1440,height:960},deviceScaleFactor:1,hasTouch:true});
+ page=await browser.newPage({viewport:{width:1440,height:960},deviceScaleFactor:1,hasTouch:true,locale:'en-US',reducedMotion:'reduce'});
+ page.setDefaultTimeout(30000);
+ // Exercise the hosted app and real catalogues without optional font services or
+ // continuous high-quality animation competing with software WebGL on CI.
+ await page.route('https://fonts.googleapis.com/**',route=>route.fulfill({status:204,body:''}));
+ await page.route('https://fonts.gstatic.com/**',route=>route.fulfill({status:204,body:''}));
+ await page.addInitScript(()=>localStorage.setItem('aether.preferences',JSON.stringify({quality:'low',autoRotate:false})));
  page.on('pageerror',e=>errors.push(e.message));
  page.on('console',m=>{if(m.type()==='error'&&!m.text().includes('fonts.googleapis'))errors.push(m.text());});
- await page.goto(base,{waitUntil:'networkidle'});
+ await page.goto(base,{waitUntil:'networkidle',timeout:60000});
  await expect(page.locator('#universe')).toBeVisible();await expect(page.locator('.loading')).toBeHidden();
  await expect(page.locator('.webgl-error')).toHaveCount(0);
+ await expect(page.locator('.app-shell')).toHaveClass(/combined-view/);
+ await expect(page.locator('#scale-title')).toHaveText('Combined map');
+ for(const layer of ['planets','stars','nebulae'])await expect(page.locator(`#combined-desktop-layers [data-object-layer="${layer}"]`)).toHaveAttribute('aria-pressed','true');
+ await expect(page.locator('#renderer-status')).toHaveText('3D RENDERER ACTIVE');
+ console.log('PASS: hosted build starts with planets, stars and nebulae enabled in the combined map');
+ // Reference-scale and host-system checks explicitly leave the combined view.
+ await page.locator('[data-action="cosmic-scales"]').click();
+ await page.locator('[data-scale="0"]').click();
  await expect(page.locator('[data-scale="0"]')).toHaveAttribute('aria-pressed','true');
- await page.locator('[data-action="rotate"]').click();
+ await expect(page.locator('.app-shell')).not.toHaveClass(/combined-view/);
  await page.screenshot({path:'test-results/planets-overview.png'});
  await page.locator('[data-action="planets"]').first().click();
  await expect(page.locator('.solar-shortcuts button')).toHaveCount(8);
@@ -98,6 +114,10 @@ try {
  await expect(page.locator('[data-action="tour"]')).toHaveAttribute('aria-pressed','true');
  await page.locator('[data-action="tour"]').click();
  assert.deepEqual(errors,[],'no runtime or shader errors');
- console.log('PASS: solar default, full NASA catalog counts/pagination/host search, planet focus, missing measurements, unobstructed immersion, mobile touch restore, five scales, VR fallback and tour.');
+ console.log('PASS: combined default, explicit Solar System navigation, full NASA catalog counts/pagination/host search, planet focus, missing measurements, unobstructed immersion, mobile touch restore, five scales, VR fallback and tour.');
  console.log('Screenshots saved in test-results/ including earth-immersive.png and mobile-saturn.png.');
+} catch(error) {
+ await writeFile('test-results/browser-errors.json',JSON.stringify({error:error.stack||String(error),runtimeErrors:errors},null,2));
+ await page?.screenshot({path:'test-results/browser-failure.png',timeout:15000}).catch(()=>{});
+ throw error;
 } finally {await browser.close();}

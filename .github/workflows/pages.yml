@@ -15,6 +15,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -28,15 +29,27 @@ jobs:
           BASE_PATH: /universe_visualizer/
       - run: npx playwright install --with-deps chromium
       - name: Check the hosted build
+        timeout-minutes: 10
         run: |
-          npm run preview -- --port 5174 --base /universe_visualizer/ > /tmp/atlas-preview.log 2>&1 &
-          for attempt in $(seq 1 30); do
-            curl --fail --silent http://localhost:5174/universe_visualizer/ > /dev/null && break
-            sleep 1
-          done
+          mkdir -p test-results
+          npm run preview -- --port 5174 --strictPort --base /universe_visualizer/ > test-results/preview.log 2>&1 &
+          preview_pid=$!
+          trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
+          if ! curl --fail --silent --show-error --retry 30 --retry-connrefused --retry-delay 1 --max-time 2 "$TEST_URL" > /dev/null; then
+            cat test-results/preview.log
+            exit 1
+          fi
           npm run test:browser
         env:
           TEST_URL: http://localhost:5174/universe_visualizer/
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-failure-diagnostics
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
       - uses: actions/upload-pages-artifact@v4
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         with:
