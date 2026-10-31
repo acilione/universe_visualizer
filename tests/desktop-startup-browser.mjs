@@ -52,7 +52,8 @@ try{
   const gate=new Promise(resolve=>{release=resolve;});
   await delayed.context().route('**/catalog/nasa-hipparcos.json',async route=>{await gate;await route.continue();});
   await delayed.goto(base,{waitUntil:'domcontentloaded',timeout:90000});await ready(delayed);
-  await expect(delayed.locator('#renderer-status')).toHaveText('LOADING COMBINED MAP');
+  await expect(delayed.locator('#renderer-status')).toHaveText('PREPARING SKY');
+  await delayed.locator('[data-action="cosmic-scales"]').click();
   await delayed.locator('[data-scale="2"]').click();
   await expect(delayed.locator('#scale-title')).toContainText('Milky Way');
   release();
@@ -65,12 +66,12 @@ try{
   const unavailable=await createPage();
   await unavailable.context().route('**/catalog/nasa-hipparcos.json',route=>route.fulfill({status:503,contentType:'text/plain',body:'Catalogue unavailable in test'}));
   await unavailable.goto(base,{waitUntil:'networkidle',timeout:90000});await ready(unavailable);
-  await expect(unavailable.locator('#scale-title')).toContainText('Solar System');
-  await expect(unavailable.locator('.toast')).toContainText('The Solar System remains available');
+  await expect(unavailable.locator('#scale-title')).toHaveText('Combined map');
+  await expect(unavailable.locator('.toast')).toContainText('Planets remain available in the combined map');
   await expect(unavailable.locator('#modal')).not.toBeVisible();
   await unavailable.context().unroute('**/catalog/nasa-hipparcos.json');
   await unavailable.locator('a.brand').click();await combined(unavailable);
-  console.log('PASS: Failed combined loading preserves the usable Solar System and can be retried from the atlas title');
+  console.log('PASS: Failed combined loading preserves the combined map and its planets and can be retried from the atlas title');
   await unavailable.close();
   assert.deepEqual(errors,[],'No unhandled browser errors');
 }finally{await browser.close();}

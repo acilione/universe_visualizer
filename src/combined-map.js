@@ -99,12 +99,13 @@ export function indexedPicking(points, objects, pickRadius, deferred=false) {
 
 export function cataloguePoints(objects, kind, pixelRatio, {capacity=objects.length,deferred=false}={}) {
   const positions = new Float32Array(capacity * 3), colors = new Float32Array(capacity * 3);
-  const sizes = new Float32Array(capacity), alphas = new Float32Array(capacity);
+  const sizes = new Float32Array(capacity), alphas = new Float32Array(capacity), arrivals=new Float32Array(capacity);
+  const revealUniforms={uArrivalTime:{value:0},uArrivalEnabled:{value:deferred?1:0}};
   const star = kind === 'star', nebula = kind === 'nebula';
   function fill(start=0,end=objects.length){
   for(let index=start;index<end;index++){
     const object=objects[index];
-    positions.set(object.position, index * 3);
+    positions.set(object.position, index * 3);arrivals[index]=deferred?revealUniforms.uArrivalTime.value:-10;
     const color = new THREE.Color(star ? colorFor(object) : nebula ? '#98cbc5' : '#ecc28a');
     colors.set([color.r, color.g, color.b], index * 3);
     const magnitude = Number.isFinite(object.mag) ? object.mag : 7;
@@ -118,14 +119,15 @@ export function cataloguePoints(objects, kind, pixelRatio, {capacity=objects.len
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   geometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
   geometry.setAttribute('aAlpha', new THREE.BufferAttribute(alphas, 1));
+  geometry.setAttribute('aArrival',new THREE.BufferAttribute(arrivals,1));
   geometry.boundingSphere=new THREE.Sphere(new THREE.Vector3(),RADIUS);
   geometry.setDrawRange(0,deferred?0:objects.length);
   if(deferred)for(const attribute of Object.values(geometry.attributes))attribute.setUsage(THREE.DynamicDrawUsage);
   const material = new THREE.ShaderMaterial({
     vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-    uniforms: {uPixelRatio: {value: pixelRatio}, uOpacity: {value: 1}, uRing: {value: kind === 'exoplanet' ? 1 : 0}},
-    vertexShader: `attribute float aSize;attribute float aAlpha;varying vec3 vColor;varying float vAlpha;uniform float uPixelRatio;
-      void main(){vColor=color;vAlpha=aAlpha;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);gl_PointSize=aSize*uPixelRatio;}`,
+    uniforms: {...revealUniforms,uPixelRatio: {value: pixelRatio}, uOpacity: {value: 1}, uRing: {value: kind === 'exoplanet' ? 1 : 0}},
+    vertexShader: `attribute float aSize;attribute float aAlpha;attribute float aArrival;uniform float uArrivalTime;uniform float uArrivalEnabled;varying vec3 vColor;varying float vAlpha;uniform float uPixelRatio;
+      void main(){vColor=color;vAlpha=aAlpha*mix(1.,smoothstep(0.,.85,uArrivalTime-aArrival),uArrivalEnabled);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);gl_PointSize=aSize*uPixelRatio;}`,
     fragmentShader: `varying vec3 vColor;varying float vAlpha;uniform float uOpacity;uniform float uRing;
       void main(){float d=length(gl_PointCoord-.5)*2.;if(d>1.)discard;float light=mix(exp(-d*d*5.)*.6+exp(-d*d*35.)*.4,exp(-pow((d-.64)*5.,2.)),uRing);gl_FragColor=vec4(vColor,light*vAlpha*uOpacity);}`,
   });
@@ -179,12 +181,12 @@ function nebulaPatches(objects, quality, deferred=false) {
   upload();
   const material = new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
-    uniforms: {uOpacity: {value: .4}},
+    uniforms: {uOpacity: {value: .4},uArrivalOpacity:{value:1}},
     vertexShader: `attribute float aSeed;varying vec2 vUv;varying float vSeed;void main(){vUv=uv;vSeed=aSeed;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
-    fragmentShader: `varying vec2 vUv;varying float vSeed;uniform float uOpacity;
+    fragmentShader: `varying vec2 vUv;varying float vSeed;uniform float uOpacity;uniform float uArrivalOpacity;
       float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
       float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1.,0.)),f.x),mix(hash(i+vec2(0.,1.)),hash(i+vec2(1.,1.)),f.x),f.y);}
-      void main(){vec2 p=(vUv-.5)*2.;float r=length(p);if(r>1.)discard;float texture=noise(p*4.+vSeed)*.55+noise(p*11.+vSeed)*.3+noise(p*23.+vSeed)*.15;float envelope=pow(max(0.,1.-r*r),1.8);vec3 color=mix(vec3(.26,.49,.56),vec3(.61,.45,.62),texture);gl_FragColor=vec4(color,envelope*(.18+texture*.82)*uOpacity);}`,
+      void main(){vec2 p=(vUv-.5)*2.;float r=length(p);if(r>1.)discard;float texture=noise(p*4.+vSeed)*.55+noise(p*11.+vSeed)*.3+noise(p*23.+vSeed)*.15;float envelope=pow(max(0.,1.-r*r),1.8);vec3 color=mix(vec3(.26,.49,.56),vec3(.61,.45,.62),texture);gl_FragColor=vec4(color,envelope*(.18+texture*.82)*uOpacity*uArrivalOpacity);}`,
   });
   material.userData.baseOpacity = .4;
   const mesh = new THREE.Mesh(geometry, material);
@@ -217,7 +219,7 @@ function solarOrbits(objects) {
 }
 
 /** A walkable schematic Solar System surrounded by catalogue sky directions. */
-export function createCombinedMap({catalogue = {}, planets = [], exoplanets = [], pixelRatio = 1, quality = 'high', planetVisual = createPlanetVisual, progressive=false, onProgress=()=>{}} = {}) {
+export function createCombinedMap({catalogue = {}, planets = [], exoplanets = [], pixelRatio = 1, quality = 'high', planetVisual = createPlanetVisual, progressive=false, onProgress=()=>{}, deferCatalogue=false, reducedMotion=false} = {}) {
   const group = new THREE.Group(); group.name = 'map';
   const layers = Object.fromEntries(['planets', 'stars', 'nebulae'].map(name => {const layer = new THREE.Group();layer.name = `combined-${name}`;group.add(layer);return [name, layer];}));
   const byId = new Map(), objects = [], targets = [], unplacedCounts = {planets: 0, stars: 0, nebulae: 0};
@@ -284,18 +286,19 @@ export function createCombinedMap({catalogue = {}, planets = [], exoplanets = []
     nebulaPatchCount: nebulae.filter(extentKnown).length,
   };
   if (catalogue.metadata?.gaiaDr3) context.description += t(' Includes the ESA Gaia DR3 bright-source experiment.',' Include il sottoinsieme sperimentale di sorgenti luminose ESA Gaia DR3.');
-  let cancelled=false,loading=progressive;
+  let cancelled=false,loading=progressive||deferCatalogue,waiting=deferCatalogue,revealTime=0;
+  context.loading=loading;context.waiting=waiting;
   const notify=()=>{
     context.renderedStarCount=stars.length;context.nebulaCount=nebulae.length;context.count=formatNumber(objects.length);
     context.unplacedCount=Object.values(unplacedCounts).reduce((sum,count)=>sum+count,0);
-    context.loading=loading;onProgress({loading,stars:stars.length,nebulae:nebulae.length,totalStars:context.catalogStarCount,totalNebulae:context.catalogNebulaCount});
+    context.loading=loading;context.waiting=waiting;onProgress({loading,waiting,stars:stars.length,nebulae:nebulae.length,totalStars:context.catalogStarCount,totalNebulae:context.catalogNebulaCount});
   };
   function* rebuildPatches(){
     const replacement=nebulaPatches(nebulae,quality,true);let adopted=false;
     try{
       yield* replacement.userData.populateSteps();
       if(cancelled)return;
-      layers.nebulae.remove(patches);patches.geometry.dispose();patches.material.dispose();patches=replacement;layers.nebulae.add(patches);adopted=true;
+      layers.nebulae.remove(patches);patches.geometry.dispose();patches.material.dispose();patches=replacement;patches.userData.arrivalTime=revealTime;patches.material.uniforms.uArrivalOpacity.value=reducedMotion?1:0;layers.nebulae.add(patches);adopted=true;
       context.nebulaPatchCount=patches.userData.patchCount;
     }finally{if(!adopted){replacement.geometry.dispose();replacement.material.dispose();}}
   }
@@ -310,10 +313,34 @@ export function createCombinedMap({catalogue = {}, planets = [], exoplanets = []
     while(patches.userData.segments!==(quality==='low'?4:8))yield* rebuildPatches();
     loading=false;return true;
   }
-  group.userData.cancelLoading=()=>{cancelled=true;loading=false;};
-  const ready=progressive?consumeSteps(populate(),{cancelled:()=>cancelled,onBatch:notify}).catch(error=>{loading=false;throw error;}):Promise.resolve(true);
+  group.userData.cancelLoading=()=>{cancelled=true;loading=false;waiting=false;context.loading=false;context.waiting=false;};
+  const start=()=>consumeSteps(populate(),{cancelled:()=>cancelled,onBatch:notify}).catch(error=>{loading=false;throw error;});
+  let ready=progressive&&!deferCatalogue?start():Promise.resolve(!deferCatalogue);
+  function setCatalogue(data){
+    if(cancelled||!waiting)return false;
+    catalogue=data;waiting=false;
+    context.catalogStarCount=(data.stars||[]).length;context.catalogNebulaCount=(data.nebulae||[]).length;
+    context.gaiaDr3=data.metadata?.gaiaDr3||null;
+    for(const [records,kind,layer] of [[stars,'star','stars'],[nebulae,'nebula','nebulae']]){
+      const previous=clouds[layer],points=cataloguePoints(records,kind,pixelRatio,{deferred:true,capacity:(data[layer]||[]).length});
+      points.material.uniforms.uArrivalTime.value=revealTime;
+      points.material.uniforms.uArrivalEnabled.value=reducedMotion?0:1;
+      targets[targets.indexOf(previous)]=points;layers[layer].remove(previous);previous.geometry.dispose();previous.material.dispose();
+      clouds[layer]=points;layers[layer].add(points);
+    }
+    notify();ready=start();return true;
+  }
+  function update(dt,motionReduced=reducedMotion){
+    reducedMotion=motionReduced;revealTime+=Math.max(0,Math.min(dt,.1));
+    for(const points of Object.values(clouds)){
+      points.material.uniforms.uArrivalTime.value=revealTime;
+      points.material.uniforms.uArrivalEnabled.value=progressive&&!reducedMotion?1:0;
+    }
+    const age=revealTime-(patches.userData.arrivalTime??-10);
+    patches.material.uniforms.uArrivalOpacity.value=reducedMotion?1:THREE.MathUtils.smoothstep(age,0,1.2);
+  }
   return {
-    ready, get loading(){return loading;}, cancelLoading:group.userData.cancelLoading,
+    get ready(){return ready;}, get loading(){return loading;}, get waiting(){return waiting;}, setCatalogue, update, cancelLoading:group.userData.cancelLoading,
     group, objects, targets, context, radius: RADIUS, layers, byId,
     setLayer(name, visible) {if (!Object.hasOwn(layers, name)) throw new RangeError(`Unknown combined map layer: ${name}`);layers[name].visible = Boolean(visible);},
     getObject(id) {

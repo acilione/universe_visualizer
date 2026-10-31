@@ -35,20 +35,22 @@ function material(uniforms, vertexShader, fragmentShader, vertexColors = false) 
 const pointFragment = `
 varying vec3 vTint;
 varying float vAlpha;
+uniform float effectOpacity;
 void main() {
   float distanceFromCenter = length(gl_PointCoord - 0.5) * 2.0;
   if (distanceFromCenter > 1.0 || vAlpha < 0.001) discard;
   float core = exp(-distanceFromCenter * distanceFromCenter * 11.0);
   float halo = exp(-distanceFromCenter * distanceFromCenter * 4.0) * 0.2;
-  gl_FragColor = vec4(vTint, (core + halo) * vAlpha);
+  gl_FragColor = vec4(vTint, (core + halo) * vAlpha * effectOpacity);
 }`;
 
 const lineFragment = `
 varying vec3 vTint;
 varying float vAlpha;
+uniform float effectOpacity;
 void main() {
   if (vAlpha < 0.001) discard;
-  gl_FragColor = vec4(vTint, vAlpha);
+  gl_FragColor = vec4(vTint, vAlpha * effectOpacity);
 }`;
 
 export function createImmersiveEffects({ parent } = {}) {
@@ -66,6 +68,7 @@ export function createImmersiveEffects({ parent } = {}) {
   let lastInteraction = -Infinity;
   const uniforms = {
     effectTime: { value: 0 },
+    effectOpacity: {value:1},
     effectRadius: { value: settings.radius },
     effectMotion: { value: 1 },
     effectActivity: { value: 0 },
@@ -98,6 +101,7 @@ uniform float effectActivity;
 uniform float effectRevealStart;
 varying vec3 vTint;
 varying float vAlpha;
+uniform float effectOpacity;
 void main() {
   float slowTime = effectTime * effectMotion * 0.12;
   vec3 drift = vec3(sin(slowTime + aPhase), cos(slowTime * 0.7 + aPhase), sin(slowTime * 0.8 + aPhase * 2.0)) * 0.018 * effectMotion;
@@ -165,6 +169,7 @@ uniform float effectActivity;
 uniform float effectRevealStart;
 varying vec3 vTint;
 varying float vAlpha;
+uniform float effectOpacity;
 void main() {
   vec4 view = modelViewMatrix * vec4(position * effectRadius * 1.04, 1.0);
   gl_Position = projectionMatrix * view;
@@ -200,6 +205,7 @@ uniform float effectActivity;
 uniform float effectRevealStart;
 varying vec3 vTint;
 varying float vAlpha;
+uniform float effectOpacity;
 void main() {
   float life = (effectTime - effectRevealStart) / 3.2;
   float travel = clamp(life, 0.0, 1.0);
@@ -334,6 +340,7 @@ void main() {
   return {
     get group() { return group; },
     configure,
+    setOpacity(value) {if(Number.isFinite(value))uniforms.effectOpacity.value=THREE.MathUtils.clamp(value,0,1);},
     setActive(value) {
       if (disposed || active === Boolean(value)) return;
       active = Boolean(value);

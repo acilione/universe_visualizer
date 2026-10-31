@@ -60,3 +60,30 @@ test('immersive sky is deferred until visible, fills progressively and preserves
  const geometry=environment.targets[0].geometry;environment.setCatalogue(catalogue);assert.equal(environment.targets[0].geometry,geometry);
  environment.setCatalogue({...catalogue,stars:stars.slice(0,100)});environment.dispose();assert.equal(await environment.ready,false);assert.equal(environment.group.parent,null);
 });
+
+
+test('deferred combined map accepts its catalogue in place and gives new points a timed reveal',async()=>{
+ const view=createCombinedMap({catalogue:{},progressive:true,deferCatalogue:true});
+ const group=view.group,objects=view.objects,targets=view.targets;
+ try{
+  assert.equal(view.waiting,true);assert.equal(view.loading,true);
+  view.setLayer('nebulae',false);view.update(2);
+  assert.equal(view.setCatalogue(catalogue),true);
+  assert.equal(await view.ready,true);assert.equal(view.waiting,false);
+  assert.equal(view.group,group);assert.equal(view.objects,objects);assert.equal(view.targets,targets);
+  assert.equal(view.layers.nebulae.visible,false);assert.equal(view.context.catalogStarCount,12000);
+  const points=group.getObjectByName('combined-star-points');
+  assert.equal(points.material.uniforms.uArrivalEnabled.value,1);
+  assert.ok(points.geometry.attributes.aArrival.array[0]>0);
+  const before=points.material.uniforms.uArrivalTime.value;view.update(.1);
+  assert.ok(points.material.uniforms.uArrivalTime.value>before);
+  view.update(.1,true);assert.equal(points.material.uniforms.uArrivalEnabled.value,0);
+  assert.equal(group.getObjectByName('combined-nebula-patches').material.uniforms.uArrivalOpacity.value,1);
+  assert.equal(view.setCatalogue(catalogue),false);
+ }finally{dispose(view);}
+});
+
+test('leaving the initial map prevents late catalogue attachment',()=>{
+ const view=createCombinedMap({progressive:true,deferCatalogue:true});
+ view.cancelLoading();assert.equal(view.setCatalogue(catalogue),false);assert.equal(view.loading,false);dispose(view);
+});

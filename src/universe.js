@@ -25,7 +25,7 @@ const vec = (a) => new THREE.Vector3(...a);
 const ease = (t) => t*t*(3-2*t);
 
 export class Universe {
-  constructor({canvas,labelContainer,onSelect=()=>{},onScale=()=>{},onMessage=()=>{},onImmersiveChange=()=>{},onPreviewChange=()=>{},onNavigate=()=>{},onObjectLayersChange=()=>{},onGaiaStreamStatus=()=>{},onCatalogueProgress=()=>{},objectLayers={}}) {
+  constructor({canvas,labelContainer,onSelect=()=>{},onScale=()=>{},onMessage=()=>{},onImmersiveChange=()=>{},onPreviewChange=()=>{},onNavigate=()=>{},onObjectLayersChange=()=>{},onGaiaStreamStatus=()=>{},onCatalogueProgress=()=>{},objectLayers={},initialCombined=false}) {
     this.canvas=canvas; this.labelContainer=labelContainer;
     this.onSelect=onSelect;this.onScale=onScale;this.onMessage=onMessage;this.onImmersiveChange=onImmersiveChange;this.onNavigate=onNavigate;
     this.objectLayers=Object.fromEntries(['planets','stars','nebulae'].map(name=>[name,objectLayers[name]!==false]));this.onObjectLayersChange=onObjectLayersChange;this.onGaiaStreamStatus=onGaiaStreamStatus;this.gaiaSkyView=null;this.onCatalogueProgress=onCatalogueProgress;
@@ -70,7 +70,7 @@ export class Universe {
     canvas.addEventListener('pointercancel',this.onSkyCancel=e=>this.skyPointers.delete(e.pointerId));
     canvas.addEventListener('wheel',this.onSkyWheel=e=>{if(this.preview?.isActive)return;if(this.isSkyNavigation()){e.preventDefault();this.zoom(Math.exp(e.deltaY*.001));}},{passive:false});
     canvas.addEventListener('webglcontextlost',this.onContextLost=(e)=>{e.preventDefault();this.onMessage(t("The graphics context was interrupted. Reload the page to resume.","Il contesto grafico è stato interrotto. Ricarica la pagina per riprendere."));});
-    this.setScale(0,true);
+    if(initialCombined)this.buildCombinedMap({}, {deferCatalogue:true,initial:true});else this.setScale(0,true);
     this.lastTime=performance.now();this.renderer.setAnimationLoop((time)=>this.animate(time));this.ready=true;
   }
   makeGlow(){const c=document.createElement('canvas');c.width=c.height=128;const ctx=c.getContext('2d');const g=ctx.createRadialGradient(64,64,0,64,64,64);g.addColorStop(0,'rgba(255,251,233,1)');g.addColorStop(.045,'rgba(255,244,216,.95)');g.addColorStop(.13,'rgba(255,231,183,.45)');g.addColorStop(.4,'rgba(242,205,151,.07)');g.addColorStop(1,'rgba(255,220,173,0)');ctx.fillStyle=g;ctx.fillRect(0,0,128,128);return new THREE.CanvasTexture(c);}
@@ -289,18 +289,29 @@ export class Universe {
     this.buildCombinedMap(catalogue);
     return this.combinedView.ready;
   }
-  buildCombinedMap(data,{preserveNavigation=false}={}){
+  buildCombinedMap(data,{preserveNavigation=false,deferCatalogue=false,initial=false}={}){
     if(this.disposed)return false;
-    this.viewRequest++;this.catalogueData=data;this.systemHost=null;this.environment?.setCatalogue(data);
-    const view=createCombinedMap({catalogue:data,planets:SOLAR_OBJECTS,exoplanets,pixelRatio:this.renderer.getPixelRatio(),quality:this.quality,progressive:true,onProgress:progress=>{
-      if(this.index===9&&this.combinedView===view&&!this.disposed)this.onCatalogueProgress(progress);
+    this.viewRequest++;this.catalogueData=deferCatalogue?null:data;this.systemHost=null;if(!deferCatalogue)this.environment?.setCatalogue(data);
+    const view=createCombinedMap({catalogue:data,planets:SOLAR_OBJECTS,exoplanets,pixelRatio:this.renderer.getPixelRatio(),quality:this.quality,progressive:true,deferCatalogue,reducedMotion:this.reducedMotion,onProgress:progress=>{
+      if(this.index===9&&this.combinedView===view&&!this.disposed){
+        if(!progress.loading&&view.group.userData.opening)this.desktopOpeningAge=0;
+        this.onCatalogueProgress(progress);
+      }
     }});
     this.combinedView=view;
     view.ready.catch(error=>{if(this.combinedView===view&&!this.disposed)this.onMessage(error.message);});
     for(const [name,visible] of Object.entries(this.objectLayers))this.combinedView.setLayer(name,visible);
-    this.buildView(9,this.combinedView.objects,this.combinedView.context,false,this.combinedView.group,{preserveNavigation});
-    this.onCatalogueProgress({loading:true,stars:0,nebulae:0,totalStars:data.stars?.length||0,totalNebulae:data.nebulae?.length||0});
+    this.buildView(9,this.combinedView.objects,this.combinedView.context,initial,this.combinedView.group,{preserveNavigation});
+    if(deferCatalogue){view.group.userData.opening=true;this.desktopOpeningAge=0;this.effects.setActive(true);this.effects.reveal();}
+    this.onCatalogueProgress({loading:true,waiting:deferCatalogue,stars:0,nebulae:0,totalStars:data.stars?.length||0,totalNebulae:data.nebulae?.length||0});
     this.onObjectLayersChange({...this.objectLayers});return true;
+  }
+  attachCombinedCatalogue(data,view=this.combinedView){
+    if(this.disposed||this.index!==9||this.combinedView!==view||!view.setCatalogue(data))return false;
+    this.catalogueData=data;this.environment?.setCatalogue(data);
+    this.desktopOpeningAge=0;this.effects.setActive(true);this.effects.reveal();
+    view.ready.catch(error=>{if(this.combinedView===view&&!this.disposed)this.onMessage(error.message);});
+    return true;
   }
   setObjectLayer(name,value){
     if(!Object.hasOwn(this.objectLayers,name))return false;
@@ -702,7 +713,11 @@ export class Universe {
     this.gaiaSkyView?.update(dt,this.renderer.xr.isPresenting?this.renderer.xr.getCamera():this.camera,this.mapRoot);
     const spatial=Boolean(this.preview?.isActive||this.xr?.isPresenting);
     const comfortOpacity=this.renderer.xr.isPresenting?(this.xr.transitionOpacity??1):1;
-    this.effects.setActive(spatial);this.effects.update(dt);this.updateImmersiveEnvironment(dt);
+    if(this.index===9)this.combinedView?.update?.(dt,this.reducedMotion);
+    if(this.desktopOpeningAge!=null)this.desktopOpeningAge+=dt;
+    const opening=this.index===9&&!this.reducedMotion&&this.combinedView?.group.userData.opening&&(this.combinedView.loading||this.desktopOpeningAge<4.5);
+    this.effects.setOpacity?.(spatial?1:opening?(this.combinedView.loading? .7:.7*(1-THREE.MathUtils.smoothstep(this.desktopOpeningAge,1.5,4.5))):0);
+    this.effects.setActive(spatial||opening);this.effects.update(dt);this.updateImmersiveEnvironment(dt);
     if(this.pendingSpatialArrival&&spatial){const arrival=this.pendingSpatialArrival;arrival.age+=dt;if(arrival.age>=.55){this.effects.arrive?.({position:vec(arrival.object.position),radius:this.spatialExtent(arrival.object)});this.pendingSpatialArrival=null;}}
     if(spatial&&this.spatialRevealAge!==null)this.spatialRevealAge+=dt;
     const reveal=spatial&&this.layers.particles&&!this.reducedMotion&&this.spatialRevealAge!==null?.24+.76*ease(Math.min(1,this.spatialRevealAge/2.6)):1;

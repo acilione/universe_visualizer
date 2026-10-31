@@ -20,7 +20,8 @@ try{
  const cdp=await context.newCDPSession(page);await cdp.send('Emulation.setCPUThrottlingRate',{rate:4});
  await page.goto(base,{waitUntil:'domcontentloaded',timeout:90000});await expect(page.locator('.loading')).toBeHidden();
  await page.waitForFunction(()=>window.testAtlas?.ready);
- assert.equal(await page.evaluate(()=>testAtlas.index),0);
+ assert.equal(await page.evaluate(()=>testAtlas.index),9);
+ assert.equal(await page.evaluate(()=>testAtlas.combinedView.waiting),true);
  await page.locator('[data-action="settings"]').click();await expect(page.locator('#language-setting')).toBeVisible();await page.keyboard.press('Escape');
  assert.ok(workers.some(url=>url.includes('celestial-catalog-worker')));
  await page.evaluate(()=>{

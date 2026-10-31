@@ -24,7 +24,7 @@ The application needs no account, API key or backend. Core catalogues and planet
 
 ## Default view and Gaia streaming
 
-The normal atlas and immersive entry default to the combined planets, moons, stars and nebulae view. Saved object-layer choices remain in effect. The Solar System is available while the local catalogues load; an explicit navigation action takes precedence over delayed loading.
+The normal atlas and immersive entry default to the combined planets, moons, stars and nebulae view. Saved object-layer choices remain in effect. Combined map is active from the first frame. Planets remain available while catalogue stars and nebulae fade into the same scene, without changing the camera or mode. A brief holographic opening accompanies loading; reduced-motion settings skip its animation. Explicit navigation to another view takes precedence over delayed loading.
 
 Star and nebula catalogues are fetched, parsed and cross-matched in a dedicated Web Worker. The worker returns bounded batches; the map fills its existing GPU buffers progressively while planets and navigation remain available. Loading shows its progress and respects object-layer choices. Leaving the combined map cancels its unfinished geometry work. VR background geometry is prepared only when needed. Browsers that cannot start a worker use cooperative processing.
 

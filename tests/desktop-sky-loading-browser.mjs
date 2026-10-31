@@ -14,20 +14,31 @@ try{
  await page.goto(process.env.TEST_URL||'http://localhost:5173',{waitUntil:'domcontentloaded'});
  await expect(page.locator('.loading')).toBeHidden({timeout:90000});
  await page.waitForFunction(()=>window.testAtlas?.ready);
+ await expect(page.locator('#scale-title')).toHaveText('Combined map');
+ await page.evaluate(()=>{window.initialGroup=testAtlas.combinedView.group;window.initialPlanet=initialGroup.getObjectByName('combined-target-earth');window.titles=[];new MutationObserver(()=>titles.push(document.querySelector('#scale-title').textContent)).observe(document.querySelector('#scale-title'),{childList:true,subtree:true,characterData:true});});
+ await expect(page.locator('#combined-desktop-layers')).toBeVisible();
  // A real drag and wheel input before the catalogue arrives used to cancel it.
  await page.mouse.move(760,460);await page.mouse.down();await page.mouse.move(850,500,{steps:8});await page.mouse.up();await page.mouse.wheel(0,-120);
- await expect(page.locator('#renderer-status')).toHaveText('LOADING COMBINED MAP');
+ await expect(page.locator('#renderer-status')).toHaveText('PREPARING SKY');
  await page.locator('[data-action="zoom-out"]').click();
- await expect(page.locator('#renderer-status')).toHaveText('LOADING COMBINED MAP');
+ // Focus stays within this map, so it must not cancel the arriving sky either.
+ await page.evaluate(()=>testAtlas.selectObject(testAtlas.combinedView.getObject('earth')));
+ await page.locator('[data-action="focus"]').first().click();
+ await page.locator('#combined-desktop-layers [data-object-layer="nebulae"]').click();
+ await expect(page.locator('#renderer-status')).toHaveText('PREPARING SKY');
  await page.evaluate(()=>{
-  const original=testAtlas.buildCombinedMap.bind(testAtlas);
+  const original=testAtlas.attachCombinedCatalogue.bind(testAtlas);
   const pose=()=>({position:testAtlas.camera.position.toArray(),quaternion:testAtlas.camera.quaternion.toArray(),target:testAtlas.controls.target.toArray(),fov:testAtlas.camera.fov});
-  testAtlas.buildCombinedMap=(...args)=>{window.poseBefore=pose();const result=original(...args);window.poseAfter=pose();return result;};
+  testAtlas.attachCombinedCatalogue=(...args)=>{window.poseBefore=pose();const result=original(...args);window.poseAfter=pose();return result;};
  });
  release();
  await page.waitForFunction(()=>testAtlas.index===9&&!testAtlas.combinedView.loading);
+ assert.equal(await page.evaluate(()=>testAtlas.combinedView.group===initialGroup&&initialGroup.getObjectByName('combined-target-earth')===initialPlanet),true,'Catalogue arrival must retain the same scene and planet meshes');
+ assert.ok((await page.evaluate(()=>titles)).every(title=>title==='Combined map'));
  assert.deepEqual(await page.evaluate(()=>poseAfter),await page.evaluate(()=>poseBefore),'Adding the sky must preserve the camera the user adjusted');
  const counts=await page.evaluate(()=>testAtlas.viewContext);
+ assert.equal(await page.evaluate(()=>testAtlas.selected.id),'earth');
+ assert.equal(await page.evaluate(()=>testAtlas.combinedView.layers.nebulae.visible),false);
  assert.equal(counts.renderedStarCount,counts.catalogStarCount);assert.ok(counts.renderedStarCount>118000);
  // Test actual GPU pixels, not just CPU catalogue sizes or draw-range counts.
  const pixels=await page.evaluate(async()=>{
@@ -35,7 +46,7 @@ try{
   const u=testAtlas,cloud=u.combinedView.group.getObjectByName('combined-star-points');
   u.scene.updateMatrixWorld(true);
   const scene=new THREE.Scene(),copy=cloud.clone();copy.matrixAutoUpdate=false;copy.matrix.copy(cloud.matrixWorld);scene.add(copy);
-  const target=new THREE.WebGLRenderTarget(256,256),camera=u.camera.clone();camera.aspect=1;camera.updateProjectionMatrix();
+  const target=new THREE.WebGLRenderTarget(256,256),camera=u.camera.clone();camera.position.set(0,100,150);camera.lookAt(0,0,0);camera.aspect=1;camera.updateProjectionMatrix();
   const saved=u.renderer.getRenderTarget(),color=u.renderer.getClearColor(new THREE.Color()),alpha=u.renderer.getClearAlpha();
   const data=new Uint8Array(256*256*4);
   try{u.renderer.setRenderTarget(target);u.renderer.setClearColor(0,1);u.renderer.render(scene,camera);u.renderer.readRenderTargetPixels(target,0,0,256,256,data);}

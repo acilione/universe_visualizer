@@ -64,8 +64,6 @@ let combinedLoading = false;
 let skyLoadingProgress = null;
 let lastCatalogueProgress = 0;
 let combinedError = '';
-let initialCombinedPending = false;
-let initialCameraAdjusted = false;
 let gaiaStreamStatus = null;
 let gaiaReturnView = null;
 let gaiaSwitchBusy = false;
@@ -96,8 +94,8 @@ $('#app').innerHTML = `
     </header>
     <section class="intro" aria-label="${t("Selected region","Regione esplorata")}">
       <div class="eyebrow">${t("ASTRONOMICAL CATALOGUES","CATALOGHI ASTRONOMICI")}</div>
-      <h1 id="scale-title">${scales[0].title}</h1>
-      <div class="subtitle" id="scale-subtitle">${scales[0].subtitle}</div>
+      <h1 id="scale-title">${t('Combined map','Mappa combinata')}</h1>
+      <div class="subtitle" id="scale-subtitle">${t('Solar System model and projected catalogue sky. Independent object layers.','Modello del Sistema Solare e cielo di catalogo proiettato. Categorie indipendenti.')}</div>
       <div class="catalogue-view-switch" role="group" aria-label="${t('Map and Gaia survey','Mappa e rilievo Gaia')}">
         <button data-action="atlas-view" aria-pressed="true">${t('Map','Mappa')}</button>
         <button data-action="gaia-stream" aria-pressed="false">Gaia DR3</button>
@@ -363,7 +361,6 @@ function updateScale(index, context = null) {
 
 function changeScale(index, manual = true) {
   index = Number(index);
-  if (index === 9 || Number.isInteger(index) && scales[index]) cancelInitialCombinedView();
   if(index===9){stopTour();showCombinedView();return;}
   if (!Number.isInteger(index) || !scales[index]) return;
   if (manual) stopTour();
@@ -373,7 +370,7 @@ function changeScale(index, manual = true) {
 }
 
 function pickObject(index, object) {
-  cancelInitialCombinedView();
+
   if(state.scale===9&&universe?.combinedView.getObject(object.id)){
     stopTour();closeModal();universe.focusObject(universe.combinedView.getObject(object.id));return;
   }
@@ -801,7 +798,7 @@ async function applyConstellationSelection(ids, { close = false, earthPerspectiv
   if (!readObserverForm()) return false;
   if (!universe) {notify(t('Constellation views require WebGL.','La vista delle costellazioni richiede WebGL.'));return false;}
   if(close&&state.scale===6&&!constellationBrowser.busy&&JSON.stringify(ids)===JSON.stringify(state.context?.constellationIds)&&JSON.stringify(constellationBrowser.observer)===JSON.stringify(state.context?.observer)){closeModal();return true;}
-  cancelInitialCombinedView();stopTour();
+  stopTour();
   const focused=document.activeElement, focusInModal=Boolean(focused?.closest('#modal'));
   const focusId=focused?.dataset.constellation||focused?.dataset.removeConstellation;
   const focusAction=focused?.dataset.action;
@@ -949,7 +946,7 @@ async function transitionCatalogue(commit){
 }
 async function openGaiaStream(){
   if(!universe||gaiaSwitchBusy||isGaiaStreamView())return;
-  cancelInitialCombinedView();stopTour();closeModal();immersiveContent='current';
+  stopTour();closeModal();immersiveContent='current';
   gaiaSwitchBusy=true;renderCatalogueSwitch();
   universe.cancelPendingView();
   const request=universe.viewRequest,saved=universe.captureAtlasView();
@@ -975,7 +972,7 @@ async function openGaiaStream(){
 }
 async function returnToAtlas(){
   if(!universe||gaiaSwitchBusy||!isGaiaStreamView())return;
-  cancelInitialCombinedView();stopTour();closeModal();
+  stopTour();closeModal();
   gaiaSwitchBusy=true;renderCatalogueSwitch();
   const request=universe.viewRequest;
   try{
@@ -1045,41 +1042,30 @@ function onObjectLayersChange(value){
 }
 function onCatalogueProgress(progress){
   skyLoadingProgress=progress?.loading?progress:null;
-  if(skyLoadingProgress&&performance.now()-lastCatalogueProgress<200)return;
+  if(skyLoadingProgress&&lastCatalogueProgress>0&&performance.now()-lastCatalogueProgress<200)return;
   lastCatalogueProgress=performance.now();
   const percent=skyLoadingProgress?Math.floor(100*(progress.stars+progress.nebulae)/Math.max(1,progress.totalStars+progress.totalNebulae)):100;
-  $('#renderer-status').textContent=skyLoadingProgress?`${t('LOADING SKY','CARICAMENTO CIELO')} · ${percent}%`:t('3D RENDERER ACTIVE','RENDERER 3D ATTIVO');
+  $('#renderer-status').textContent=skyLoadingProgress?.waiting?t('PREPARING SKY','PREPARAZIONE CIELO'):skyLoadingProgress?`${t('LOADING SKY','CARICAMENTO CIELO')} · ${percent}%`:t('3D RENDERER ACTIVE','RENDERER 3D ATTIVO');
   refreshCombinedLoading();
 }
 function refreshCombinedLoading(){
   if(!skyLoadingProgress&&$('#modal').open&&$('#modal').dataset.kind==='vr'){$('#modal-body').innerHTML=vrContent();refreshIcons();}
   const status=$('#combined-preview-status');
   status.hidden=!combinedLoading&&!combinedError&&!skyLoadingProgress;
-  status.textContent=skyLoadingProgress?`${t('Loading sky','Caricamento cielo')}: ${number(skyLoadingProgress.stars)} / ${number(skyLoadingProgress.totalStars)} ${t('stars','stelle')} · ${number(skyLoadingProgress.nebulae)} / ${number(skyLoadingProgress.totalNebulae)} ${t('nebulae','nebulose')}`:combinedLoading?t('Loading combined NASA catalogues…','Caricamento dei cataloghi NASA combinati…'):combinedError;
-}
-function cancelInitialCombinedView(){
-  if(!initialCombinedPending)return;
-  initialCombinedPending=false;
-  if(universe)$('#renderer-status').textContent=t('3D RENDERER ACTIVE','RENDERER 3D ATTIVO');
-}
-function preserveInitialCamera(){
-  if(initialCombinedPending)initialCameraAdjusted=true;
+  status.textContent=skyLoadingProgress?.waiting?t('Preparing sky catalogues…','Preparazione dei cataloghi celesti…'):skyLoadingProgress?`${t('Loading sky','Caricamento cielo')}: ${number(skyLoadingProgress.stars)} / ${number(skyLoadingProgress.totalStars)} ${t('stars','stelle')} · ${number(skyLoadingProgress.nebulae)} / ${number(skyLoadingProgress.totalNebulae)} ${t('nebulae','nebulose')}`:combinedLoading?t('Loading combined NASA catalogues…','Caricamento dei cataloghi NASA combinati…'):combinedError;
 }
 async function showInitialCombinedView(){
   if(!universe)return;
-  initialCombinedPending=true;initialCameraAdjusted=false;
-  const request=universe.viewRequest, selection=state.object?.id;
-  $('#renderer-status').textContent=t('LOADING COMBINED MAP','CARICAMENTO MAPPA COMBINATA');
+  const view=universe.combinedView;
   try{
     const data=await prepareCombinedCatalogue();
-    // Explicit view/object navigation wins; orbit and zoom keep loading active.
-    // Preserve the adjusted camera when adding the catalogue around the planets.
-    if(initialCombinedPending&&universe.viewRequest===request&&state.object?.id===selection&&!universe.disposed)universe.buildCombinedMap(data,{preserveNavigation:initialCameraAdjusted});
+    // Enrich the existing map; keep its bodies, camera, selection and layer state.
+    universe.attachCombinedCatalogue(data,view);
   }catch(error){
-    if(initialCombinedPending)notify(t('Combined catalogues are unavailable. The Solar System remains available; select the atlas title to retry.','I cataloghi combinati non sono disponibili. Il Sistema Solare resta disponibile; seleziona il titolo dell\u2019atlante per riprovare.'));
-  }finally{
-    initialCombinedPending=false;
-    if(universe&&!skyLoadingProgress)$('#renderer-status').textContent=t('3D RENDERER ACTIVE','RENDERER 3D ATTIVO');
+    if(!universe.disposed&&universe.index===9&&universe.combinedView===view){
+      view.cancelLoading();universe.desktopOpeningAge=Infinity;onCatalogueProgress(null);
+      notify(t('Sky catalogues are unavailable. Planets remain available in the combined map; select the atlas title to retry.','Cataloghi celesti non disponibili. I pianeti restano disponibili nella mappa combinata; seleziona il titolo dell\u2019atlante per riprovare.'));
+    }
   }
 }
 function prepareCombinedCatalogue(){
@@ -1134,7 +1120,7 @@ async function startVR(button, mode='immersive-vr') {
   if(immersiveContent==='combined'&&!combinedData)return;
   button.disabled = true;
   try {
-    if(immersiveContent==='combined'&&universe.index!==9)universe.buildCombinedMap(combinedData);
+    if(immersiveContent==='combined'&&(universe.index!==9||universe.catalogueData!==combinedData))universe.buildCombinedMap(combinedData);
     const started = await universe.enterVR({mode,layout:spatialLayout,handsFirst:true});
     if (started) closeModal();
   } catch (error) { notify(error?.message || t("Unable to start the immersive session.","Impossibile avviare la sessione immersiva.")); }
@@ -1176,7 +1162,7 @@ function onPreviewChange(active, details={}) {
 
 function startPreview() {
   if(!universe||(immersiveContent==='combined'&&!combinedData))return;
-  if(immersiveContent==='combined'&&universe.index!==9)universe.buildCombinedMap(combinedData);
+  if(immersiveContent==='combined'&&(universe.index!==9||universe.catalogueData!==combinedData))universe.buildCombinedMap(combinedData);
   stopTour();if(state.cinematic)setCinematic(false);closeModal();
   universe.enterPreview({layout:spatialLayout,directTravel:true});
   setPreviewClean(true);
@@ -1223,7 +1209,6 @@ document.addEventListener('change', event => {
 document.addEventListener('click', async event => {
   const button = event.target.closest('button, a.brand');
   if (!button || button.disabled) return;
-  if(button.closest('.view-controls'))preserveInitialCamera();
   if (button.matches('a.brand')) { event.preventDefault(); closeModal(); changeScale(9); return; }
   if (button.dataset.scale !== undefined) return changeScale(button.dataset.scale);
   if(button.dataset.objectLayer){universe?.setObjectLayer(button.dataset.objectLayer,!state.objectLayers[button.dataset.objectLayer]);return;}
@@ -1310,7 +1295,7 @@ document.addEventListener('click', async event => {
     case 'start-vr': await startVR(button); break;
     case 'start-mr': await startVR(button,'immersive-ar'); break;
     case 'start-preview': startPreview(); break;
-    case 'retry-combined': prepareCombinedCatalogue().catch(()=>{}); break;
+    case 'retry-combined': showCombinedView(); break;
     case 'exit-preview': universe?.exitPreview(); break;
     case 'preview-clean': setPreviewClean(!previewClean); break;
     case 'recenter-preview': universe?.preview.recenter(); break;
@@ -1333,7 +1318,7 @@ document.addEventListener('click', async event => {
     case 'tour': toggleTour(); break;
     case 'object': openModal('object', t("Object data","Dati dell’oggetto"), objectMarkup(state.object, true)); break;
     case 'focus':
-      cancelInitialCombinedView();
+
       if (Number.isInteger(state.object.targetScale) && scales[state.object.targetScale]) { if(universe)universe.focusObject(state.object);else changeScale(state.object.targetScale); }
       else { universe?.focusObject(state.object); notify(`${t("Focus: ","Messa a fuoco: ")}${state.object.name}.`); }
       closeModal();
@@ -1362,13 +1347,11 @@ document.addEventListener('keydown', event => {
   if (event.target.matches('input, textarea, select, [contenteditable="true"]') || event.ctrlKey || event.metaKey || event.altKey || $('#modal').open) return;
   if (event.key === '/') { event.preventDefault(); openSearch(); }
   else if (/^[1-5]$/.test(event.key)) { event.preventDefault(); changeScale(Number(event.key) - 1); }
-  else if (event.key.toLowerCase() === 'r') { preserveInitialCamera();universe?.resetView(); }
+  else if (event.key.toLowerCase() === 'r') { universe?.resetView(); }
   else if (event.code === 'Space' && !universe?.preview.isActive && !event.target.closest('button, a')) { event.preventDefault(); setRotation(!state.autoRotate); }
 });
 document.addEventListener('pointermove', revealImmersionControl, { passive: true });
 document.addEventListener('pointerdown', revealImmersionControl, { passive: true });
-document.addEventListener('pointerdown',event=>{if(event.target.closest('#universe,.view-controls'))preserveInitialCamera();},{capture:true,passive:true});
-$('#universe').addEventListener('wheel',preserveInitialCamera,{capture:true,passive:true});
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { stopTour(); audioContext?.suspend().catch(() => {}); }
   else if (state.sound) audioContext?.resume().catch(() => {});
@@ -1381,6 +1364,7 @@ refreshIcons();
 
 try {
   universe = new Universe({
+    initialCombined:true,
     canvas: $('#universe'),
     labelContainer: $('#map-labels'),
     onSelect: renderObject,

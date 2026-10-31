@@ -71,6 +71,8 @@ This view combines different presentation scales. The Solar System and its suppo
 
 In the room layout, the combined map stays fixed in the tracked space as you walk. Changing object layers only changes visibility; it does not recenter, rotate or resize the map. During close-up inspection, a distant catalogue sky remains around the viewer so that enlarging a planet does not remove the stellar surroundings. Its stars and nebula centres remain selectable. This is an angular reference sky, with no invented stellar parallax or radial distance.
 
+On normal startup, the combined map is already active before catalogue data arrive. Holographic arcs and particles introduce the map, and new sky batches fade in without moving the camera; reduced-motion settings skip these animations.
+
 Star and nebula geometry is populated in bounded tasks that allow input and rendering to continue. The surrounding sky is allocated only when an immersive view needs it, and appears progressively without recentering the viewer. Existing layer and quality settings apply during loading; leaving the combined map cancels its unfinished geometry work.
 
 The separate **Gaia DR3 streamed sky** can be opened from **Catalogue sections** before headset entry. It keeps **Current map** selected in the chooser. This is a native J2016.0 angular survey: tracked looking and source selection work, while detailed angular zoom is available in the normal desktop sky view. A bounded set of progressive tiles is loaded from CDS; it is not a full spatial Gaia Galaxy. See [Gaia data access](DATA_GAIA_DR3.md) and the [full-catalogue study](GAIA_STREAMING_STUDY.md).
