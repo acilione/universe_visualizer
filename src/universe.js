@@ -8,6 +8,7 @@ import { createXR } from './xr.js';
 import { createDesktopImmersive } from './desktop-immersive.js';
 import { createImmersiveEffects } from './immersive-effects.js';
 import { createImmersiveEnvironment } from './immersive-environment.js';
+import {circularOrbitPath} from './orbit-paths.js';
 import { createCombinedMap } from './combined-map.js';
 import { loadCelestialCatalog } from './celestial-catalog.js';
 import { createPlanetVisual, disposePlanetTextures, updatePlanetVisualLighting } from './planet-visuals.js';
@@ -110,14 +111,14 @@ export class Universe {
     const g=new THREE.Group(),random=seededRandom(5),p=[],c=[],sizes=[];
     if(this.index===0){for(let i=0;i<2600;i++){const r=11.1+(random()-.5)*1.3,a=random()*Math.PI*2;p.push(Math.cos(a)*r,(random()-.5)*.2,Math.sin(a)*r);c.push(.38,.56,.43);sizes.push(.25+random()*.4);}g.add(this.particleCloud(p,c,sizes,.65));}
     const orbits=new THREE.Group();orbits.name='orbits';
-    for(const o of this.objects){if(o.orbit&&o.bodyKind!=='moon')orbits.add(this.ring(o.orbit,.25));}
+    for(const o of this.objects){if(o.orbit&&o.bodyKind!=='moon'){const path=this.line(circularOrbitPath(o).map(vec),GOLD,.25);path.userData.orbitBodyId=o.id;orbits.add(path);}}
     orbits.visible=this.layers.grid&&!this.immersive;g.add(orbits);
     if(this.index===0){
       for(const parent of catalog.solar){
         const moons=moonsForPlanet(parent.id);if(!moons.length)continue;
         const paths=new THREE.Group();paths.name='moon-orbits-'+parent.id;paths.userData.moonParentId=parent.id;
         paths.position.copy(vec(parent.position));paths.visible=false;
-        for(const moon of moons){const path=this.ring(moon.orbitRadius,.32);path.rotation.x=moon.orbitInclinationRad||0;paths.add(path);}
+        for(const moon of moons){const points=circularOrbitPath(moon,parent.position).map(point=>vec(point).sub(vec(parent.position)));const path=this.line(points,GOLD,.32);path.userData.orbitBodyId=moon.id;paths.add(path);}
         g.add(paths);
       }
     }
@@ -466,7 +467,7 @@ export class Universe {
       }
       this.content.add(customMap);
     } else {
-      const grid=this.makeGrid();grid.scale.setScalar(this.boundsRadius/23);grid.visible=this.layers.grid&&!this.immersive;this.content.add(grid);
+      if(!this.isPlanetaryView()){const grid=this.makeGrid();grid.scale.setScalar(this.boundsRadius/23);grid.visible=this.layers.grid&&!this.immersive;this.content.add(grid);}
       const map=this.isPlanetaryView()?this.makeSolar():[null,()=>this.makeStars(),()=>this.makeGalaxy(81,this.quality==='high'?38000:15000),()=>this.makeLocal(),()=>this.makeCosmic()][index]();map.name='map';this.content.add(map);
     }
     if(this.gaiaSkyView)this.targets=this.gaiaSkyView.targets;

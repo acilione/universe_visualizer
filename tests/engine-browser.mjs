@@ -7,6 +7,10 @@ try {
  await page.goto((process.env.ENGINE_TEST_URL||'http://localhost:5173')+'/tests/fixtures/engine.html',{waitUntil:'networkidle'});
  await page.waitForFunction(()=>window.atlas?.ready);
  assert.equal(await page.evaluate(()=>atlas.index),0);
+ assert.equal(await page.evaluate(()=>Boolean(atlas.content.getObjectByName('grid'))),false,'Planetary views have no unrelated reference circles');
+ const paths=await page.evaluate(()=>atlas.content.getObjectByName('orbits').children.map(line=>({id:line.userData.orbitBodyId,point:Array.from(line.geometry.attributes.position.array.slice(0,3)),position:catalog.solar.find(body=>body.id===line.userData.orbitBodyId).position})));
+ assert.equal(paths.length,8);
+ for(const path of paths)assert.ok(Math.hypot(...path.point.map((value,index)=>value-path.position[index]))<1e-5,path.id+' must lie on its orbit line');
  assert.equal(await page.evaluate(()=>atlas.targets.length),await page.evaluate(()=>catalog.solar.length+solarMoons.length));
  await page.evaluate(()=>atlas.focusObject(catalog.solar.find(p=>p.id==='earth')));
  await page.waitForFunction(()=>!atlas.cameraFlight);
@@ -19,14 +23,15 @@ try {
  assert.ok(await page.evaluate(()=>atlas.camera.position.distanceTo(atlas.controls.target)>atlas.selected.size));
  await page.evaluate(()=>atlas.setImmersive(true));
  assert.equal(await page.evaluate(()=>atlas.selectionRing.visible),false);
- assert.equal(await page.evaluate(()=>atlas.content.getObjectByName('grid').visible),false);
+ assert.equal(await page.evaluate(()=>atlas.content.getObjectByName('orbits').visible),false);
  await expect(page.locator('.labels')).toBeHidden();
  const planet=await page.evaluate(()=>{const p=exoplanets.find(p=>p.name==='TRAPPIST-1 e');atlas.focusObject(p);return p.id;});
  await page.waitForFunction(()=>!atlas.cameraFlight);
  assert.deepEqual(await page.evaluate(()=>[atlas.index,atlas.systemHost,atlas.objects.length,atlas.selected.id]),[5,'TRAPPIST-1',8,planet]);
  assert.equal(await page.evaluate(()=>atlas.content.getObjectByName('orbits').visible),false);
  await page.evaluate(()=>atlas.setImmersive(false));
- assert.equal(await page.evaluate(()=>atlas.selectionRing.visible),true);
+ assert.equal(await page.evaluate(()=>atlas.selectionRing.visible),false,'Planet inspection keeps the surface free of the selection ring');
+ assert.equal(await page.evaluate(()=>atlas.content.getObjectByName('orbits').visible),true);
  await page.evaluate(()=>{const p=exoplanets.find(p=>p.distancePc===null);atlas.focusObject(p);});
  await page.waitForFunction(()=>!atlas.cameraFlight);
  assert.ok(await page.evaluate(()=>atlas.camera.position.toArray().every(Number.isFinite)));

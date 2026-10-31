@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { t, formatNumber } from './i18n.js';
 import { equatorialVector } from './sky-math.js';
 import { createPlanetVisual } from './planet-visuals.js';
+import {circularOrbitPath} from './orbit-paths.js';
 import {consumeSteps} from './cooperative.js';
 
 const RADIUS = 60;
@@ -205,11 +206,8 @@ function solarOrbits(objects) {
     if (!Number.isFinite(radius) || radius <= 0) continue;
     const center = moon ? byId.get(object.parentId)?.position : [0, 0, 0];
     if (!center) continue;
-    const inclination = moon ? object.orbitInclinationRad || 0 : 0;
-    for (let i = 0; i < 96; i++) for (const j of [i, i + 1]) {
-      const angle = j / 96 * Math.PI * 2;
-      positions.push(center[0] + Math.cos(angle) * radius, center[1] + Math.sin(angle) * radius * Math.sin(inclination), center[2] + Math.sin(angle) * radius * Math.cos(inclination));
-    }
+    const path=circularOrbitPath(object,center,240);
+    for(let index=0;index<path.length-1;index++)positions.push(...path[index],...path[index+1]);
   }
   const geometry = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   const material = new THREE.LineBasicMaterial({color: '#85b4ad', transparent: true, opacity: .13, depthWrite: false});

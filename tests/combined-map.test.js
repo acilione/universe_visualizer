@@ -55,7 +55,7 @@ test('Solar System stays schematic; Sun follows Stars and moons follow Planets',
     assert.notEqual(view.getObject('earth').position, planets[1].position);
     assert.deepEqual(view.getObject('earth').position, planets[1].position);
     assert.equal(view.targets.length, 6, 'only solar proxies and three catalogue batches');
-    assert.equal(view.group.getObjectByName('combined-solar-orbits').geometry.attributes.position.count, 384);
+    assert.equal(view.group.getObjectByName('combined-solar-orbits').geometry.attributes.position.count, 960);
     const ray = new THREE.Raycaster(new THREE.Vector3(0, 0, 8), new THREE.Vector3(0, 0, -1));
     view.group.updateMatrixWorld(true);
     assert.equal(ray.intersectObjects(view.targets, false)[0].object.userData.object.id, 'sun');
