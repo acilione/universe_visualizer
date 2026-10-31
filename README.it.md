@@ -26,9 +26,9 @@ npm run preview -- --port 5174
 
 L'atlante normale e le viste immersive partono dalla mappa combinata di pianeti, satelliti, stelle e nebulose, rispettando i livelli scelti. La mappa combinata è attiva dal primo fotogramma: pianeti e comandi sono disponibili subito, mentre stelle e nebulose compaiono nella stessa scena senza cambiare vista o posizione della telecamera. Una breve apertura olografica accompagna il caricamento; la preferenza di movimento ridotto disattiva le animazioni. La scelta esplicita di un’altra vista prevale sul caricamento tardivo.
 
-**Gaia DR3**, accanto a **Mappa**, oppure **Sezioni del catalogo > Gaia DR3 (Tutto cielo, dettaglio progressivo)** apre il catalogo completo CDS Gaia DR3 tramite tasselli progressivi. Trascina per guardare e usa la rotellina per restringere il campo. I dati vengono caricati su richiesta, con limiti di memoria e sorgenti rappresentate. La vista angolare resta separata dalla fusione con NASA e dall'esperimento locale sulle sorgenti luminose. Lo stato distingue le sorgenti caricate dalla copertura totale dell'archivio.
+**Gaia DR3**, accanto a **Mappa combinata**, oppure **Sezioni del catalogo > Gaia DR3 (Tutto cielo, dettaglio progressivo)** apre il catalogo completo CDS Gaia DR3 tramite tasselli progressivi. Trascina per guardare e usa la rotellina per restringere il campo. I dati vengono caricati su richiesta, con limiti di memoria e sorgenti rappresentate. La vista angolare resta separata dalla fusione con NASA e dall'esperimento locale sulle sorgenti luminose. Lo stato distingue le sorgenti caricate dalla copertura totale dell'archivio.
 
-Il selettore **Mappa / Gaia DR3** prepara la regione osservata prima della dissolvenza; **Mappa** ripristina la precedente inquadratura. I cataloghi mantengono le rispettive epoche: non viene simulata una trasformazione fisica fra i due rilievi.
+**Mappa combinata** riapre la mappa completa dal Sistema Solare o dalle altre scale di riferimento. Il comando **Gaia DR3** prepara la regione osservata prima della dissolvenza; **Torna alla mappa** ripristina la precedente inquadratura. I cataloghi mantengono le rispettive epoche: non viene simulata una trasformazione fisica fra i due rilievi.
 
 [Studio per Gaia completo](GAIA_STREAMING_STUDY.md) e [note sui dati Gaia](DATA_GAIA_DR3.md).
 

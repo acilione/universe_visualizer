@@ -96,8 +96,8 @@ $('#app').innerHTML = `
       <div class="eyebrow">${t("ASTRONOMICAL CATALOGUES","CATALOGHI ASTRONOMICI")}</div>
       <h1 id="scale-title">${t('Combined map','Mappa combinata')}</h1>
       <div class="subtitle" id="scale-subtitle">${t('Solar System model and projected catalogue sky. Independent object layers.','Modello del Sistema Solare e cielo di catalogo proiettato. Categorie indipendenti.')}</div>
-      <div class="catalogue-view-switch" role="group" aria-label="${t('Map and Gaia survey','Mappa e rilievo Gaia')}">
-        <button data-action="atlas-view" aria-pressed="true">${t('Map','Mappa')}</button>
+      <div class="catalogue-view-switch" role="group" aria-label="${t('Map navigation','Navigazione della mappa')}">
+        <button data-action="atlas-view" aria-pressed="true">${t('Combined map','Mappa combinata')}</button>
         <button data-action="gaia-stream" aria-pressed="false">Gaia DR3</button>
       </div>
     </section>
@@ -934,7 +934,8 @@ function renderGaiaStreamStatus(){
 function renderCatalogueSwitch(){
   const active=isGaiaStreamView();
   document.querySelectorAll('.catalogue-view-switch button').forEach(button=>{
-    button.setAttribute('aria-pressed',String((button.dataset.action==='gaia-stream')===active));
+    button.setAttribute('aria-pressed',String(button.dataset.action==='gaia-stream'?active:!active&&state.scale===9));
+    if(button.dataset.action==='atlas-view')button.textContent=active?t('Back to map','Torna alla mappa'):t('Combined map','Mappa combinata');
     button.disabled=gaiaSwitchBusy;
   });
   $('.catalogue-view-switch').setAttribute('aria-busy',String(gaiaSwitchBusy));
@@ -976,7 +977,11 @@ async function returnToAtlas(){
   gaiaSwitchBusy=true;renderCatalogueSwitch();
   const request=universe.viewRequest;
   try{
-    if(!gaiaReturnView)await prepareCombinedCatalogue();
+    if(!gaiaReturnView||gaiaReturnView.index===9&&!universe.catalogueData){
+      const data=await prepareCombinedCatalogue();
+      if(universe.viewRequest!==request)return;
+      universe.catalogueData=data;
+    }
     await transitionCatalogue(async()=>{if(universe.viewRequest===request)await universe.restoreAtlasView(gaiaReturnView);});
   }catch(error){notify(t('The map could not be restored. Select a reference scale to continue.','Impossibile ripristinare la mappa. Seleziona una scala di riferimento.'));}
   finally{gaiaSwitchBusy=false;renderCatalogueSwitch();}
@@ -1283,7 +1288,7 @@ document.addEventListener('click', async event => {
     case 'search-official-images': searchOfficialImages(); break;
     case 'gaia-info': openGaiaInfo(); break;
     case 'gaia-stream': await openGaiaStream(); break;
-    case 'atlas-view': await returnToAtlas(); break;
+    case 'atlas-view': if(isGaiaStreamView())await returnToAtlas();else if(state.scale!==9)changeScale(9);break;
     case 'gaia-stream-retry': universe?.retryGaiaStream(); break;
     case 'toggle-gaia': state.gaiaDr3=!state.gaiaDr3;savePreferences();rememberCurrentView();location.reload();break;
     case 'nasa-stars': openSearch('stars'); break;

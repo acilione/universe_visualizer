@@ -41,11 +41,14 @@ await context.route(service + '/**', async route => {
   if (hold) { held.push(route); return; }
   return route.fulfill({ status: 200, headers, contentType: 'text/tab-separated-values', body: tile() });
 });
+let releaseCatalogue;
+const catalogueGate=new Promise(resolve=>{releaseCatalogue=resolve;});
+await page.context().route('**/catalog/nasa-hipparcos.json',async route=>{await catalogueGate;await route.continue();});
 const mapButton = page.locator('.catalogue-view-switch [data-action="atlas-view"]');
 const gaiaButton = page.locator('.catalogue-view-switch [data-action="gaia-stream"]');
 const release = async () => { hold = false; for (const route of held.splice(0)) await route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*' }, body: tile() }).catch(() => {}); };
 try {
-  await page.goto(base, { waitUntil: 'networkidle', timeout: 90000 });
+  await page.goto(base, { waitUntil: 'domcontentloaded', timeout: 90000 });
   await expect(page.locator('.loading')).toBeHidden({ timeout: 90000 });
   await page.waitForFunction(() => window.testAtlas?.index === 9);
   const desktopSpacing = await page.evaluate(() => ({ intro: document.querySelector('.intro').getBoundingClientRect().bottom, sidebar: document.querySelector('.left-panel').getBoundingClientRect().top }));
@@ -83,7 +86,9 @@ try {
   pass('Initial tiles load over the existing map, then a full-canvas fade preserves the actual region and FOV without a camera flight');
 
   const expected = await page.evaluate(() => entrySnapshot);
-  await mapButton.click(); await expect(mapButton).toBeEnabled();
+  assert.equal(await page.evaluate(()=>testAtlas.catalogueData),null,'Initial sky remains pending while Gaia is open');
+  await mapButton.click(); await expect(mapButton).toBeDisabled();
+  releaseCatalogue();await expect(mapButton).toBeEnabled();
   await expect(page.locator('.app-shell')).not.toHaveClass(/gaia-stream-view/);
   const restored = await page.evaluate(() => serializeAtlas());
   for (const key of ['index','selected','fov','near','far','zoom','minDistance','maxDistance']) assert.equal(restored[key], expected[key], key);
@@ -111,4 +116,4 @@ try {
   pass('Persistent Map and Gaia controls remain visible, separate and within a narrow viewport');
   await writeFile(out + '/report.json', JSON.stringify({ checkpoints, requests: requests.length, errors }, null, 2));
 } catch (error) { console.error(error); console.error('Handoff diagnostics:', await page.evaluate(() => ({ index: window.testAtlas?.index, viewRequest: window.testAtlas?.viewRequest, busy: document.querySelector('.catalogue-view-switch')?.getAttribute('aria-busy'), opacity: getComputedStyle(document.querySelector('#universe')).opacity, animations: document.querySelector('#universe').getAnimations().map(animation => ({ state: animation.playState, time: animation.currentTime })), commits: window.commitOpacities, errors: document.querySelector('.toast')?.textContent })).catch(() => null)); await page.screenshot({ path: out + '/failure.png' }).catch(() => {}); throw error; }
-finally { await release(); await browser.close(); }
+finally { releaseCatalogue?.(); await release(); await browser.close(); }
