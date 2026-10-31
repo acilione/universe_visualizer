@@ -65,6 +65,7 @@ let skyLoadingProgress = null;
 let lastCatalogueProgress = 0;
 let combinedError = '';
 let initialCombinedPending = false;
+let initialCameraAdjusted = false;
 let gaiaStreamStatus = null;
 let gaiaReturnView = null;
 let gaiaSwitchBusy = false;
@@ -1061,15 +1062,19 @@ function cancelInitialCombinedView(){
   initialCombinedPending=false;
   if(universe)$('#renderer-status').textContent=t('3D RENDERER ACTIVE','RENDERER 3D ATTIVO');
 }
+function preserveInitialCamera(){
+  if(initialCombinedPending)initialCameraAdjusted=true;
+}
 async function showInitialCombinedView(){
   if(!universe)return;
-  initialCombinedPending=true;
+  initialCombinedPending=true;initialCameraAdjusted=false;
   const request=universe.viewRequest, selection=state.object?.id;
   $('#renderer-status').textContent=t('LOADING COMBINED MAP','CARICAMENTO MAPPA COMBINATA');
   try{
     const data=await prepareCombinedCatalogue();
-    // Loading the default must never override navigation made while data arrive.
-    if(initialCombinedPending&&universe.viewRequest===request&&state.object?.id===selection&&!universe.disposed)universe.buildCombinedMap(data);
+    // Explicit view/object navigation wins; orbit and zoom keep loading active.
+    // Preserve the adjusted camera when adding the catalogue around the planets.
+    if(initialCombinedPending&&universe.viewRequest===request&&state.object?.id===selection&&!universe.disposed)universe.buildCombinedMap(data,{preserveNavigation:initialCameraAdjusted});
   }catch(error){
     if(initialCombinedPending)notify(t('Combined catalogues are unavailable. The Solar System remains available; select the atlas title to retry.','I cataloghi combinati non sono disponibili. Il Sistema Solare resta disponibile; seleziona il titolo dell\u2019atlante per riprovare.'));
   }finally{
@@ -1218,7 +1223,7 @@ document.addEventListener('change', event => {
 document.addEventListener('click', async event => {
   const button = event.target.closest('button, a.brand');
   if (!button || button.disabled) return;
-  if(button.closest('.view-controls'))cancelInitialCombinedView();
+  if(button.closest('.view-controls'))preserveInitialCamera();
   if (button.matches('a.brand')) { event.preventDefault(); closeModal(); changeScale(9); return; }
   if (button.dataset.scale !== undefined) return changeScale(button.dataset.scale);
   if(button.dataset.objectLayer){universe?.setObjectLayer(button.dataset.objectLayer,!state.objectLayers[button.dataset.objectLayer]);return;}
@@ -1357,13 +1362,13 @@ document.addEventListener('keydown', event => {
   if (event.target.matches('input, textarea, select, [contenteditable="true"]') || event.ctrlKey || event.metaKey || event.altKey || $('#modal').open) return;
   if (event.key === '/') { event.preventDefault(); openSearch(); }
   else if (/^[1-5]$/.test(event.key)) { event.preventDefault(); changeScale(Number(event.key) - 1); }
-  else if (event.key.toLowerCase() === 'r') { cancelInitialCombinedView();universe?.resetView(); }
+  else if (event.key.toLowerCase() === 'r') { preserveInitialCamera();universe?.resetView(); }
   else if (event.code === 'Space' && !universe?.preview.isActive && !event.target.closest('button, a')) { event.preventDefault(); setRotation(!state.autoRotate); }
 });
 document.addEventListener('pointermove', revealImmersionControl, { passive: true });
 document.addEventListener('pointerdown', revealImmersionControl, { passive: true });
-document.addEventListener('pointerdown',event=>{if(event.target.closest('#universe,.view-controls,#map-labels'))cancelInitialCombinedView();},{capture:true,passive:true});
-$('#universe').addEventListener('wheel',cancelInitialCombinedView,{capture:true,passive:true});
+document.addEventListener('pointerdown',event=>{if(event.target.closest('#universe,.view-controls'))preserveInitialCamera();},{capture:true,passive:true});
+$('#universe').addEventListener('wheel',preserveInitialCamera,{capture:true,passive:true});
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { stopTour(); audioContext?.suspend().catch(() => {}); }
   else if (state.sound) audioContext?.resume().catch(() => {});

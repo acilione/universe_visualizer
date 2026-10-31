@@ -289,7 +289,7 @@ export class Universe {
     this.buildCombinedMap(catalogue);
     return this.combinedView.ready;
   }
-  buildCombinedMap(data){
+  buildCombinedMap(data,{preserveNavigation=false}={}){
     if(this.disposed)return false;
     this.viewRequest++;this.catalogueData=data;this.systemHost=null;this.environment?.setCatalogue(data);
     const view=createCombinedMap({catalogue:data,planets:SOLAR_OBJECTS,exoplanets,pixelRatio:this.renderer.getPixelRatio(),quality:this.quality,progressive:true,onProgress:progress=>{
@@ -298,7 +298,7 @@ export class Universe {
     this.combinedView=view;
     view.ready.catch(error=>{if(this.combinedView===view&&!this.disposed)this.onMessage(error.message);});
     for(const [name,visible] of Object.entries(this.objectLayers))this.combinedView.setLayer(name,visible);
-    this.buildView(9,this.combinedView.objects,this.combinedView.context,false,this.combinedView.group);
+    this.buildView(9,this.combinedView.objects,this.combinedView.context,false,this.combinedView.group,{preserveNavigation});
     this.onCatalogueProgress({loading:true,stars:0,nebulae:0,totalStars:data.stars?.length||0,totalNebulae:data.nebulae?.length||0});
     this.onObjectLayersChange({...this.objectLayers});return true;
   }
