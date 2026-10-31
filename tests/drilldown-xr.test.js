@@ -46,7 +46,7 @@ function createHarness(t) {
     skyPointers: new Map(), retiring: [], labels: [], targets: [], layers: { labels: true, grid: true, particles: true },
     autoRotate: false, quality: 'low', immersive: false, reducedMotion: true,
     effects: { configure() {}, select() {} },
-    onSelect: object => selected.push(object.id), onScale: index => navigated.push(index), onMessage() {},
+    onSelect: object => selected.push(object.id), onCatalogueProgress:()=>{},onScale: index => navigated.push(index), onMessage() {},
     // Geometry construction is replaced; catalogue navigation, view lifecycle,
     // selection, XR ray casting and XR transforms all use production code.
     makeGrid: () => new THREE.Group(), makeSolar: () => new THREE.Group(), makeStars: () => new THREE.Group(),

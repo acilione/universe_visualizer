@@ -133,7 +133,7 @@ test('Universe leaves and re-enters the streamed sky without retaining its worke
     scene,mapRoot,camera:new THREE.PerspectiveCamera(),renderer:{xr:{isPresenting:false},getPixelRatio:()=>1},xr:{isPresenting:false},
     controls:{target:new THREE.Vector3()},canvas:{clientWidth:1200},quality:'high',viewRequest:0,elapsed:0,index:0,disposed:false,
     gaiaSkyView:null,skyPointers:new Map(),retiring:[],bodyVisuals:new Map(),labels:[],layers:{grid:true,particles:true},sunLight:new THREE.PointLight(),
-    onGaiaStreamStatus:status=>statuses.push(status),onScale:()=>{},selectObject:()=>{},setLayer:()=>{},resetView:()=>{},configureImmersiveEffects:()=>{},
+    onGaiaStreamStatus:status=>statuses.push(status),onCatalogueProgress:()=>{},onScale:()=>{},selectObject:()=>{},setLayer:()=>{},resetView:()=>{},configureImmersiveEffects:()=>{},
     makeGrid:()=>new THREE.Group(),makeStars:()=>new THREE.Group(),makeMarker:()=>{},
   });
   try{

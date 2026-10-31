@@ -26,6 +26,8 @@ The application needs no account, API key or backend. Core catalogues and planet
 
 The normal atlas and immersive entry default to the combined planets, moons, stars and nebulae view. Saved object-layer choices remain in effect. The Solar System is available while the local catalogues load; an explicit navigation action takes precedence over delayed loading.
 
+Star and nebula catalogues are fetched, parsed and cross-matched in a dedicated Web Worker. The worker returns bounded batches; the map fills its existing GPU buffers progressively while planets and navigation remain available. Loading shows its progress and respects object-layer choices. Leaving the combined map cancels its unfinished geometry work. VR background geometry is prepared only when needed. Browsers that cannot start a worker use cooperative processing.
+
 **Gaia DR3** beside **Map**, or **Catalogue sections > Gaia DR3 (Full sky, streamed detail)**, opens on-demand access to the full CDS Gaia DR3 catalogue. Drag to look and scroll to resolve a smaller field. A worker loads only relevant progressive sky tiles, with fixed source and memory budgets. Source information preserves exact Gaia identifiers and native astrometry; the status distinguishes loaded sources from total archive coverage. This angular survey is separate from NASA catalogue merging and the optional bundled bright-source experiment.
 
 The **Map / Gaia DR3** switch prepares the requested sky region before a short fade. It keeps the viewing direction or selected astronomical source, and **Map** restores the previous view and camera. Catalogue epochs remain unchanged; this is not a cross-match or a 3D interpolation between surveys.

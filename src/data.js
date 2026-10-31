@@ -1,4 +1,4 @@
-import { t, locale } from './i18n.js';
+import { t, locale, formatNumber } from './i18n.js';
 import nearbyStars from './nearby-stars.json' with { type: 'json' };
 export const sources = {
   solar: 'https://science.nasa.gov/solar-system/planet-sizes-and-locations-in-our-solar-system/',
@@ -101,7 +101,7 @@ for (const star of nearbyStars) {
   const spectral=star.spectralType?.[0];
   const tint={M:'#d9957b',K:'#e7ba88',G:'#e8d2a5',F:'#eae4d1',A:'#bfd9ed',B:'#a5c5ec',O:'#99b9ed'}[spectral] || '#c9d7dd';
   catalog.stars.push(object(star.id,star.name,t("Star · HYG 4.1", "Stella · HYG 4.1"),equatorial(star.raDeg,star.decDeg,star.distanceLy,.7),
-    t(`≈ ${star.distanceLy.toLocaleString(locale(),{maximumFractionDigits:2})} ly from the Sun`, `≈ ${star.distanceLy.toLocaleString(locale(),{maximumFractionDigits:2})} a.l. dal Sole`),
+    t(`≈ ${formatNumber(star.distanceLy,{maximumFractionDigits:2})} ly from the Sun`, `≈ ${formatNumber(star.distanceLy,{maximumFractionDigits:2})} a.l. dal Sole`),
     t(`HYG 4.1 catalog star (${star.sourceId}). Equatorial J2000 direction and catalog distance.${star.spectralType?' Spectral type: '+star.spectralType+'.':''} Display brightness is increased for visibility.`, `Stella del catalogo HYG 4.1 (${star.sourceId}). Direzione equatoriale J2000 e distanza da catalogo.${star.spectralType?' Tipo spettrale: '+star.spectralType+'.':''} La luminosità nella mappa è amplificata per renderla visibile.`),tint,
     {raDeg:star.raDeg,decDeg:star.decDeg,distanceLy:star.distanceLy,sceneUnitsPerLy:.7,mag:star.mag,measured:true,source:star.source,positionKind:'approximate-equatorial',positionNote:scales[1].positionNote}));
 }

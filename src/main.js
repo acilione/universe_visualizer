@@ -61,6 +61,8 @@ let immersiveContent = 'combined';
 let combinedData = null;
 let combinedPromise = null;
 let combinedLoading = false;
+let skyLoadingProgress = null;
+let lastCatalogueProgress = 0;
 let combinedError = '';
 let initialCombinedPending = false;
 let gaiaStreamStatus = null;
@@ -1040,11 +1042,19 @@ function onObjectLayersChange(value){
   document.querySelectorAll('[data-object-layer]').forEach(button=>button.setAttribute('aria-pressed',Boolean(value[button.dataset.objectLayer])));
   updatePreviewHud();savePreferences();
 }
+function onCatalogueProgress(progress){
+  skyLoadingProgress=progress?.loading?progress:null;
+  if(skyLoadingProgress&&performance.now()-lastCatalogueProgress<200)return;
+  lastCatalogueProgress=performance.now();
+  const percent=skyLoadingProgress?Math.floor(100*(progress.stars+progress.nebulae)/Math.max(1,progress.totalStars+progress.totalNebulae)):100;
+  $('#renderer-status').textContent=skyLoadingProgress?`${t('LOADING SKY','CARICAMENTO CIELO')} · ${percent}%`:t('3D RENDERER ACTIVE','RENDERER 3D ATTIVO');
+  refreshCombinedLoading();
+}
 function refreshCombinedLoading(){
-  if($('#modal').open&&$('#modal').dataset.kind==='vr'){$('#modal-body').innerHTML=vrContent();refreshIcons();}
+  if(!skyLoadingProgress&&$('#modal').open&&$('#modal').dataset.kind==='vr'){$('#modal-body').innerHTML=vrContent();refreshIcons();}
   const status=$('#combined-preview-status');
-  status.hidden=!combinedLoading&&!combinedError;
-  status.textContent=combinedLoading?t('Loading combined NASA catalogues…','Caricamento dei cataloghi NASA combinati…'):combinedError;
+  status.hidden=!combinedLoading&&!combinedError&&!skyLoadingProgress;
+  status.textContent=skyLoadingProgress?`${t('Loading sky','Caricamento cielo')}: ${number(skyLoadingProgress.stars)} / ${number(skyLoadingProgress.totalStars)} ${t('stars','stelle')} · ${number(skyLoadingProgress.nebulae)} / ${number(skyLoadingProgress.totalNebulae)} ${t('nebulae','nebulose')}`:combinedLoading?t('Loading combined NASA catalogues…','Caricamento dei cataloghi NASA combinati…'):combinedError;
 }
 function cancelInitialCombinedView(){
   if(!initialCombinedPending)return;
@@ -1064,7 +1074,7 @@ async function showInitialCombinedView(){
     if(initialCombinedPending)notify(t('Combined catalogues are unavailable. The Solar System remains available; select the atlas title to retry.','I cataloghi combinati non sono disponibili. Il Sistema Solare resta disponibile; seleziona il titolo dell\u2019atlante per riprovare.'));
   }finally{
     initialCombinedPending=false;
-    if(universe)$('#renderer-status').textContent=t('3D RENDERER ACTIVE','RENDERER 3D ATTIVO');
+    if(universe&&!skyLoadingProgress)$('#renderer-status').textContent=t('3D RENDERER ACTIVE','RENDERER 3D ATTIVO');
   }
 }
 function prepareCombinedCatalogue(){
@@ -1376,7 +1386,8 @@ try {
     onNavigate:stopTour,
     objectLayers:state.objectLayers,
     onObjectLayersChange,
-    onGaiaStreamStatus
+    onGaiaStreamStatus,
+    onCatalogueProgress
   });
   ['labels','grid','particles'].forEach(name => universe.setLayer(name, state[name]));
   universe.setAutoRotate(state.autoRotate);

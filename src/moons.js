@@ -1,5 +1,5 @@
 import { catalog } from './data.js';
-import { t, locale } from './i18n.js';
+import { t, formatNumber } from './i18n.js';
 
 const PHYSICAL_SOURCE = 'https://ssd.jpl.nasa.gov/sats/phys_par/';
 const ORBIT_SOURCE = 'https://ssd.jpl.nasa.gov/sats/elem/';
@@ -54,7 +54,7 @@ const positionNote = t(
   'Schematic circular orbits with compressed separations, enlarged moon sizes and illustrative phases. Orbital planes are simplified.',
   'Orbite circolari schematiche con separazioni compresse, dimensioni delle lune amplificate e fasi illustrative. Piani orbitali semplificati.',
 );
-const number = (value, digits = 3) => value.toLocaleString(locale(), { maximumFractionDigits: digits });
+const number = (value, digits = 3) => formatNumber(value, { maximumFractionDigits: digits });
 function phaseFor(id) {
   let hash = 2166136261;
   for (const character of id) hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);

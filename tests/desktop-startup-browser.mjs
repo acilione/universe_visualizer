@@ -16,7 +16,7 @@ const ready=page=>expect(page.locator('.loading')).toBeHidden({timeout:90000});
 const combined=page=>expect(page.locator('.app-shell')).toHaveClass(/combined-view/,{timeout:90000});
 try{
   const page=await createPage(),requests=[];
-  page.on('request',request=>{if(/\/catalog\/nasa-[^/]+\.json$/.test(request.url()))requests.push(request.url());});
+  page.context().on('request',request=>{if(/\/catalog\/nasa-[^/]+\.json$/.test(request.url()))requests.push(request.url());});
   await page.goto(base,{waitUntil:'networkidle',timeout:90000});await ready(page);await combined(page);
   await expect(page.locator('html')).toHaveAttribute('lang','en');
   await expect(page.locator('#modal')).not.toBeVisible();
@@ -50,7 +50,7 @@ try{
 
   const delayed=await createPage();let release;
   const gate=new Promise(resolve=>{release=resolve;});
-  await delayed.route('**/catalog/nasa-hipparcos.json',async route=>{await gate;await route.continue();});
+  await delayed.context().route('**/catalog/nasa-hipparcos.json',async route=>{await gate;await route.continue();});
   await delayed.goto(base,{waitUntil:'domcontentloaded',timeout:90000});await ready(delayed);
   await expect(delayed.locator('#renderer-status')).toHaveText('LOADING COMBINED MAP');
   await delayed.locator('[data-scale="2"]').click();
@@ -63,12 +63,12 @@ try{
   await delayed.close();
 
   const unavailable=await createPage();
-  await unavailable.route('**/catalog/nasa-hipparcos.json',route=>route.fulfill({status:503,contentType:'text/plain',body:'Catalogue unavailable in test'}));
+  await unavailable.context().route('**/catalog/nasa-hipparcos.json',route=>route.fulfill({status:503,contentType:'text/plain',body:'Catalogue unavailable in test'}));
   await unavailable.goto(base,{waitUntil:'networkidle',timeout:90000});await ready(unavailable);
   await expect(unavailable.locator('#scale-title')).toContainText('Solar System');
   await expect(unavailable.locator('.toast')).toContainText('The Solar System remains available');
   await expect(unavailable.locator('#modal')).not.toBeVisible();
-  await unavailable.unroute('**/catalog/nasa-hipparcos.json');
+  await unavailable.context().unroute('**/catalog/nasa-hipparcos.json');
   await unavailable.locator('a.brand').click();await combined(unavailable);
   console.log('PASS: Failed combined loading preserves the usable Solar System and can be retried from the atlas title');
   await unavailable.close();

@@ -1,4 +1,4 @@
-import { t, locale } from './i18n.js';
+import { t, formatNumber } from './i18n.js';
 import snapshot from './exoplanets.json' with { type: 'json' };
 import { seededRandom } from './data.js';
 
@@ -8,7 +8,7 @@ for (const row of snapshot.planets) {
   if (!systems.has(row.host)) systems.set(row.host, []);
   systems.get(row.host).push(row);
 }
-const n = (value, digits=2) => Number.isFinite(value) ? value.toLocaleString(locale(),{maximumFractionDigits:digits}) : t('unknown', 'sconosciuto');
+const n = (value, digits=2) => Number.isFinite(value) ? formatNumber(value,{maximumFractionDigits:digits}) : t('unknown', 'sconosciuto');
 const discoveryMethods = {
   'Radial Velocity': 'Velocità radiale',
   Imaging: 'Immagine diretta',

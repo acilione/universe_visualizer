@@ -1,3 +1,4 @@
+import {consumeSteps} from './cooperative.js';
 import * as THREE from 'three';
 import { equatorialVector } from './sky-math.js';
 import { indexedPicking } from './combined-map.js';
@@ -22,22 +23,26 @@ export function supportsPassthroughDimming({ mode, blendMode } = {}) {
   return (mode === 'mr' || mode === 'immersive-ar') && blendMode === 'alpha-blend';
 }
 
-function skyStars(objects, uniforms, nebula = false) {
-  const positions = [], colors = [], sizes = [], alphas = [];
-  for (const object of objects) {
-    positions.push(...object.position);
+function skyStars(objects, uniforms, nebula = false, capacity=objects.length) {
+  const positions=new Float32Array(capacity*3),colors=new Float32Array(capacity*3),sizes=new Float32Array(capacity),alphas=new Float32Array(capacity);
+  function fill(start=0,end=objects.length){
+  for(let i=start;i<end;i++){
+    const object=objects[i];
+    positions.set(object.position,i*3);
     const color = new THREE.Color(nebula ? '#82c0bc' : stellarColor(object));
-    colors.push(color.r, color.g, color.b);
+    colors.set([color.r,color.g,color.b],i*3);
     const magnitude = Number.isFinite(object.mag) ? object.mag : 9;
-    sizes.push(nebula ? 3.8 : clamp(7.8 - magnitude * .65, 1.1, 10));
+    sizes[i]=nebula ? 3.8 : clamp(7.8 - magnitude * .65, 1.1, 10);
     // Compress dynamic range for the display; retain the catalogue magnitude order.
-    alphas.push(nebula ? .35 : clamp(Math.pow(10, -.19 * (magnitude - 1)), .018, 1));
+    alphas[i]=nebula ? .35 : clamp(Math.pow(10, -.19 * (magnitude - 1)), .018, 1);
   }
+  }
+  fill();
   const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  geometry.setAttribute('aSize', new THREE.Float32BufferAttribute(sizes, 1));
-  geometry.setAttribute('aAlpha', new THREE.Float32BufferAttribute(alphas, 1));
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+  geometry.setAttribute('aAlpha', new THREE.BufferAttribute(alphas, 1));
   const material = new THREE.ShaderMaterial({
     uniforms, vertexColors: true, transparent: true, depthWrite: false, depthTest: true,
     blending: THREE.AdditiveBlending, toneMapped: false,
@@ -50,7 +55,15 @@ function skyStars(objects, uniforms, nebula = false) {
   points.name = nebula ? 'immersive-nebula-centres' : 'immersive-catalogue-background'; points.frustumCulled = false; points.renderOrder = -9000;
   points.userData.angularReferenceOnly = true; points.userData.particles = false;
   points.userData.catalogueObjectIds = objects.map(object => object.id);
-  indexedPicking(points, objects, nebula ? .28 : .2);
+  const index=indexedPicking(points, objects, nebula ? .28 : .2);
+  geometry.setDrawRange(0,objects.length);
+  if(capacity>objects.length)for(const attribute of Object.values(geometry.attributes))attribute.setUsage(THREE.DynamicDrawUsage);
+  points.userData.append=(start,end=objects.length)=>{
+    fill(start,end);index.append(start,end);
+    for(const attribute of Object.values(geometry.attributes)){attribute.addUpdateRange(start*attribute.itemSize,(end-start)*attribute.itemSize);attribute.needsUpdate=true;}
+    points.userData.catalogueObjectIds.push(...objects.slice(start,end).map(object=>object.id));
+    geometry.setDrawRange(0,end);
+  };
   return points;
 }
 
@@ -96,13 +109,14 @@ function skyNebulae(objects, uniforms) {
 }
 
 /** Four draw calls at most; no render targets or per-star scene objects. */
-export function createImmersiveEnvironment({ parent } = {}) {
+export function createImmersiveEnvironment({ parent, progressive=false } = {}) {
   if (!parent?.isObject3D) throw new TypeError('Immersive environment requires a scene parent.');
   const group = new THREE.Group(); group.name = 'immersive-surrounding-environment'; group.visible = false; parent.add(group);
   const settings = { active: false, mode: 'desktop', blendMode: 'opaque', dim: .56, stars: true, nebulae: true, skyVisible: true, quality: 'high', pixelRatio: 1, reducedMotion: false, nearField: false };
   const uniforms = { uSkyOpacity: { value: 0 }, uPixelRatio: { value: 1 }, uDimOpacity: { value: 0 } };
   let disposed = false, stars = null, nebulae = null, nebulaCentres = null, starCount = 0, nebulaCount = 0, nebulaPatchCount = 0, revealAge = 100;
   let objects = [], targets = [], currentCatalogue = null, nearFieldAnchored = false;
+  let pendingCatalogue=null,generation=0,loading=false,ready=Promise.resolve(true);
   const localField = new THREE.Group(); localField.name = 'immersive-local-field'; parent.add(localField);
   const ambient = createImmersiveEffects({parent:localField});
   ambient.configure({radius:6,ambientOnly:true});
@@ -136,6 +150,29 @@ export function createImmersiveEnvironment({ parent } = {}) {
     if (!object) return;
     object.removeFromParent(); object.geometry.dispose(); object.material.dispose();
   }
+  const projected = object => ({ id: object.id, name: object.name, bodyKind: object.bodyKind, raDeg: object.raDeg, decDeg: object.decDeg,
+        mag: object.mag, colorIndex: object.colorIndex, color: object.color, angularSizeArcmin: object.angularSizeArcmin,
+        position: equatorialVector(object.raDeg, object.decDeg, PICK_RADIUS), positionKind: 'sky-projection', environmentReference: true });
+  function startCatalogue(){
+    const catalogue=pendingCatalogue,version=generation;pendingCatalogue=null;loading=true;
+    const validStars=[],validNebulae=[];
+    release(stars);release(nebulae);release(nebulaCentres);nebulae=null;
+    stars=skyStars(validStars,uniforms,false,(catalogue.stars||[]).length);
+    nebulaCentres=skyStars(validNebulae,uniforms,true,(catalogue.nebulae||[]).length);
+    targets=[stars,nebulaCentres];objects=[];starCount=0;nebulaCount=0;nebulaPatchCount=0;group.add(stars,nebulaCentres);
+    function* fill(){
+      for(const [entries,records,points,isStar] of [[catalogue.nebulae||[],validNebulae,nebulaCentres,false],[catalogue.stars||[],validStars,stars,true]]){
+        for(let offset=0;offset<entries.length;offset+=64){
+          const start=records.length;
+          for(const entry of entries.slice(offset,offset+64))if(knownDirection(entry)){const object=projected(entry);records.push(object);objects.push(object);}
+          points.userData.append(start);starCount=validStars.length;nebulaCount=validNebulae.length;yield;
+        }
+        if(!isStar){const patches=validNebulae.filter(extentKnown);nebulae=skyNebulae(patches,uniforms);nebulaPatchCount=patches.length;group.add(nebulae);yield;}
+      }
+      loading=false;return true;
+    }
+    ready=consumeSteps(fill(),{cancelled:()=>disposed||version!==generation,onBatch:sync});
+  }
   function configure(options = {}) {
     if (disposed) return;
     for (const key of ['active', 'stars', 'nebulae', 'skyVisible', 'reducedMotion', 'nearField']) if (typeof options[key] === 'boolean') settings[key] = options[key];
@@ -155,20 +192,25 @@ export function createImmersiveEnvironment({ parent } = {}) {
     ambient.configure({quality:settings.quality,reducedMotion:settings.reducedMotion});
     ambient.setActive(settings.active && settings.nearField);
     if (!settings.active || !settings.nearField) nearFieldAnchored = false;
+    if(pendingCatalogue&&settings.active&&settings.skyVisible)startCatalogue();
     sync();
   }
   return {
     group,
     radius: PICK_RADIUS,
+    get ready(){return ready;},
     get targets() { return targets; },
     get objects() { return objects; },
     configure,
     setCatalogue(catalogue = {}) {
       if (disposed || currentCatalogue === catalogue) return;
       currentCatalogue = catalogue;
-      const projected = object => ({ id: object.id, name: object.name, bodyKind: object.bodyKind, raDeg: object.raDeg, decDeg: object.decDeg,
-        mag: object.mag, colorIndex: object.colorIndex, color: object.color, angularSizeArcmin: object.angularSizeArcmin,
-        position: equatorialVector(object.raDeg, object.decDeg, PICK_RADIUS), positionKind: 'sky-projection', environmentReference: true });
+      if(progressive){
+        generation++;pendingCatalogue=catalogue;loading=false;
+        release(stars);release(nebulae);release(nebulaCentres);stars=null;nebulae=null;nebulaCentres=null;
+        objects=[];targets=[];starCount=0;nebulaCount=0;nebulaPatchCount=0;
+        if(settings.active&&settings.skyVisible)startCatalogue();return;
+      }
       const validStars = (catalogue.stars || []).filter(knownDirection).slice().sort((a, b) => (a.mag ?? Infinity) - (b.mag ?? Infinity)).map(projected);
       const validNebulae = (catalogue.nebulae || []).filter(knownDirection).map(projected);
       const patches = validNebulae.filter(extentKnown);
@@ -206,13 +248,13 @@ export function createImmersiveEnvironment({ parent } = {}) {
       sync();
     },
     get diagnostics() {
-      return { active: settings.active && !disposed, mode: settings.mode, dimSupported: supportsPassthroughDimming(settings), requestedDim: settings.dim, effectiveDim: uniforms.uDimOpacity.value,
+      return { loading,pending:Boolean(pendingCatalogue),active: settings.active && !disposed, mode: settings.mode, dimSupported: supportsPassthroughDimming(settings), requestedDim: settings.dim, effectiveDim: uniforms.uDimOpacity.value,
         starCount, renderedStarCount: stars?.visible && group.visible ? stars.geometry.drawRange.count : 0,
         nearFieldActive:settings.active && settings.nearField, nearFieldPosition:localField.position.toArray(), nebulaCount, nebulaPatchCount, skyVisible: settings.skyVisible, angularReferenceOnly: true, viewer: viewer.toArray(), drawCalls: group.visible ? group.children.filter(object => object.visible).length + (settings.nearField ? ambient.group.children.filter(object=>object.visible).length : 0) : 0 };
     },
     dispose() {
       if (disposed) return;
-      disposed = true; currentCatalogue = null; ambient.dispose(); localField.removeFromParent(); settings.active = false; uniforms.uDimOpacity.value = 0; uniforms.uSkyOpacity.value = 0;
+      disposed = true; loading=false;generation++;pendingCatalogue=null;currentCatalogue = null; ambient.dispose(); localField.removeFromParent(); settings.active = false; uniforms.uDimOpacity.value = 0; uniforms.uSkyOpacity.value = 0;
       release(stars); release(nebulae); release(nebulaCentres); release(dimmer); objects = []; targets = []; group.visible = false; group.removeFromParent(); group.clear();
     },
   };

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { t, formatNumber } from './i18n.js';
 import { equatorialVector } from './sky-math.js';
 import { createPlanetVisual } from './planet-visuals.js';
+import {consumeSteps} from './cooperative.js';
 
 const RADIUS = 60;
 const CELL_SIZE = 3;
@@ -13,11 +14,12 @@ const visibleInTree = object => {for (let node = object; node; node = node.paren
 
 // Each catalogue stays one GPU batch. Sparse map-local cells are traversed along
 // the ray, so controller hover never scans 118,000 individual star records.
-export function indexedPicking(points, objects, pickRadius) {
-  const cells = new Map(), bounds = new THREE.Box3(), point = new THREE.Vector3();
-  for (let index = 0; index < objects.length; index++) {
+export function indexedPicking(points, objects, pickRadius, deferred=false) {
+  const cells = new Map(), bounds = new THREE.Box3(), rawBounds = new THREE.Box3(), point = new THREE.Vector3();
+  function append(start=0,end=objects.length){
+  for (let index = start; index < end; index++) {
     point.fromArray(objects[index].position);
-    bounds.expandByPoint(point);
+    rawBounds.expandByPoint(point);
     const coordinates = point.toArray().map(value => Math.floor(value / CELL_SIZE));
     const key = keyFor(...coordinates);
     let bucket = cells.get(key);
@@ -28,7 +30,9 @@ export function indexedPicking(points, objects, pickRadius) {
     }
     bucket.indices.push(index);
   }
-  bounds.expandByScalar(pickRadius);
+  bounds.copy(rawBounds).expandByScalar(pickRadius);
+  }
+  if(!deferred)append();
   const inverse = new THREE.Matrix4(), ray = new THREE.Ray(), worldPoint = new THREE.Vector3();
   const stats = points.userData.pickStats = {visitedCells: 0, candidates: 0};
   points.userData.indexedCatalogue = true;
@@ -90,26 +94,33 @@ export function indexedPicking(points, objects, pickRadius) {
       index: bestIndex, object: this, dataObject: objects[bestIndex],
     });
   };
+  return {append};
 }
 
-function cataloguePoints(objects, kind, pixelRatio) {
-  const positions = new Float32Array(objects.length * 3), colors = new Float32Array(objects.length * 3);
-  const sizes = new Float32Array(objects.length), alphas = new Float32Array(objects.length);
+export function cataloguePoints(objects, kind, pixelRatio, {capacity=objects.length,deferred=false}={}) {
+  const positions = new Float32Array(capacity * 3), colors = new Float32Array(capacity * 3);
+  const sizes = new Float32Array(capacity), alphas = new Float32Array(capacity);
   const star = kind === 'star', nebula = kind === 'nebula';
-  objects.forEach((object, index) => {
+  function fill(start=0,end=objects.length){
+  for(let index=start;index<end;index++){
+    const object=objects[index];
     positions.set(object.position, index * 3);
     const color = new THREE.Color(star ? colorFor(object) : nebula ? '#98cbc5' : '#ecc28a');
     colors.set([color.r, color.g, color.b], index * 3);
     const magnitude = Number.isFinite(object.mag) ? object.mag : 7;
     sizes[index] = star ? Math.max(1.5, 8 - magnitude * .7) : nebula ? 4 : 3.5;
     alphas[index] = star ? THREE.MathUtils.clamp(Math.pow(10, -.15 * (magnitude - 2)), .09, .95) : nebula ? .65 : .55;
-  });
+  }
+  }
+  if(!deferred)fill();
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   geometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
   geometry.setAttribute('aAlpha', new THREE.BufferAttribute(alphas, 1));
-  geometry.computeBoundingSphere();
+  geometry.boundingSphere=new THREE.Sphere(new THREE.Vector3(),RADIUS);
+  geometry.setDrawRange(0,deferred?0:objects.length);
+  if(deferred)for(const attribute of Object.values(geometry.attributes))attribute.setUsage(THREE.DynamicDrawUsage);
   const material = new THREE.ShaderMaterial({
     vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
     uniforms: {uPixelRatio: {value: pixelRatio}, uOpacity: {value: 1}, uRing: {value: kind === 'exoplanet' ? 1 : 0}},
@@ -122,17 +133,25 @@ function cataloguePoints(objects, kind, pixelRatio) {
   const points = new THREE.Points(geometry, material);
   points.name = `combined-${kind}-points`;
   points.userData.particles = false;
-  indexedPicking(points, objects, star ? .17 : .27);
+  const index=indexedPicking(points, objects, star ? .17 : .27,deferred);
+  points.userData.append=(start,end=objects.length)=>{
+    if(end>capacity)throw new RangeError('Catalogue point capacity exceeded.');
+    fill(start,end);index.append(start,end);
+    for(const attribute of Object.values(geometry.attributes)){attribute.addUpdateRange(start*attribute.itemSize,(end-start)*attribute.itemSize);attribute.needsUpdate=true;}
+    geometry.setDrawRange(0,end);
+  };
   return points;
 }
 
 // All measured extents share one sphere-conforming mesh and one material.
 // Opacity is deliberately restrained: these are angular illustrations, not photos.
-function nebulaPatches(objects, quality) {
+function nebulaPatches(objects, quality, deferred=false) {
   const extents = objects.filter(extentKnown), segments = quality === 'low' ? 4 : 8;
   const positions = [], uvs = [], seeds = [], indices = [];
   const normal = new THREE.Vector3(), right = new THREE.Vector3(), up = new THREE.Vector3(), point = new THREE.Vector3();
-  extents.forEach((object, patchIndex) => {
+  function* fill(){
+  for (let patchIndex=0;patchIndex<extents.length;patchIndex++){
+    const object=extents[patchIndex];
     normal.fromArray(object.position).normalize();
     right.crossVectors(Math.abs(normal.y) > .99 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0), normal).normalize();
     up.crossVectors(normal, right).normalize();
@@ -146,12 +165,18 @@ function nebulaPatches(objects, quality) {
       const a = offset + y * (segments + 1) + x, b = a + segments + 1;
       indices.push(a, b, a + 1, b, b + 1, a + 1);
     }
-  });
+    yield;
+  }
+  }
+  if(!deferred)for(const _ of fill()){}
   const geometry = new THREE.BufferGeometry();
+  function upload(){
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geometry.setAttribute('aSeed', new THREE.Float32BufferAttribute(seeds, 1));
-  geometry.setIndex(indices); geometry.computeBoundingSphere();
+  geometry.setIndex(indices); geometry.boundingSphere=new THREE.Sphere(new THREE.Vector3(),RADIUS);
+  }
+  upload();
   const material = new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
     uniforms: {uOpacity: {value: .4}},
@@ -167,6 +192,7 @@ function nebulaPatches(objects, quality) {
   mesh.userData.illustrative = true; mesh.userData.particles = false;
   mesh.userData.catalogueObjectIds = extents.map(object => object.id);
   mesh.userData.patchCount = extents.length; mesh.userData.segments = segments;
+  if(deferred)mesh.userData.populateSteps=function*(){yield*fill();upload();};
   return mesh;
 }
 
@@ -191,7 +217,7 @@ function solarOrbits(objects) {
 }
 
 /** A walkable schematic Solar System surrounded by catalogue sky directions. */
-export function createCombinedMap({catalogue = {}, planets = [], exoplanets = [], pixelRatio = 1, quality = 'high', planetVisual = createPlanetVisual} = {}) {
+export function createCombinedMap({catalogue = {}, planets = [], exoplanets = [], pixelRatio = 1, quality = 'high', planetVisual = createPlanetVisual, progressive=false, onProgress=()=>{}} = {}) {
   const group = new THREE.Group(); group.name = 'map';
   const layers = Object.fromEntries(['planets', 'stars', 'nebulae'].map(name => {const layer = new THREE.Group();layer.name = `combined-${name}`;group.add(layer);return [name, layer];}));
   const byId = new Map(), objects = [], targets = [], unplacedCounts = {planets: 0, stars: 0, nebulae: 0};
@@ -204,10 +230,15 @@ export function createCombinedMap({catalogue = {}, planets = [], exoplanets = []
   const hostNote = t(
     'Marker at the host\u2019s catalogue sky direction. Planets in the same system share a direction; individual orbits are not resolved in this projection.',
     'Marcatore nella direzione celeste di catalogo della stella ospite. I pianeti dello stesso sistema condividono una direzione; le singole orbite non sono risolte in questa proiezione.');
+  const project = (entry,layer,host=false) => {
+    if(byId.has(entry.id))return byId.get(entry.id);
+    const known=coordinatesKnown(entry);
+    const object={...entry,combinedLayer:layer,position:known?equatorialVector(entry.raDeg,entry.decDeg,RADIUS):null,positionKind:known?'sky-projection':'unplaced',positionNote:host?`${skyNote} ${hostNote}`:entry.bodyKind==='nebula'?`${skyNote} ${positionNote}`:skyNote};
+    byId.set(object.id,object);return object;
+  };
   const skyRecords = (entries, layer, host = false) => entries.map(entry => {
     const known = coordinatesKnown(entry);
-    const object = {...entry, combinedLayer: layer, position: known ? equatorialVector(entry.raDeg, entry.decDeg, RADIUS) : null, positionKind: known ? 'sky-projection' : 'unplaced', positionNote: host ? `${skyNote} ${hostNote}` : entry.bodyKind === 'nebula' ? `${skyNote} ${positionNote}` : skyNote};
-    byId.set(object.id, object);
+    const object=project(entry,layer,host);
     if (known) objects.push(object); else unplacedCounts[layer]++;
     return object;
   }).filter(object => object.position);
@@ -231,13 +262,15 @@ export function createCombinedMap({catalogue = {}, planets = [], exoplanets = []
     body.add(hit); targets.push(hit); layers[object.combinedLayer].add(body);
   }
   layers.planets.add(solarOrbits(solar));
-  const stars = skyRecords(catalogue.stars || [], 'stars');
-  const nebulae = skyRecords(catalogue.nebulae || [], 'nebulae');
+  const stars = progressive?[]:skyRecords(catalogue.stars || [], 'stars');
+  const nebulae = progressive?[]:skyRecords(catalogue.nebulae || [], 'nebulae');
   const hosts = skyRecords(exoplanets, 'planets', true);
+  const clouds={};
   for (const [records, kind, layer] of [[stars, 'star', 'stars'], [nebulae, 'nebula', 'nebulae'], [hosts, 'exoplanet', 'planets']]) {
-    const points = cataloguePoints(records, kind, pixelRatio); layers[layer].add(points); targets.push(points);
+    const deferred=progressive&&kind!=='exoplanet';
+    const points = cataloguePoints(records, kind, pixelRatio,{deferred,capacity:deferred?(catalogue[layer]||[]).length:records.length});clouds[layer]=points;layers[layer].add(points); targets.push(points);
   }
-  const patches = nebulaPatches(nebulae, quality);
+  let patches = nebulaPatches(nebulae, quality);
   layers.nebulae.add(patches);
   const context = {
     id: 'combined-map', mode: 'combined-map', name: t('Combined map', 'Mappa combinata'), short: t('Combined map', 'Mappa combinata'),
@@ -251,15 +284,48 @@ export function createCombinedMap({catalogue = {}, planets = [], exoplanets = []
     nebulaPatchCount: nebulae.filter(extentKnown).length,
   };
   if (catalogue.metadata?.gaiaDr3) context.description += t(' Includes the ESA Gaia DR3 bright-source experiment.',' Include il sottoinsieme sperimentale di sorgenti luminose ESA Gaia DR3.');
+  let cancelled=false,loading=progressive;
+  const notify=()=>{
+    context.renderedStarCount=stars.length;context.nebulaCount=nebulae.length;context.count=formatNumber(objects.length);
+    context.unplacedCount=Object.values(unplacedCounts).reduce((sum,count)=>sum+count,0);
+    context.loading=loading;onProgress({loading,stars:stars.length,nebulae:nebulae.length,totalStars:context.catalogStarCount,totalNebulae:context.catalogNebulaCount});
+  };
+  function* rebuildPatches(){
+    const replacement=nebulaPatches(nebulae,quality,true);let adopted=false;
+    try{
+      yield* replacement.userData.populateSteps();
+      if(cancelled)return;
+      layers.nebulae.remove(patches);patches.geometry.dispose();patches.material.dispose();patches=replacement;layers.nebulae.add(patches);adopted=true;
+      context.nebulaPatchCount=patches.userData.patchCount;
+    }finally{if(!adopted){replacement.geometry.dispose();replacement.material.dispose();}}
+  }
+  function* populate(){
+    for(const [entries,records,layer] of [[catalogue.nebulae||[],nebulae,'nebulae'],[catalogue.stars||[],stars,'stars']]){
+      for(let offset=0;offset<entries.length;offset+=64){
+        const start=records.length;records.push(...skyRecords(entries.slice(offset,offset+64),layer));
+        clouds[layer].userData.append(start);yield;
+      }
+      if(layer==='nebulae')yield* rebuildPatches();
+    }
+    while(patches.userData.segments!==(quality==='low'?4:8))yield* rebuildPatches();
+    loading=false;return true;
+  }
+  group.userData.cancelLoading=()=>{cancelled=true;loading=false;};
+  const ready=progressive?consumeSteps(populate(),{cancelled:()=>cancelled,onBatch:notify}).catch(error=>{loading=false;throw error;}):Promise.resolve(true);
   return {
+    ready, get loading(){return loading;}, cancelLoading:group.userData.cancelLoading,
     group, objects, targets, context, radius: RADIUS, layers, byId,
     setLayer(name, visible) {if (!Object.hasOwn(layers, name)) throw new RangeError(`Unknown combined map layer: ${name}`);layers[name].visible = Boolean(visible);},
-    getObject(id) {return byId.get(id);},
+    getObject(id) {
+      const source=catalogue.byId?.get(id);
+      return byId.get(id)||(source?project(source,source.bodyKind==='nebula'?'nebulae':'stars'):undefined);
+    },
     setQuality(nextQuality, nextPixelRatio = pixelRatio) {
+      quality=nextQuality;
       pixelRatio = Number.isFinite(nextPixelRatio) && nextPixelRatio > 0 ? nextPixelRatio : pixelRatio;
       for (const target of targets) if (target.userData.indexedCatalogue) target.material.uniforms.uPixelRatio.value = pixelRatio;
       const segments = nextQuality === 'low' ? 4 : 8;
-      if (patches.userData.segments !== segments) {
+      if (!loading && patches.userData.segments !== segments) {
         const replacement = nebulaPatches(nebulae, nextQuality);
         patches.geometry.dispose(); patches.geometry = replacement.geometry;
         patches.userData.segments = segments;

@@ -15,4 +15,9 @@ export function setLanguage(code) {
 }
 export const t = (english, italian) => language === 'it' ? italian : english;
 export const locale = () => language === 'it' ? 'it-IT' : 'en-US';
-export const formatNumber = (value, options = {}) => new Intl.NumberFormat(locale(), options).format(value);
+const numberFormats=new Map();
+export function formatNumber(value,options={}){
+  const key=locale()+JSON.stringify(options);
+  if(!numberFormats.has(key)){if(numberFormats.size>=64)numberFormats.clear();numberFormats.set(key,new Intl.NumberFormat(locale(),options));}
+  return numberFormats.get(key).format(value);
+}

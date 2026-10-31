@@ -34,7 +34,8 @@
     "test:catalogue-handoff": "node tests/catalogue-handoff-browser.mjs",
     "test:constellation-multi-engine": "node tests/constellation-multi-engine.mjs",
     "test:multi-constellations": "node tests/multi-constellations-browser.mjs",
-    "test:constellation-input": "node tests/multi-constellation-input-browser.mjs"
+    "test:constellation-input": "node tests/multi-constellation-input-browser.mjs",
+    "test:progressive-loading": "node tests/progressive-loading-browser.mjs"
   },
   "dependencies": {
     "@hscmap/healpix": "1.4.12",
