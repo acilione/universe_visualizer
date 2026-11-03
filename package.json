@@ -35,7 +35,8 @@
     "test:constellation-multi-engine": "node tests/constellation-multi-engine.mjs",
     "test:multi-constellations": "node tests/multi-constellations-browser.mjs",
     "test:constellation-input": "node tests/multi-constellation-input-browser.mjs",
-    "test:progressive-loading": "node tests/progressive-loading-browser.mjs && node tests/desktop-sky-loading-browser.mjs"
+    "test:progressive-loading": "node tests/progressive-loading-browser.mjs && node tests/desktop-sky-loading-browser.mjs",
+    "test:spatial-hud": "node tests/spatial-hud-browser.mjs"
   },
   "dependencies": {
     "@hscmap/healpix": "1.4.12",

@@ -8,6 +8,7 @@ import { createXR } from './xr.js';
 import { createDesktopImmersive } from './desktop-immersive.js';
 import { createImmersiveEffects } from './immersive-effects.js';
 import { createImmersiveEnvironment } from './immersive-environment.js';
+import { createSpatialHud } from './spatial-hud.js';
 import {circularOrbitPath} from './orbit-paths.js';
 import { createCombinedMap } from './combined-map.js';
 import { loadCelestialCatalog } from './celestial-catalog.js';
@@ -57,6 +58,10 @@ export class Universe {
         if(!active){this.environment.configure({active:false});this.setLayer('particles',this.layers.particles);this.effects.setActive(false);this.spatialRevealAge=null;this.resize();if(details.viewChanged||this.previewEntryIndex!==this.index){this.controls.enabled=!this.isSkyNavigation();this.controls.autoRotate=!this.isSkyNavigation()&&this.autoRotate;this.resetView(true);}}
         onPreviewChange(active,details);
       }});
+    this.hud=createSpatialHud({scene:this.scene,canvas,getCamera:()=>this.renderer.xr.isPresenting?this.renderer.xr.getCamera():this.camera,
+      getTargets:()=>this.spatialTargets(),getMode:()=>({xr:this.renderer.xr.isPresenting,spatial:this.renderer.xr.isPresenting||this.preview.isActive,immersive:this.immersive}),
+      getHover:()=>this.xr.hoverHit,isBlocked:()=>Boolean(this.cameraFlight||this.skyFlight||this.preview.isTransitioning||this.xr.isTransitioning||this.renderer.xr.isPresenting&&this.xr.hoverBlocked),
+      resolveObject:object=>object.gaiaStreamed&&this.gaiaSkyView?this.gaiaSkyView.resolve(object):object.environmentReference?this.catalogueData?.byId?.get(object.id)||object:object});
     this.resizeObserver=new ResizeObserver(()=>this.resize());this.resizeObserver.observe(canvas.parentElement);this.resize();
     this.pointerStart=null;this.skyPointers=new Map();this.viewRequest=0;
     canvas.addEventListener('pointerdown',this.onPointerDown=(e)=>{if(this.preview?.isActive)return;this.pointerStart={x:e.clientX,y:e.clientY,time:performance.now()};if(this.isSkyNavigation()){this.skyFlight=null;this.skyEntry=null;this.skyPointers.set(e.pointerId,{x:e.clientX,y:e.clientY});canvas.setPointerCapture(e.pointerId);}});
@@ -316,7 +321,7 @@ export class Universe {
   }
   setObjectLayer(name,value){
     if(!Object.hasOwn(this.objectLayers,name))return false;
-    this.objectLayers[name]=Boolean(value);
+    this.hud?.reset();this.objectLayers[name]=Boolean(value);
     if(this.index===9){this.combinedView.setLayer(name,Boolean(value));this.updateMoonOrbits();this.configureImmersiveEffects();}
     this.onObjectLayersChange({...this.objectLayers});return true;
   }
@@ -445,7 +450,7 @@ export class Universe {
   buildView(index,objects,context,initial=false,customMap=null,{preserveNavigation=false}={}){
     const selectedId=preserveNavigation?this.selected?.id:null;
     if(this.gaiaSkyView&&customMap!==this.gaiaSkyView.group){this.gaiaSkyView.dispose();this.gaiaSkyView=null;this.onGaiaStreamStatus({active:false});}
-    this.cameraFlight=null;this.skyFlight=null;this.skyEntry=null;this.skyPointers.clear();
+    this.hud?.reset();this.cameraFlight=null;this.skyFlight=null;this.skyEntry=null;this.skyPointers.clear();
     if(!preserveNavigation)this.earthPerspective=false;this.earthReference=null;this.earthMarker=null;this.earthLabel=null;
     const previousIndex=this.index;
     this.content?.traverse(node=>node.userData.cancelLoading?.());
@@ -645,6 +650,7 @@ export class Universe {
     if(name==='grid'){for(const name of ['grid','orbits']){const grid=this.content.getObjectByName(name);if(grid)grid.visible=value&&!this.immersive;}this.updateMoonOrbits();}
     if(name==='particles'){this.sky.visible=value&&this.index<6&&!(this.xr?.isPresenting&&this.xr.mode==='immersive-ar');this.content.traverse(o=>{if(o.userData.particles)o.visible=value;});this.configureImmersiveEffects();}
   }
+  setHudEnabled(value){this.hud?.setEnabled(value);}
   setImmersive(value){
     const changed=this.immersive!==value;this.immersive=value;this.setLayer('labels',this.layers.labels);this.setLayer('grid',this.layers.grid);if(this.selectionRing)this.selectionRing.visible=!value&&(this.index!==7||this.selected?.altitudeDeg>=0);
     const orbits=this.content.getObjectByName('orbits');if(orbits)orbits.visible=this.layers.grid&&!value;
@@ -736,9 +742,10 @@ export class Universe {
     if(!this.lastLabelTime||this.elapsed-this.lastLabelTime>.05){this.updateLabels();this.lastLabelTime=this.elapsed;}
     // Map-relative tracers must not expose a relocation while the content fades.
     // Keep the separate room field, distant sky and MR passthrough untouched.
+    this.hud?.update(dt,{reducedMotion:this.reducedMotion});
     const comfortEffects=(this.renderer.xr.isPresenting&&this.xr.isTransitioning||this.preview?.isActive&&this.preview.isTransitioning)?this.effects.group:null;
     const effectsVisible=comfortEffects?.visible;if(comfortEffects)comfortEffects.visible=false;
     try{this.renderer.render(this.scene,this.camera);}finally{if(comfortEffects)comfortEffects.visible=effectsVisible;}
   }
-  dispose(){this.gaiaSkyView?.dispose();this.disposed=true;this.viewRequest++;this.canvas.removeEventListener('pointermove',this.onSkyMove);this.canvas.removeEventListener('pointercancel',this.onSkyCancel);this.canvas.removeEventListener('wheel',this.onSkyWheel);this.renderer.setAnimationLoop(null);this.resizeObserver.disconnect();this.preview.dispose();this.effects.dispose();this.environment.dispose();this.controls.dispose();this.xr.dispose?.();this.disposeGroup(this.mapRoot);this.disposeGroup(this.sky);this.glowTexture.dispose();disposePlanetTextures();this.renderer.dispose();this.canvas.removeEventListener('pointerdown',this.onPointerDown);this.canvas.removeEventListener('pointerup',this.onPointerUp);this.canvas.removeEventListener('webglcontextlost',this.onContextLost);this.labels.forEach(l=>l.element.remove());}
+  dispose(){this.gaiaSkyView?.dispose();this.disposed=true;this.viewRequest++;this.canvas.removeEventListener('pointermove',this.onSkyMove);this.canvas.removeEventListener('pointercancel',this.onSkyCancel);this.canvas.removeEventListener('wheel',this.onSkyWheel);this.renderer.setAnimationLoop(null);this.resizeObserver.disconnect();this.hud.dispose();this.preview.dispose();this.effects.dispose();this.environment.dispose();this.controls.dispose();this.xr.dispose?.();this.disposeGroup(this.mapRoot);this.disposeGroup(this.sky);this.glowTexture.dispose();disposePlanetTextures();this.renderer.dispose();this.canvas.removeEventListener('pointerdown',this.onPointerDown);this.canvas.removeEventListener('pointerup',this.onPointerUp);this.canvas.removeEventListener('webglcontextlost',this.onContextLost);this.labels.forEach(l=>l.element.remove());}
 }

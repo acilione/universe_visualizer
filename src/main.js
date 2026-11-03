@@ -32,6 +32,7 @@ const state = {
   autoRotate: typeof preferences.autoRotate === 'boolean' ? preferences.autoRotate : !reducedMotion,
   quality: preferences.quality === 'low' ? 'low' : 'high',
   gaiaDr3: preferences.gaiaDr3 === true,
+  spatialHud: preferences.spatialHud !== false,
   mrDimming: Number.isFinite(preferences.mrDimming) ? Math.max(0,Math.min(.8,preferences.mrDimming)) : .56,
   objectLayers: Object.fromEntries(['planets','stars','nebulae'].map(name=>[name,preferences.objectLayers?.[name]!==false])),
   tour: false, sound: false, cinematic: false
@@ -192,8 +193,8 @@ window.addEventListener('resize',positionSidePanel,{passive:true});
 positionSidePanel();
 
 function savePreferences() {
-  const { labels, grid, particles, autoRotate, quality, objectLayers, gaiaDr3, mrDimming } = state;
-  try { localStorage.setItem('aether.preferences', JSON.stringify({ labels, grid, particles, autoRotate, quality, objectLayers, gaiaDr3, mrDimming, constellationIds:constellationBrowser.ids })); } catch { /* Storage can be unavailable in private browsers. */ }
+  const { labels, grid, particles, autoRotate, quality, objectLayers, gaiaDr3, mrDimming, spatialHud } = state;
+  try { localStorage.setItem('aether.preferences', JSON.stringify({ labels, grid, particles, autoRotate, quality, objectLayers, gaiaDr3, mrDimming, spatialHud, constellationIds:constellationBrowser.ids })); } catch { /* Storage can be unavailable in private browsers. */ }
 }
 
 function notify(message) {
@@ -879,7 +880,7 @@ function openAbout() {
 
 function openHelp() {
   openModal('help', t("Controls and navigation","Comandi e navigazione"), `
-    <div class="help-keys"><div><strong>${t("Drag","Trascina")}</strong>${t("Orbit the map","Orbita intorno alla mappa")}</div><div><strong>${t("Scroll / two fingers","Rotellina / due dita")}</strong>${t("Zoom in and out","Avvicina e allontana")}</div><div><strong>${t("Click / tap a planet or moon","Clic / tocco su un pianeta o satellite")}</strong>${t("Inspect the selected body","Osserva il corpo selezionato")}</div><div><strong>${t("Planets & moons","Pianeti e satelliti")}</strong>${t("Browse eight planets, confirmed exoplanets and major natural satellites","Sfoglia otto pianeti, esopianeti confermati e satelliti naturali principali")}</div><div><strong>${t("Constellations","Costellazioni")}</strong>${t("Add or remove constellations in 3D, or use View from Earth with your location and time","Aggiungi o rimuovi costellazioni in 3D, oppure usa Guarda dalla Terra con luogo e orario desiderati")}</div><div><strong>${t("Immersive view","Vista immersiva")}</strong>${t("Hide all text. Press Esc or use the top-right icon to restore controls","Nasconde tutte le scritte. Esc o l’icona in alto a destra per tornare")}</div><div><strong>1 — 5</strong>${t("Change reference scale","Cambia scala di riferimento")}</div><div><strong>/</strong>${t("Search stars, planets and moons","Cerca stelle, pianeti e satelliti")}</div><div><strong>${t("Space","Spazio")}</strong>${t("Pause or resume rotation","Ferma o riprendi la rotazione")}</div><div><strong>R</strong>${t("Reset the camera","Ripristina l’inquadratura")}</div><div><strong>Esc</strong>${t("Close dialogs and immersive view","Chiudi finestre e vista immersiva")}</div></div>
+    <div class="help-keys"><div><strong>${t("Drag","Trascina")}</strong>${t("Orbit the map","Orbita intorno alla mappa")}</div><div><strong>${t("Scroll / two fingers","Rotellina / due dita")}</strong>${t("Zoom in and out","Avvicina e allontana")}</div><div><strong>${t("Click / tap a planet or moon","Clic / tocco su un pianeta o satellite")}</strong>${t("Inspect the selected body","Osserva il corpo selezionato")}</div><div><strong>${t("Planets & moons","Pianeti e satelliti")}</strong>${t("Browse eight planets, confirmed exoplanets and major natural satellites","Sfoglia otto pianeti, esopianeti confermati e satelliti naturali principali")}</div><div><strong>${t("Constellations","Costellazioni")}</strong>${t("Add or remove constellations in 3D, or use View from Earth with your location and time","Aggiungi o rimuovi costellazioni in 3D, oppure usa Guarda dalla Terra con luogo e orario desiderati")}</div><div><strong>${t("Immersive view","Vista immersiva")}</strong>${t("Hide navigation panels and labels; object telemetry remains available. H toggles the HUD. Esc restores controls","Nasconde pannelli ed etichette; i dati dell’oggetto restano disponibili. H attiva o nasconde l’HUD. Esc ripristina i comandi")}</div><div><strong>1 — 5</strong>${t("Change reference scale","Cambia scala di riferimento")}</div><div><strong>/</strong>${t("Search stars, planets and moons","Cerca stelle, pianeti e satelliti")}</div><div><strong>${t("Space","Spazio")}</strong>${t("Pause or resume rotation","Ferma o riprendi la rotazione")}</div><div><strong>R</strong>${t("Reset the camera","Ripristina l’inquadratura")}</div><div><strong>Esc</strong>${t("Close dialogs and immersive view","Chiudi finestre e vista immersiva")}</div></div>
     <h3>${t("VIRTUAL REALITY","NELLA REALTÀ VIRTUALE")}</h3><p>${t("Desktop preview provides a first-person view without a headset. WebXR supports room-scale VR and mixed reality with a compatible headset. Hand tracking requires device and browser support; controllers are also supported.","L’anteprima PC offre una visuale in prima persona senza visore. Un visore WebXR compatibile permette di usare VR e realtà mista alla scala dell’ambiente. Il tracciamento delle mani richiede un visore e un browser che lo supportino. Anche i controller sono utilizzabili.")}</p><button class="focus-button" data-action="vr">${icon('glasses')}${t("VR controls","Comandi VR")}</button>`);
 }
 
@@ -1016,6 +1017,12 @@ async function openGaiaInfo() {
   }
 }
 
+function setSpatialHud(enabled) {
+  state.spatialHud=Boolean(enabled);universe?.setHudEnabled(state.spatialHud);
+  document.querySelectorAll('[data-action="toggle-hud"]').forEach(button=>button.setAttribute('aria-checked',state.spatialHud));
+  savePreferences();
+}
+
 function openSettings() {
   openModal('settings', t("Settings","Impostazioni"), `
     <h3>${t('LANGUAGE', 'LINGUA')}</h3>
@@ -1024,6 +1031,9 @@ function openSettings() {
       <option value="en" ${getLanguage() === 'en' ? 'selected' : ''}>English</option>
       <option value="it" ${getLanguage() === 'it' ? 'selected' : ''}>Italiano</option>
     </select>
+    <h3>${t('SPATIAL HUD','HUD SPAZIALE')}</h3>
+    <div class="layer-row"><span>${t('Object telemetry','Dati dell’oggetto')}</span><button class="toggle" role="switch" data-action="toggle-hud" aria-label="${t('Object telemetry HUD','HUD dati dell’oggetto')}" aria-checked="${state.spatialHud}"></button></div>
+    <p>${t('Point at an object, or look toward it in VR, to read its catalogue data inside the scene. Works with controls hidden. Press H to toggle; zoom and gestures remain available.','Punta un oggetto, o guardalo in VR, per leggerne i dati di catalogo nella scena. Funziona anche con i comandi nascosti. Premi H per attivarlo o nasconderlo; zoom e gesti restano disponibili.')}</p>
     <h3>${t('GAIA DR3 SKY','CIELO GAIA DR3')}</h3>
     <button class="planet-details-button" data-action="gaia-stream">${t('Open full sky with streamed detail','Apri tutto il cielo con dettaglio progressivo')}${icon('arrow-up-right')}</button>
     <h3>${t("EXPERIMENTAL CATALOGUE","CATALOGO SPERIMENTALE")}</h3>
@@ -1317,6 +1327,7 @@ document.addEventListener('click', async event => {
     case 'zoom-out': universe?.zoom(1.25); break;
     case 'reset': universe?.resetView(); notify(t("View reset.","Vista ripristinata.")); break;
     case 'rotate': setRotation(!state.autoRotate); break;
+    case 'toggle-hud': setSpatialHud(!state.spatialHud); break;
     case 'settings-rotate': setRotation(!state.autoRotate); button.setAttribute('aria-checked', state.autoRotate); break;
     case 'cinema': toggleCinematic(); break;
     case 'sound': await toggleSound(); break;
@@ -1350,7 +1361,8 @@ document.addEventListener('keydown', event => {
     return;
   }
   if (event.target.matches('input, textarea, select, [contenteditable="true"]') || event.ctrlKey || event.metaKey || event.altKey || $('#modal').open) return;
-  if (event.key === '/') { event.preventDefault(); openSearch(); }
+  if (event.key.toLowerCase() === 'h' && !event.repeat) { event.preventDefault(); setSpatialHud(!state.spatialHud); }
+  else if (event.key === '/') { event.preventDefault(); openSearch(); }
   else if (/^[1-5]$/.test(event.key)) { event.preventDefault(); changeScale(Number(event.key) - 1); }
   else if (event.key.toLowerCase() === 'r') { universe?.resetView(); }
   else if (event.code === 'Space' && !universe?.preview.isActive && !event.target.closest('button, a')) { event.preventDefault(); setRotation(!state.autoRotate); }
@@ -1386,6 +1398,7 @@ try {
   ['labels','grid','particles'].forEach(name => universe.setLayer(name, state[name]));
   universe.setAutoRotate(state.autoRotate);
   universe.setMRDimming(state.mrDimming);
+  universe.setHudEnabled(state.spatialHud);
   universe.setQuality(state.quality);
 } catch (error) {
   announceFailure();

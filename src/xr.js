@@ -94,6 +94,8 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   let mapGrabPoints = null;
   let baseScale = 0.04;
   let hoverButton = -1;
+  let hoverHit = null, hoverInput = null, hoverBlocked = false;
+  const clearHover = (blocked = false) => { hoverHit = null; hoverInput = null; hoverBlocked = blocked; };
   let panelDirty = true;
   let lastScale = null;
   let lastLayerState = '';
@@ -326,6 +328,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
 
   function startInput(input, kind) {
     if (!active || input.press || transitionState) return;
+    clearHover(true);
     const pose = inputPose(input);
     if (!pose) return;
     input.press = { kind, time: performance.now(), pose, hit: pick(input), manipulated: kind === 'squeeze', maxDistance: 0, maxAngle: 0 };
@@ -375,6 +378,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   }
 
   function cancelInput(input) {
+    if (hoverInput === input) clearHover();
     input.press = null;
     input.pinching = false;
     input.backHold?.reset();
@@ -466,6 +470,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
 
   /** A floor-space origin reset changes coordinates, not the physical map pose. */
   function referenceReset(event) {
+    clearHover(true);
     for (const input of inputs) cancelInput(input);
     focusState = null;
     cancelTransition();
@@ -512,6 +517,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
 
   /** Hide all panel writing; the peripheral, textless sphere restores controls. */
   function setImmersive(value) {
+    clearHover();
     const changed = immersive !== Boolean(value);
     immersive = Boolean(value);
     panel.visible = active && !immersive;
@@ -529,6 +535,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   /** Request an overview reset on the next tracked frame. */
   function recenter() {
     if (!active) return false;
+    clearHover(true);
     focusState = null;
     cancelTransition();
     recenterPending = true;
@@ -557,6 +564,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   // Fade the virtual map only. The tracked camera, room and distant sky remain
   // stationary; no intermediate translation, rotation or scale is ever drawn.
   function startTransition(commit) {
+    clearHover(true);
     if (getReducedMotion()) { cancelTransition(); commit(); return; }
     if (transitionVisibility === null) transitionVisibility = mapRoot.visible;
     transitionState = { commit, phase: 'out', age: 0, fromOpacity: transitionOpacity };
@@ -639,6 +647,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   }
 
   function restoreDesktop() {
+    clearHover();
     if (!snapshot && !active && !entering) return;
     removeReferenceReset?.();
     removeReferenceReset = null;
@@ -757,7 +766,10 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
         else restoreDesktop();
       }, { once: true });
       session.addEventListener('visibilitychange', () => {
-        if (session.visibilityState !== 'visible') for (const input of inputs) cancelInput(input);
+        if (session.visibilityState !== 'visible') {
+          for (const input of inputs) cancelInput(input);
+          clearHover(true);
+        }
       });
       await renderer.xr.setSession(session);
       if (disposed || ended) {
@@ -810,11 +822,13 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   }
 
   function update(delta = 1 / 60) {
+    clearHover();
     if (!active || !renderer.xr.isPresenting) return;
     const session = renderer.xr.getSession();
     const frame = renderer.xr.getFrame?.(), referenceSpace = renderer.xr.getReferenceSpace?.();
     if ((session?.visibilityState && session.visibilityState !== 'visible') || (frame && referenceSpace && !frame.getViewerPose(referenceSpace))) {
       for (const input of inputs) cancelInput(input);
+      clearHover(true);
       return;
     }
     const currentMode = presentationMode();
@@ -882,6 +896,14 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
         cancelInput(input);
       }
       const hit = handsFirst && input.press?.hit && !input.press.manipulated ? input.press.hit : pick(input);
+      // Reuse the navigation pick. Do not raycast a second time for the HUD or
+      // expose a cached press hit while the map can move under that point.
+      if (input.source && input.controller.visible) {
+        if (input.press || input.fistActive || hit?.panel) hoverBlocked = true;
+        else if (hit?.item && !transitionState && (!hoverHit || hit.distance < hoverHit.distance)) {
+          hoverHit = hit; hoverInput = input;
+        }
+      }
       input.cursor.visible = !!hit && !!input.source && !input.fistActive;
       if (hit) {
         input.cursor.position.copy(hit.point);
@@ -932,6 +954,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
       gesture = null;
       endMapGrab();
     }
+    if (hoverBlocked || transitionState) { hoverHit = null; hoverInput = null; }
     if (nextHover !== hoverButton) { hoverButton = nextHover; panelDirty = true; }
     const value = getScale?.();
     if (lastScale !== value) { lastScale = value; panelDirty = true; }
@@ -939,6 +962,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   }
 
   async function dispose() {
+    clearHover();
     if (disposed) return;
     disposed = true;
     if (active) await renderer.xr.getSession()?.end();
@@ -973,5 +997,7 @@ export function createXR({ renderer, scene, camera, controls, mapRoot, getTarget
   }
 
   paintPanel();
-  return { enter, setLayout, update, setInfo, focusObject, recenter, navigateBack, setImmersive, dispose, get transitionOpacity() { return transitionOpacity; }, get isTransitioning() { return Boolean(transitionState); }, get handsFirst() { return handsFirst; }, get isInspecting() { return inspecting; }, get environmentBlendMode() { return renderer.xr.getSession()?.environmentBlendMode || null; }, get layout() { return layout; }, get mode() { return sessionMode; }, get isPresenting() { return active; }, get isImmersive() { return immersive; } };
+  return { enter, setLayout, update, setInfo, focusObject, recenter, navigateBack, setImmersive, dispose,
+    get hoverHit() { return active && renderer.xr.isPresenting && !recenterPending && !transitionState && !hoverBlocked && hoverInput?.source && hoverInput.controller.visible && hoverHit && visibleObject(hoverHit.object) ? hoverHit : null; },
+    get hoverBlocked() { return active && (hoverBlocked || recenterPending || Boolean(transitionState)); }, get transitionOpacity() { return transitionOpacity; }, get isTransitioning() { return Boolean(transitionState); }, get handsFirst() { return handsFirst; }, get isInspecting() { return inspecting; }, get environmentBlendMode() { return renderer.xr.getSession()?.environmentBlendMode || null; }, get layout() { return layout; }, get mode() { return sessionMode; }, get isPresenting() { return active; }, get isImmersive() { return immersive; } };
 }

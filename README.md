@@ -85,9 +85,13 @@ Constellation controls:
 
 The Earth-origin orientation includes J2000 precession. Proper motion, parallax, nutation, atmospheric refraction, daylight, light pollution and terrain are not simulated. Earth–Sun separation is negligible at the constellation scale and is omitted. The sky stays at the selected instant until changed.
 
-**Immersive view** hides interface text and labels. Press **Esc**, or use the textless restore control, to return. Reduced-motion preferences disable decorative animation. Short desktop windows use independently scrollable side panels above the reference-scale bar.
+**Immersive view** hides navigation panels and labels. The scene-rendered object HUD remains available. Press **Esc**, or use the textless restore control, to return. Reduced-motion preferences disable decorative animation. Short desktop windows use independently scrollable side panels above the reference-scale bar.
 
-Shortcuts: **1–5** reference scale, **R** reset, **/** search, **Space** auto-rotation, **Esc** close dialog or immersive view.
+The **spatial HUD** displays catalogue information for the object under your pointer, or in your viewing direction in desktop VR preview and VR/MR. A tracked hand or controller pointing at an object takes priority over head direction. The readout is drawn in WebGL, stays readable while zooming, and does not capture clicks, wheel input or gestures. **Settings → Spatial HUD** or **H** toggles it; the choice is saved on this device.
+
+The HUD reuses existing indexed catalogue picking and headset hover results. Gaze/pointer checks run at most ten times per second, and a short dwell stabilizes the readout. Its single text texture updates only when the displayed object or language changes; its frame and reticle share one line batch. It adds no catalogue copies, network requests or worker message streams. Catalogue parsing and progressive geometry loading retain their existing worker/task scheduling.
+
+Shortcuts: **1–5** reference scale, **R** reset, **/** search, **Space** auto-rotation, **H** object HUD, **Esc** close dialog or immersive view.
 
 ## Immersive preview, VR and mixed reality
 

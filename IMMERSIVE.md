@@ -4,7 +4,7 @@ Open the immersive-mode chooser from the headset button in the atlas. Desktop pr
 
 ## Preview on a PC
 
-Choose **Start desktop preview**. This works in a desktop browser with WebGL and does not require WebXR or a headset. It provides a first-person view of the spatial map, with mouse and keyboard standing in for headset movement. The view starts without text overlays; the small restore control opens optional settings and catalogue controls. It is a single-camera preview; stereoscopic depth, tracked hands and physical passthrough require a headset.
+Choose **Start desktop preview**. This works in a desktop browser with WebGL and does not require WebXR or a headset. It provides a first-person view of the spatial map, with mouse and keyboard standing in for headset movement. The view starts with navigation panels hidden and the spatial object HUD enabled; the small restore control opens optional settings and catalogue controls. It is a single-camera preview; stereoscopic depth, tracked hands and physical passthrough require a headset.
 
 | Control | Action |
 | --- | --- |
@@ -21,7 +21,8 @@ Choose **Start desktop preview**. This works in a desktop browser with WebGL and
 | Room scale / Tabletop | Choose a surrounding volume or a smaller map in front of the viewer |
 | Map size and rotation controls | Transform the map explicitly |
 | Search / Object data | Find catalogue objects and inspect the current selection |
-| Hide controls | Remove the text overlay; the restore button shows it again |
+| Hide controls | Hide navigation panels; the object HUD remains available |
+| H | Toggle the spatial object HUD |
 | Esc | Release pointer lock, close a dialog or leave the preview, as applicable |
 | Exit preview | Return to the desktop atlas |
 
@@ -138,3 +139,9 @@ Primary references:
 - [WebXR Device API specification](https://immersive-web.github.io/webxr/)
 - [WebXR reference-space reset events](https://immersive-web.github.io/webxr/#xrreferencespaceevent-interface)
 - [Three.js WebXRManager](https://threejs.org/docs/pages/WebXRManager.html)
+
+## Spatial object HUD
+
+Look toward a body or catalogue source to see a compact instrument readout inside the rendered scene. In VR/MR, a tracked hand or controller aimed at an object takes priority. A brief acquisition delay avoids rapid changes between neighbouring sources. The panel stays at a fixed viewing distance and size while the map moves or zooms; it never moves the viewer or becomes a navigation target. It hides during travel fades, grabs and open dialogs.
+
+The HUD is enabled by default, independently of map labels and hidden controls. Press **H** on desktop or use **Settings → Spatial HUD** before entering a headset to turn it off. Missing measurements stay unavailable; display coordinates are never presented as physical distances. The readout uses two draw calls, a bounded text texture and throttled indexed picking, without duplicating catalogue workers.

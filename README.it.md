@@ -86,7 +86,9 @@ python3 scripts/import_constellations.py
 
 ## Vista libera
 
-La modalità immersiva nasconde pannelli, scritte, etichette, marcatori di selezione e griglia. Non contiene pulsanti con testo in sovrimpressione. **Esc** ripristina l’interfaccia; su touchscreen o dopo il movimento del puntatore compare un piccolo comando grafico per tornare alla mappa completa. I controlli di navigazione del canvas rimangono attivi.
+L’**HUD spaziale** mostra i dati di catalogo dell’oggetto puntato, oppure nella direzione dello sguardo nell’anteprima VR e in VR/MR. La mano o il controller hanno precedenza sullo sguardo. È disegnato in WebGL, mantiene dimensioni leggibili durante lo zoom e lascia passare clic, rotellina e gesti. **Impostazioni → HUD spaziale** o **H** lo attivano o nascondono; la preferenza viene salvata. I controlli del bersaglio avvengono al massimo dieci volte al secondo, riutilizzando gli indici esistenti; il testo viene ridisegnato solo quando cambiano oggetto o lingua.
+
+La modalità immersiva nasconde pannelli di navigazione, etichette, marcatori di selezione e griglia. L’HUD dei dati dell’oggetto resta disponibile nella scena; **H** lo attiva o nasconde. **Esc** ripristina l’interfaccia; su touchscreen o dopo il movimento del puntatore compare un piccolo comando grafico per tornare alla mappa completa. I controlli di navigazione del canvas rimangono attivi.
 
 La mappa normale riprende dal video `treasure_planet_map_video.mp4` il linguaggio di meridiani curvi azzurri, orbite luminose e particelle. Le transizioni e l’aspetto dei corpi sono adattamenti dell’atlante, non una riproduzione fotogramma per fotogramma.
 
