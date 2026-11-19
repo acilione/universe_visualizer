@@ -34,20 +34,22 @@ const render=()=>page.evaluate(()=>{atlas.elapsed+=2;atlas.content.userData.born
 try{
   if(process.env.LIVE_GAIA==='1'){
     await page.goto(engineBase+'/tests/fixtures/engine.html',{waitUntil:'networkidle',timeout:90000});await page.waitForFunction(()=>window.atlas?.ready);await page.evaluate(()=>atlas.renderer.setAnimationLoop(null));
-    const live=await page.evaluate(async service=>{
-      const results=[];
-      for(const path of ['properties','metadata.xml','Norder1/Dir0/Npix0.tsv']){
-        const response=await fetch(service+'/'+path,{mode:'cors',credentials:'omit',signal:AbortSignal.timeout(15000)});
-        if(!response.ok)throw new Error('Live Gaia HTTP '+response.status);
-        const reader=response.body.getReader(),decoder=new TextDecoder();let bytes=0,text='';
-        try{while(true){const {done,value}=await reader.read();if(done)break;bytes+=value.byteLength;if(bytes>2*1024*1024){await reader.cancel();throw new Error('Live smoke byte budget exceeded');}text+=decoder.decode(value,{stream:true});}text+=decoder.decode();}finally{reader.releaseLock();}
-        results.push({path,status:response.status,type:response.type,bytes,text});
-      }
-      return results;
-    },service);
-    validateGaiaMetadata(live[0].text,live[1].text);const rows=parseGaiaTile(live[2].text);assert.ok(rows.length>0);assert.equal(typeof rows[0].sourceId,'string');
-    await writeFile(out+'/live-cds.json',JSON.stringify({requests:live.map(({text,...rest})=>rest),sourceId:rows[0].sourceId,rows:rows.length},null,2));
-    pass('Three bounded live CDS requests pass actual browser CORS and release/schema validation');
+    await page.evaluate(async()=>{
+      await atlas.showGaiaSky();
+      const {equatorialVector}=await import('/src/sky-math.js');
+      atlas.camera.fov=.5;
+      atlas.camera.updateProjectionMatrix();
+      atlas.camera.lookAt(atlas.camera.position.clone().fromArray(equatorialVector(83.82,-5.39)));
+    });
+    await tick();
+    await page.waitForFunction(()=>{
+      const d=atlas.gaiaSkyView.diagnostics;
+      return d.lastCone.radiusDeg<2 && !d.overview && (d.mirror || d.loadedTiles>0) && d.renderedSources>0;
+    },null,{timeout:90000});
+    const stats=await page.evaluate(()=>atlas.gaiaSkyView.diagnostics);
+    await writeFile(out+'/live-cds.json',JSON.stringify(stats,null,2));
+    pass('Live DR3 sources render through the catalogue worker and a browser-accessible CDS service');
+
   }
   await context.route(service+'/**',async route=>{
     const url=route.request().url();requests.push(url);const headers={'access-control-allow-origin':'*'};

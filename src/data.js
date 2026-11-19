@@ -1,5 +1,6 @@
 import { t, locale, formatNumber } from './i18n.js';
-import {circularOrbitPosition} from './orbit-paths.js';
+import {planetOrbit,orbitPoint} from './planet-ephemeris.js';
+const orbitalEpoch = Date.now();
 import nearbyStars from './nearby-stars.json' with { type: 'json' };
 export const sources = {
   solar: 'https://science.nasa.gov/solar-system/planet-sizes-and-locations-in-our-solar-system/',
@@ -31,7 +32,7 @@ export function equatorial(ra, dec, distance, factor=1) {
 const object=(id,name,type,position,distance,detail,color='#ecc589',extra={})=>({id,name,type,position,distance,detail,color,...extra});
 const planets=[['mercury',t("Mercury", "Mercurio"),.39,'#ac9d88'],['venus',t("Venus", "Venere"),.72,'#d5b97d'],['earth',t("Earth", "Terra"),1,'#81c4cc'],['mars',t("Mars", "Marte"),1.52,'#d58462'],['jupiter',t("Jupiter", "Giove"),5.2,'#d3a377'],['saturn',t("Saturn", "Saturno"),9.58,'#e9ce92'],['uranus',t("Uranus", "Urano"),19.2,'#96d6d7'],['neptune',t("Neptune", "Nettuno"),30.05,'#658ecc']];
 export const catalog = {
-  solar:[object('sun',t("Sun", "Sole"),t("Star", "Stella"),[0,0,0],t("0 AU from the Sun", "0 UA dal Sole"),t("The star at the center of the Solar System. Its light takes approximately 8 minutes to reach Earth.", "La stella al centro del nostro sistema. La sua luce impiega circa 8 minuti per raggiungere la Terra."),'#ffd99a',{size:1.25}),...planets.map(([id,name,au,color],i)=>{const r=3.2+i*2.25,a=.55+i*2.28;return object(id,name,i<4?t("Terrestrial planet", "Pianeta roccioso"):i<6?t("Gas giant", "Gigante gassoso"):t("Ice giant", "Gigante ghiacciato"),circularOrbitPosition(r,a),t(`${au.toLocaleString(locale())} AU from the Sun`, `${au.toLocaleString(locale())} UA dal Sole`),t(`${name} is the ${['first','second','third','fourth','fifth','sixth','seventh','eighth'][i]} planet in the Solar System. The distance approximates the orbital semimajor axis. Circular orbits and orbital phases are illustrative.`, `${name} è il ${['primo','secondo','terzo','quarto','quinto','sesto','settimo','ottavo'][i]} pianeta del Sistema Solare. La distanza indicata approssima il semiasse maggiore orbitale. Orbite circolari e fasi sono illustrative.`),color,{size:i<4?.27:.6,orbit:r,orbitPhaseRad:a})})],
+  solar:[object('sun',t("Sun", "Sole"),t("Star", "Stella"),[0,0,0],t("0 AU from the Sun", "0 UA dal Sole"),t("The star at the center of the Solar System. Its light takes approximately 8 minutes to reach Earth.", "La stella al centro del nostro sistema. La sua luce impiega circa 8 minuti per raggiungere la Terra."),'#ffd99a',{size:1.25}),...planets.map(([id,name,au,color],i)=>{const r=3.2+i*2.25,ephemeris=planetOrbit(id,orbitalEpoch);return object(id,name,i<4?t("Terrestrial planet", "Pianeta roccioso"):i<6?t("Gas giant", "Gigante gassoso"):t("Ice giant", "Gigante ghiacciato"),orbitPoint(ephemeris,r),t(`${au.toLocaleString(locale())} AU from the Sun`, `${au.toLocaleString(locale())} UA dal Sole`),t(`${name} is the ${['first','second','third','fourth','fifth','sixth','seventh','eighth'][i]} planet in the Solar System. The distance approximates the orbital semimajor axis. Orbital direction follows the current JPL approximation.`, `${name} è il ${['primo','secondo','terzo','quarto','quinto','sesto','settimo','ottavo'][i]} pianeta del Sistema Solare. La distanza indicata approssima il semiasse maggiore orbitale. La direzione orbitale segue l’approssimazione JPL per il momento attuale.`),color,{size:i<4?.27:.6,orbit:r,ephemeris})})],
   stars:[object('sol',t("Sun", "Sole"),t("Reference star", "Stella di riferimento"),[0,0,0],t("0 ly", "0 a.l."),t("The Sun is the origin of this heliocentric reference frame.", "Il Sole è l’origine di questo sistema di riferimento eliocentrico."),'#ffe2a8',{targetScale:0}),...[
     ['proxima','Proxima Centauri',217.43,-62.68,4.24,t("Red dwarf", "Nana rossa"),t("The closest star to the Sun, part of the Alpha Centauri system.", "La stella più vicina al Sole, parte del sistema di Alfa Centauri."),'#dd9174'],
     ['alpha',t("Alpha Centauri A/B", "Alfa Centauri A/B"),219.90,-60.83,4.37,t("Binary system", "Sistema binario"),t("A pair of stars in the nearest stellar system to the Sun.", "Una coppia di stelle nel sistema stellare più vicino al nostro."),'#f1d391'],
@@ -73,7 +74,7 @@ const objectSources = {
   coma: sources.coma,
 };
 const positionNotes = {
-  solar: t("Illustrative orbits and phases; compressed distances and enlarged sizes.", "Orbite e fasi illustrative; distanze compresse e dimensioni amplificate."),
+  solar: t("Current planetary directions from JPL orbital elements. Distances compressed, sizes enlarged.", "Direzioni planetarie attuali da elementi orbitali JPL. Distanze compresse e dimensioni amplificate."),
   stars: t("Approximate J2000 direction and distance; enlarged sizes.", "Direzione J2000 e distanza approssimate; dimensioni amplificate."),
   galaxy: t("Schematic position in the Milky Way reconstruction.", "Posizione schematica nella ricostruzione della Via Lattea."),
   local: t("Approximate equatorial direction and distance from the Solar System; enlarged sizes.", "Direzione equatoriale e distanza approssimate dal Sistema Solare; dimensioni amplificate."),
@@ -85,7 +86,7 @@ for (const scale of scales) {
     entry.source = objectSources[entry.id] ?? (scale.id === 'solar'
       ? `https://science.nasa.gov/${entry.id}/facts/`
       : scale.source);
-    entry.positionKind = ['stars', 'local'].includes(scale.id) ? 'approximate-equatorial' : 'schematic';
+    entry.positionKind = entry.ephemeris ? 'approximate-heliocentric' : ['stars', 'local'].includes(scale.id) ? 'approximate-equatorial' : 'schematic';
     entry.positionNote = scale.positionNote;
     if (['sun', 'sol', 'local-milkyway'].includes(entry.id)) {
       entry.positionKind = 'reference';

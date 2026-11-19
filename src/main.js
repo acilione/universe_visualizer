@@ -227,6 +227,7 @@ function objectMarkup(object, isModal = false) {
   const nebula = object.bodyKind === 'nebula';
   const moons = planet ? moonsForPlanet(object.id) : [];
   const exoplanet = object.bodyKind === 'exoplanet';
+  const orbit = object.ephemeris;
   const isOverview = object.id === catalog[scale.id]?.[0]?.id || object.id === state.context?.overview?.id;
   const catalogStar = !nebula && (object.bodyKind === 'catalog-star' || state.scale >= 6 && Number.isFinite(object.raDeg) && Number.isFinite(object.decDeg));
   const canDive = Number.isInteger(object.targetScale) && scales[object.targetScale];
@@ -239,6 +240,9 @@ function objectMarkup(object, isModal = false) {
     <div><span>${t("RADIUS","RAGGIO")}</span><strong>${number(object.radiusEarth, 'R⊕')}</strong></div>
     <div><span>${t("ORBITAL PERIOD","PERIODO ORBITALE")}</span><strong>${number(object.periodDays, t("days","giorni"))}</strong></div>
     ${isModal ? `<div><span>${t("CATALOGUE MASS","MASSA DA CATALOGO")}${object.massProvenance ? ' · ' + escape(object.massProvenance) : ''}</span><strong>${number(object.massEarth, 'M⊕')}</strong></div><div><span>${t("EQUILIBRIUM TEMPERATURE","TEMPERATURA DI EQUILIBRIO")}</span><strong>${number(object.temperatureK, 'K')}</strong></div><div><span>${t("SEMI-MAJOR AXIS","SEMIASSE MAGGIORE")}</span><strong>${number(object.semiMajorAxisAu, t("AU","UA"))}</strong></div><div><span>${t("DISCOVERY YEAR","ANNO DI SCOPERTA")}</span><strong>${Number.isFinite(object.discoveryYear) ? object.discoveryYear : t("Not available","Non disponibile")}</strong></div>` : ''}
+    </div>` : orbit && isModal ? `<div class="planet-measurements">
+      <div><span>${t('HELIOCENTRIC DISTANCE','DISTANZA ELIOCENTRICA')}</span><strong>${(orbit.a*(1-orbit.e*Math.cos(orbit.E))).toLocaleString(locale(),{maximumFractionDigits:5})} ${t('AU','UA')}</strong></div>
+      <div><span>${t('POSITION EPOCH (UTC)','EPOCA DELLA POSIZIONE (UTC)')}</span><strong>${new Date(orbit.utcMs).toISOString().slice(0,16).replace('T',' ')}</strong></div>
     </div>` : catalogStar ? `<div class="planet-measurements star-measurements">
       <div><span>${t("RIGHT ASCENSION · J2000","ASCENSIONE RETTA · J2000")}</span><strong>${number(object.raDeg, '°')}</strong></div>
       <div><span>${t("DECLINATION · J2000","DECLINAZIONE · J2000")}</span><strong>${number(object.decDeg, '°')}</strong></div>
@@ -921,12 +925,17 @@ function renderGaiaStreamStatus(){
   if(status){
     const loaded=Number.isFinite(status.loadedSources)?status.loadedSources:0;
     description=loaded.toLocaleString(locale())+t(' sources currently loaded.',' sorgenti attualmente caricate.');
+    if(status.overview) description+=' '+t('Local Gaia DR3 overview (G ≤ 5.5).','Panoramica locale Gaia DR3 (G ≤ 5,5).');
+    if(status.mirror) description+=' '+(loaded ? t('VizieR cone search, brightest sources first.','Ricerca conica VizieR, sorgenti più luminose per prime.') : t('VizieR returned no sources in this field.','VizieR non ha restituito sorgenti in questo campo.'));
+    if(status.mirrorLimited) description+=' '+t('1,500-row limit. Zoom in for a smaller field.','Limite di 1.500 righe. Ingrandisci per restringere il campo.');
+    if(status.error && !status.mirror && status.radiusDeg>2) description+=' '+t('Zoom to a field radius of 2° or less for VizieR detail.','Ingrandisci fino a un raggio di campo di 2° o meno per il dettaglio VizieR.');
     if(status.loading||status.pending)description+=' '+t('Loading sky detail\u2026','Caricamento del dettaglio celeste\u2026');
     else if(!status.error)description+=' '+t('Look around or zoom to load another region.','Osserva intorno o ingrandisci per caricare un\u2019altra regione.');
     if(status.sourceLimited||status.cacheLimited)description+=' '+t('Display limit reached; zoom into a smaller region for more detail.','Limite di visualizzazione raggiunto; ingrandisci una regione pi\u00f9 piccola per maggiore dettaglio.');
-    else if(status.limited)description+=' '+t('Zoom into a smaller region to load more detail.','Ingrandisci una regione pi\u00f9 piccola per caricare maggiore dettaglio.');
-    if(status.retryAfterMs>0)description+=' '+t('Archive temporarily busy. Retry after ','Archivio temporaneamente occupato. Riprova tra ')+Math.ceil(status.retryAfterMs/1000)+t(' seconds.',' secondi.');
-    if(status.error)description+=' '+t('Some sky data could not be loaded.','Non \u00e8 stato possibile caricare alcuni dati celesti.');
+    else if(status.limited && !status.mirror && !status.error)description+=' '+t('Zoom into a smaller region to load more detail.','Ingrandisci una regione pi\u00f9 piccola per caricare maggiore dettaglio.');
+    if(status.retryAfterMs>0 && !status.mirror)description+=' '+t('Archive temporarily busy. Retry after ','Archivio temporaneamente occupato. Riprova tra ')+Math.ceil(status.retryAfterMs/1000)+t(' seconds.',' secondi.');
+    if(status.mirrorError)description+=' '+t('VizieR cone search failed. Retry to query this field again.','Ricerca conica VizieR non riuscita. Riprova a cercare in questo campo.');
+    if(status.error && !status.mirror)description+=' '+t('Some sky data could not be loaded.','Non \u00e8 stato possibile caricare alcuni dati celesti.');
   }
   const label=$('#gaia-stream-status');
   if(label.textContent!==description)label.textContent=description;

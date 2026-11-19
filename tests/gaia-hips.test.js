@@ -114,3 +114,39 @@ test('Gaia distinguishes progressive detail from a source or memory cap',async()
   stream.setView({raDeg:45,decDeg:0,radiusDeg:1,order:1});await waitFor(()=>!stream.snapshot().loading);
   assert.equal(stream.snapshot().detailAvailable,true);assert.equal(stream.snapshot().limited,true);assert.equal(stream.snapshot().sourceLimited,false);assert.equal(stream.snapshot().cacheLimited,false);stream.dispose();
 });
+
+test('Gaia keeps a local sky while offline, cancels stale cone searches and accepts measured empty fields', async () => {
+  const cones = [];
+  const stream = createGaiaTileStream({fallback:true, updateIntervalMs:0, fetchImpl: (url,{signal}) => {
+    if (url.endsWith('/properties')) return Promise.resolve(new Response('',{status:503}));
+    return new Promise(resolve=>cones.push({url:new URL(url),signal,resolve}));
+  }});
+  const bright = {sourceId:'9007199254740993',raDeg:45,decDeg:0,gMag:4};
+  const description = '#Name: I/355/gaiadr3\n#Coosys\tH_2016.000:\tICRS\n';
+  const columns = 'Source\tRA_ICRS\tDE_ICRS\tGmag\tBP-RP\tPlx\te_Plx\tRUWE\tpmRA\tpmDE\tQSO\tGal';
+  const table = description + [columns,' \tdeg\tdeg\tmag\tmag\tmas\tmas\t \tmas/yr\tmas/yr\t \t ','---','9007199254740997\t45\t0\t13\t1\t3\t.3\t1.1\t2\t1\t0\t0'].join('\n');
+  try {
+    stream.setOverview([bright,{...bright,raDeg:200}]);
+    stream.setView({raDeg:45,decDeg:0,radiusDeg:50});
+    await waitFor(()=>stream.snapshot().error);
+    assert.equal(stream.snapshot().overview,true);
+    assert.equal(stream.snapshot().records.length,1);
+    assert.equal(cones.length,0);
+    stream.setView({raDeg:5,decDeg:0,radiusDeg:1});
+    stream.setView({raDeg:45,decDeg:0,radiusDeg:1});
+    assert.equal(cones.length,2);
+    assert.ok(cones[0].signal.aborted);
+    assert.equal(cones[1].url.searchParams.get('-sort'),'Gmag');
+    assert.equal(cones[1].url.searchParams.get('-out.max'),'1500');
+    cones[0].resolve(new Response('obsolete'));
+    cones[1].resolve(new Response(table));
+    await waitFor(()=>stream.snapshot().mirror);
+    assert.equal(stream.snapshot().records[0].sourceId,'9007199254740997');
+    assert.equal(stream.snapshot().mirrorError,null);
+    stream.setView({raDeg:0,decDeg:90,radiusDeg:.05});
+    cones.at(-1).resolve(new Response(description));
+    await waitFor(()=>stream.snapshot().mirror);
+    assert.deepEqual(stream.snapshot().records,[]);
+    assert.equal(stream.snapshot().loading,false);
+  } finally {stream.dispose();}
+});

@@ -62,9 +62,10 @@ export function getBodyAppearance(object) {
   if ((observed?.map || observed?.model) && (object.id !== 'titan' || observed.kind === 'cloud-reconstruction')) return {
     ...base, ...observed, classification: observed.kind === 'observed-mosaic' ? 'observed' : 'reconstructed',
     ...(observed.ringMap ? { ringCredit: observed.ringMapCredit, ringSourceUrl: observed.ringMapSourceUrl, ringNote: observed.ringMapNote, ringNoteIt: observed.ringMapNoteIt } : {}),
-    ...(observed.bumpMap ? {
-      shapeNote: 'NASA/JPL reference ellipsoid with surface-normal shading from documented elevation data at its physical scale; the silhouette stays an ellipsoid. Orientation and display size are schematic.',
-      shapeNoteIt: 'Ellissoide di riferimento NASA/JPL con ombreggiatura delle normali da dati altimetrici alla scala fisica; il profilo resta ellissoidale. Orientamento e dimensioni visuali schematici.',
+    ...(Number.isFinite(observed.heightRangeKm) ? {
+      shape: 'measured-topography', shapeSource: observed.bumpSourceUrl,
+      shapeNote: 'LRO/LOLA elevations displace the lunar mesh at their measured scale. Fine relief is resolved through surface shading.',
+      shapeNoteIt: 'Le quote LRO/LOLA deformano la geometria lunare alla scala misurata. I dettagli fini sono resi tramite ombreggiatura.',
     } : {}),
     ...(observed.model ? {
       shape: observed.kind === 'measured-shape' ? 'measured-3d-model' : 'official-3d-model', shapeSource: observed.sourceUrl,
@@ -566,6 +567,11 @@ export function createPlanetVisual(object) {
     if (appearance.bumpMap && Number.isFinite(appearance.bumpScaleKm) && shape) {
       material.bumpMap = texture(appearance.bumpMap, false, appearance.flipY !== false);
       material.bumpScale = radius * appearance.bumpScaleKm / Math.max(...shape.radiiKm);
+      if (Number.isFinite(appearance.heightMinKm) && appearance.heightReferenceRadiusKm > 0) {
+        material.displacementMap = material.bumpMap;
+        material.displacementScale = radius * appearance.heightRangeKm / appearance.heightReferenceRadiusKm;
+        material.displacementBias = radius * appearance.heightMinKm / appearance.heightReferenceRadiusKm;
+      }
       material.userData.reliefSource = appearance.bumpSourceUrl || appearance.sourceUrl;
       material.userData.reliefExaggeration = 1;
     }
@@ -575,9 +581,25 @@ export function createPlanetVisual(object) {
   if (object.id === 'saturn') addSaturnRingShadow(material, radius);
   if (object.id === 'neptune' && material.map) addNeptuneDisplayHue(material);
   if (object.id === 'venus' && material.map) addVenusDisplayClouds(material);
-  const mesh = new THREE.Mesh(ellipsoidGeometry(radius, object.id, moon ? 64 : 96), material);
+  const mesh = new THREE.Mesh(ellipsoidGeometry(radius, object.id, material.displacementMap ? 192 : moon ? 64 : 96), material);
   mesh.name = 'planet-surface';
-  surface.add(mesh);
+  if (material.displacementMap) {
+    const terrain = new THREE.LOD();
+    const coarse = new THREE.Mesh(ellipsoidGeometry(radius, object.id, 48), material);
+    const peak = Math.max(0, material.displacementBias + material.displacementScale);
+    mesh.geometry.boundingSphere.radius += peak;
+    coarse.geometry.boundingSphere.radius += peak;
+    terrain.addLevel(mesh, 0);
+    terrain.addLevel(coarse, radius * 18, .08);
+    terrain.update = function (camera) {
+      // A room-scale XR map can be much smaller than its desktop equivalent.
+      this.levels[1].distance = radius * 18 * this.matrixWorld.getMaxScaleOnAxis();
+      THREE.LOD.prototype.update.call(this, camera);
+    };
+    surface.add(terrain);
+  } else {
+    surface.add(mesh);
+  }
   attachOfficialModel(group, mesh, appearance, radius);
   if (object.id === 'earth') surface.rotation.y = -.3;
   if (moon && shape?.tidallyLocked && Number.isFinite(object.phase)) surface.rotation.y = Math.PI - object.phase;

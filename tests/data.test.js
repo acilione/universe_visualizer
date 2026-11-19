@@ -46,7 +46,7 @@ test('catalog entries can be picked and linked across all scales', () => {
         assert.ok(Number.isInteger(entry.targetScale));
         assert.ok(scales[entry.targetScale], `Broken navigation from ${entry.id}`);
       }
-      if (entry.orbit !== undefined) close(Math.hypot(...entry.position), entry.orbit);
+      if (entry.ephemeris) close(Math.hypot(...entry.position), entry.orbit * (1-entry.ephemeris.e*Math.cos(entry.ephemeris.E)));
     }
   }
   assert.equal(catalog.solar.filter(entry => entry.orbit !== undefined).length, 8);
@@ -57,7 +57,7 @@ test('catalog exposes source and representation limits for each object', () => {
     for (const entry of entries) {
       assert.equal(new URL(entry.source).protocol, 'https:');
       assert.ok(entry.positionNote);
-      assert.ok(['reference', 'schematic', 'approximate-equatorial'].includes(entry.positionKind));
+      assert.ok(['reference', 'schematic', 'approximate-equatorial', 'approximate-heliocentric'].includes(entry.positionKind));
       if (['galaxy', 'cosmic'].includes(scaleId)) assert.equal(entry.positionKind, 'schematic');
     }
   }

@@ -1,3 +1,6 @@
+import {parseGaiaTile} from './gaia-tile-parser.js';
+export {parseGaiaTile} from './gaia-tile-parser.js';
+import {parseVizierCone, vizierConeUrl, MAX_CONE_ROWS, MAX_CONE_RADIUS_DEG} from './gaia-fallback.js';
 import { pix2vec_nest, max_pixrad } from '@hscmap/healpix';
 
 import { GAIA_DR3_HIPS } from './gaia-manifest.js';
@@ -58,43 +61,6 @@ export function validateGaiaMetadata(propertiesText, metadataText) {
   return { ...m, metadataValidated: true, catalogueReleaseDate: p.hips_release_date || null };
 }
 
-const optionalNumber = value => value == null || value.trim() === '' ? null : Number.isFinite(Number(value)) ? Number(value) : null;
-const optionalFlag = value => value === '1' ? true : value === '0' ? false : null;
-/** Parse only the fields used by this application. Never round a source ID. */
-export function parseGaiaTile(text) {
-  const lines = text.split(/\r?\n/).filter(line => line.trim() && !line.trimStart().startsWith('#'));
-  if (!lines.length) return [];
-  const columns = lines.shift().split('\t'), indexes = new Map(columns.map((name, index) => [name.trim(), index]));
-  for (const name of ['Source', 'RAdeg', 'DEdeg', 'Gmag']) if (!indexes.has(name)) throw new Error(`Gaia tile is missing ${name}.`);
-  if (lines.length > 100000) throw new Error('Gaia tile contains too many rows.');
-  const result = [], seen = new Map();
-  for (const line of lines) {
-    const cells = line.split('\t'); if (cells.length !== columns.length) throw new Error('Incomplete Gaia TSV row.');
-    const value = name => cells[indexes.get(name)]?.trim();
-    const number = name => optionalNumber(value(name));
-    const sourceId = value('Source');
-    if (!/^[1-9][0-9]{0,18}$/.test(sourceId || '') || BigInt(sourceId) > 9223372036854775807n) throw new Error('Invalid Gaia source identifier.');
-    const raDeg = number('RAdeg'), decDeg = number('DEdeg');
-    if (raDeg == null || raDeg < 0 || raDeg >= 360 || decDeg == null || Math.abs(decDeg) > 90) throw new Error('Invalid Gaia source coordinates.');
-    const ra2000 = number('RAJ2000'), dec2000 = number('DEJ2000');
-    const valid2000 = ra2000 != null && ra2000 >= 0 && ra2000 < 360 && dec2000 != null && Math.abs(dec2000) <= 90;
-    const hip = number('HIP'), neighbours = number('nHIP'), flag = number('f_HIP');
-    const row = { sourceId, raDeg, decDeg, refEpoch: GAIA_DR3_HIPS.referenceEpoch,
-      raJ2000Deg: valid2000 ? ra2000 : null, decJ2000Deg: valid2000 ? dec2000 : null,
-      gMag: number('Gmag'), bpMag: number('BPmag'), rpMag: number('RPmag'), bpRp: number('BP-RP'),
-      parallaxMas: number('Plx'), parallaxErrorMas: number('e_Plx'), pmRaMasYr: number('pmRA'), pmDecMasYr: number('pmDE'),
-      ruwe: number('RUWE'), duplicatedSource: optionalFlag(value('Dup')), inQsoCandidates: optionalFlag(value('QSO?')), inGalaxyCandidates: optionalFlag(value('Gal?')),
-      // These are reported links, NOT an approved merge with NASA identities.
-      // CDS ReadMe gives dHIP in arcsec; metadata.xml incorrectly labels it mas.
-      hipMatches: Number.isInteger(hip) && hip > 0 ? [{ hip, angularDistanceArcsec: number('dHIP'), numberOfNeighbours: Number.isInteger(neighbours) ? neighbours : null, xmFlag: Number.isInteger(flag) ? flag : null }] : [],
-    };
-    const old = seen.get(sourceId);
-    if (old && JSON.stringify(old) !== JSON.stringify(row)) throw new Error('Conflicting measurements for one Gaia source identifier.');
-    if (!old) { seen.set(sourceId, row); result.push(row); }
-  }
-  return result;
-}
-
 async function boundedText(response, maxBytes) {
   const length = Number(response.headers?.get?.('content-length'));
   if (length > maxBytes) { await response.body?.cancel?.(); throw new Error('Gaia response exceeds the download budget.'); }
@@ -118,7 +84,7 @@ async function boundedText(response, maxBytes) {
 /** View-driven catalogue access. No full-catalogue traversal or persistent mirror. */
 export function createGaiaTileStream({ fetchImpl = globalThis.fetch, onUpdate = () => {}, maxSources = 12000,
   maxCacheBytes = 32 * 1024 * 1024, maxTileBytes = 2 * 1024 * 1024, maxConcurrent = 2,
-  timeoutMs = 15000, updateIntervalMs = 250, maxTiles = 80 } = {}) {
+  fallback = false, timeoutMs = 15000, updateIntervalMs = 250, maxTiles = 80 } = {}) {
   if (typeof fetchImpl !== 'function') throw new TypeError('Gaia streaming requires fetch.');
   maxSources = clamp(Math.floor(maxSources) || 12000, 1, 50000);
   maxConcurrent = clamp(Math.floor(maxConcurrent) || 2, 1, 2);
@@ -129,20 +95,51 @@ export function createGaiaTileStream({ fetchImpl = globalThis.fetch, onUpdate = 
   let cooldownUntil = 0, cooldownMessage = null;
   const retryAfterMs = () => Math.max(0, cooldownUntil - Date.now());
 
+  let overview=[], localRows=[], coneRows=null, coneController=null, coneRequested=false, coneError=null;
+  let collected = null;
+  function refreshOverview() {
+    if (!plan) return;
+    const limit = Math.cos(plan.radiusDeg*RAD);
+    localRows = overview.filter(row=>dot(plan.centre,row.direction)>=limit);
+  }
+  async function loadMirror() {
+    if (!fallback || !plan || plan.radiusDeg>MAX_CONE_RADIUS_DEG || coneRequested || disposed) return;
+    coneRequested=true;
+    const controller=new AbortController();
+    coneController=controller;
+    notify();
+    try {
+      const text=await request(vizierConeUrl(plan),controller,1024*1024,false,30000);
+      if (coneController===controller && !disposed) coneRows=parseVizierCone(text);
+    } catch(error) {
+      if (coneController===controller && !disposed) coneError=error.message;
+    } finally {
+      if (coneController===controller) { coneController=null; notify(); }
+    }
+  }
   function collect() {
     if (!plan) return [];
+    if (collected) return collected;
     const records = new Map(), threshold = Math.cos(plan.radiusDeg * RAD);
     for (const tile of plan.tiles) for (const row of cache.get(tile.key)?.records || []) {
       const ra = row.raDeg, dec = row.decDeg;
       if (dot(plan.centre, vector(ra, dec)) >= threshold - 1e-12 && !records.has(row.sourceId)) records.set(row.sourceId, row);
     }
-    return [...records.values()].sort((a, b) => (a.gMag ?? Infinity) - (b.gMag ?? Infinity) || a.sourceId.localeCompare(b.sourceId));
+    return collected = [...records.values()].sort((a, b) => (a.gMag ?? Infinity) - (b.gMag ?? Infinity) || a.sourceId.localeCompare(b.sourceId));
   }
   function queue() { return plan?.tiles.filter(tile => !cache.has(tile.key) && !active.has(tile.key) && !failed.has(tile.key) && !skipped.has(tile.key)) || []; }
-  function snapshot() {
+  let lastPublishedRows=null;
+  function snapshot(onlyChanges=false) {
     const all = collect(), paused = retryAfterMs() > 0, waiting = !sourceBudgetHit && !paused ? queue().length : 0;
     const failure = (paused ? cooldownMessage : null) || metadataError || [...failed.entries()].find(([key]) => wanted.has(key))?.[1]?.message || null;
-    return { records: all.slice(0, maxSources), loading: !disposed && !paused && (metadataLoading || active.size > 0 || metadataReady && waiting > 0), pending: disposed || paused ? 0 : active.size + waiting,
+    const useMirror = coneRows !== null && (!all.length || Boolean(failure));
+    const useOverview = !all.length && !useMirror && localRows.length>0;
+    const rows = useMirror ? coneRows : all.length ? all : localRows;
+    const records = onlyChanges && lastPublishedRows===rows ? undefined : rows.slice(0,maxSources);
+    if (onlyChanges) lastPublishedRows=rows;
+    return { records, overview:useOverview, mirror:useMirror, radiusDeg:plan?.radiusDeg,
+      mirrorLimited:useMirror && coneRows.length===MAX_CONE_ROWS, mirrorError:coneError,
+      loading: Boolean(coneController) || !disposed && !paused && (metadataLoading || active.size > 0 || metadataReady && waiting > 0), pending: disposed || paused ? 0 : active.size + waiting,
       loadedTiles: plan?.tiles.filter(tile => cache.has(tile.key)).length || 0, order: plan?.order ?? null,
       limited: Boolean(plan?.limited || sourceBudgetHit || all.length > maxSources || skipped.size),
       sourceLimited: sourceBudgetHit || all.length > maxSources, cacheLimited: skipped.size > 0, detailAvailable: plan != null && plan.order < GAIA_DR3_HIPS.maxOrder,
@@ -151,11 +148,11 @@ export function createGaiaTileStream({ fetchImpl = globalThis.fetch, onUpdate = 
   }
   function notify() {
     if (disposed || updateTimer != null) return;
-    updateTimer = setTimeout(() => { updateTimer = null; if (!disposed) onUpdate(snapshot()); }, Math.max(0, updateIntervalMs));
+    updateTimer = setTimeout(() => { updateTimer = null; if (!disposed) onUpdate(snapshot(true)); }, Math.max(0, updateIntervalMs));
   }
-  async function request(url, controller, limit, empty404 = false) {
+  async function request(url, controller, limit, empty404 = false, deadlineMs = timeoutMs) {
     let timedOut = false;
-    const timer = setTimeout(() => { timedOut = true; controller.abort(); }, Math.max(1, timeoutMs));
+    const timer = setTimeout(() => { timedOut = true; controller.abort(); }, Math.max(1, deadlineMs));
     try {
       const response = await fetchImpl(url, { signal: controller.signal, mode: 'cors', credentials: 'omit' });
       if (empty404 && response.status === 404) { await response.body?.cancel?.(); return null; }
@@ -186,6 +183,7 @@ export function createGaiaTileStream({ fetchImpl = globalThis.fetch, onUpdate = 
       if (candidate == null) { skipped.add(tile.key); return; }
       cacheBytes -= cache.get(candidate).bytes; cache.delete(candidate);
     }
+    collected=null;
     cache.set(tile.key, { records, bytes }); cacheBytes += bytes;
   }
   function pauseService(error) {
@@ -207,7 +205,7 @@ export function createGaiaTileStream({ fetchImpl = globalThis.fetch, onUpdate = 
       const records = text == null ? [] : parseGaiaTile(text);
       store(tile, records, text == null ? 0 : new TextEncoder().encode(text).byteLength);
     } catch (error) {
-      if (!disposed && wanted.has(tile.key) && (!controller.signal.aborted || error.message === 'Gaia request timed out.')) { rememberFailure(tile.key, error); pauseService(error); }
+      if (!disposed && wanted.has(tile.key) && (!controller.signal.aborted || error.message === 'Gaia request timed out.')) { rememberFailure(tile.key, error); pauseService(error); loadMirror(); }
     } finally {
       if (active.get(tile.key) === controller) active.delete(tile.key);
       if (!disposed) { sourceBudgetHit = collect().length >= maxSources; notify(); pump(); }
@@ -226,21 +224,29 @@ export function createGaiaTileStream({ fetchImpl = globalThis.fetch, onUpdate = 
       const xml = await request(`${GAIA_DR3_HIPS.baseUrl}/metadata.xml`, metadataController, 196608);
       if (disposed) return;
       validateGaiaMetadata(properties, xml); metadataReady = true;
-    } catch (error) { if (!disposed) { metadataError = error.message || 'Unable to validate Gaia DR3 metadata.'; pauseService(error); } }
+    } catch (error) { if (!disposed) { metadataError = error.message || 'Unable to validate Gaia DR3 metadata.'; pauseService(error); loadMirror(); } }
     finally { metadataLoading = false; metadataController = null; if (!disposed) { notify(); pump(); } }
   }
   return {
+    setOverview(rows) {
+      if (disposed) return;
+      overview=rows.map(row=>({...row,direction:vector(row.raDeg,row.decDeg)}));
+      refreshOverview();notify();
+    },
     setView(view) {
       if (disposed) return null;
-      plan = planGaiaTiles(view, { maxTiles }); wanted = new Set(plan.tiles.map(tile => tile.key)); skipped.clear();
+      coneController?.abort(); coneController=null; coneRequested=false; coneError=null; coneRows=null; collected=null;
+      plan = planGaiaTiles(view, { maxTiles }); refreshOverview(); wanted = new Set(plan.tiles.map(tile => tile.key)); skipped.clear();
       for (const [key, controller] of active) if (!wanted.has(key)) { controller.abort(); active.delete(key); }
       for (const [key, failure] of failed) if (failure.retryAt <= Date.now()) failed.delete(key);
       for (const key of wanted) if (cache.has(key)) { const entry = cache.get(key); cache.delete(key); cache.set(key, entry); }
       sourceBudgetHit = collect().length >= maxSources;
+      if(metadataError || retryAfterMs()>0 || [...failed.keys()].some(key=>wanted.has(key))) loadMirror();
       initialize(); pump(); notify(); return plan;
     },
     retry() {
       if (disposed) return;
+      if (coneError) { coneRequested=false; coneError=null; loadMirror(); }
       if (retryAfterMs() > 0) { notify(); return; }
       metadataError = null; for (const key of wanted) failed.delete(key); skipped.clear();
       sourceBudgetHit = collect().length >= maxSources; initialize(); pump(); notify();
@@ -248,7 +254,7 @@ export function createGaiaTileStream({ fetchImpl = globalThis.fetch, onUpdate = 
     snapshot,
     dispose() {
       if (disposed) return;
-      disposed = true; clearTimeout(updateTimer); updateTimer = null; metadataController?.abort();
+      disposed = true; coneController?.abort(); coneController=null; clearTimeout(updateTimer); updateTimer = null; metadataController?.abort();
       for (const controller of active.values()) controller.abort();
       active.clear(); cache.clear(); failed.clear(); skipped.clear(); wanted.clear(); cacheBytes = 0; plan = null; cooldownUntil = 0; cooldownMessage = null;
     },

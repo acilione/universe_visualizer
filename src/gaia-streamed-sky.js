@@ -29,7 +29,7 @@ export function streamedGaiaObject(row) {
     distance:distanceLy===null?t('Distance unavailable','Distanza non disponibile'):t('Inverse-parallax estimate: ','Stima da parallasse inversa: ')+distanceLy.toLocaleString(locale(),{maximumFractionDigits:2})+' ly',
     source:GAIA_DR3_SOURCE,sources:[GAIA_DR3_DATA_MODEL,'https://cdsarc.cds.unistra.fr/viz-bin/cat/I/355'],
     gaiaMatchStatus:'streamed-independent',gaiaData:{...row,hipMatches:row.hipMatches||[],coordinateFrame:'ICRS / Gaia-CRF3',referenceEpoch:2016,source:GAIA_DR3_SOURCE},
-    detail:t('Gaia DR3 source streamed from the full CDS catalogue. G-band photometry; native astrometry at J2016.0.','Sorgente Gaia DR3 caricata dal catalogo completo CDS. Fotometria in banda G; astrometria originale a J2016.0.'),
+    detail:t('Gaia DR3 catalogue source. G-band photometry; native astrometry at J2016.0.','Sorgente del catalogo Gaia DR3. Fotometria in banda G; astrometria originale a J2016.0.'),
     positionNote:t('Native ICRS direction at J2016.0, matching the streamed tile coverage. Angular sky projection; no radial distance is rendered.','Direzione ICRS originale a J2016.0, coerente con i tasselli caricati. Proiezione angolare; nessuna distanza radiale rappresentata.')};
 }
 
@@ -66,6 +66,7 @@ export function createGaiaStreamedSky({pixelRatio=1,quality='high',onStatus=()=>
     fragmentShader:'varying vec3 vColor;uniform float uOpacity;void main(){float d=length(gl_PointCoord-.5)*2.;if(d>1.)discard;float glow=exp(-d*d*5.)*.7+exp(-d*d*35.)*.3;gl_FragColor=vec4(vColor,glow*.8*uOpacity);}'});
   material.userData.baseOpacity=1;
   const points=new THREE.Points(geometry,material);points.name='gaia-streamed-sources';points.frustumCulled=false;points.userData.particles=false;group.add(points);
+  const palette = ['#b6ceff','#dce9ff','#fff4df','#ffdaa8','#ffb57e'].map(hex=>new THREE.Color(hex));
   let records=[],objects=[],disposed=false,elapsed=0,lastCone=null,pendingCone=null,stableAge=0,lastStatus={};
   const readyWaiters=new Set();
   const worker=workerFactory();
@@ -81,16 +82,23 @@ export function createGaiaStreamedSky({pixelRatio=1,quality='high',onStatus=()=>
         const p=equatorialVector(row.raDeg,row.decDeg,RADIUS);
         positions.set(p,index*3);
         const bp=Number.isFinite(row.bpRp)?row.bpRp:.8;
-        const color=new THREE.Color(bp<0?'#b6ceff':bp<.6?'#dce9ff':bp<1.2?'#fff4df':bp<2?'#ffdaa8':'#ffb57e');
-        colors.set([color.r,color.g,color.b],index*3);
+        const color=palette[bp<0?0:bp<.6?1:bp<1.2?2:bp<2?3:4];
+        color.toArray(colors,index*3);
         sizes[index]=Math.max(1.6,Math.min(7,6-(row.gMag??16)*.2));
         return {id:'gaia-dr3-'+row.sourceId,gaiaStreamed:true,streamIndex:index,streamRecord:row,position:p};
       });
-      for(const attribute of Object.values(geometry.attributes))attribute.needsUpdate=true;
+      for(const attribute of Object.values(geometry.attributes)) {
+        attribute.clearUpdateRanges();
+        if (objects.length) {
+          attribute.addUpdateRange(0,objects.length*attribute.itemSize);
+          attribute.needsUpdate=true;
+        }
+      }
       geometry.setDrawRange(0,objects.length);
       // A small angular target scales with the viewport rather than swallowing a dense field.
       indexedPicking(points,objects,Math.max(.00025,Math.min(.12,(lastCone?.radiusDeg??30)*RAD*RADIUS/180)));
-      geometry.computeBoundingSphere();
+      // This angular shell has a fixed extent, including during partial updates.
+      geometry.boundingSphere ||= new THREE.Sphere(new THREE.Vector3(),RADIUS+.001);
     }
     const {records:ignored,...stats}=update;
     status({...stats,loadedSources:records.length,limited:Boolean(update.limited)||((update.records?.length||0)>maxSources)});

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { t, formatNumber } from './i18n.js';
 import { equatorialVector } from './sky-math.js';
 import { createPlanetVisual } from './planet-visuals.js';
-import {circularOrbitPath} from './orbit-paths.js';
+import {orbitPath} from './orbit-paths.js';
 import {consumeSteps} from './cooperative.js';
 
 const RADIUS = 60;
@@ -200,20 +200,46 @@ function nebulaPatches(objects, quality, deferred=false) {
 }
 
 function solarOrbits(objects) {
-  const positions = [], byId = new Map(objects.map(object => [object.id, object]));
-  for (const object of objects) {
-    const moon = object.bodyKind === 'moon', radius = moon ? object.orbitRadius : object.orbit;
-    if (!Number.isFinite(radius) || radius <= 0) continue;
-    const center = moon ? byId.get(object.parentId)?.position : [0, 0, 0];
-    if (!center) continue;
-    const path=circularOrbitPath(object,center,240);
-    for(let index=0;index<path.length-1;index++)positions.push(...path[index],...path[index+1]);
+  const byId = new Map(objects.map(object => [object.id, object]));
+  const segments = 240;
+  const guides = [];
+  for (const body of objects) {
+    const parent = byId.get(body.parentId);
+    if (body.bodyKind === 'moon' && !parent) continue;
+    if (body.ephemeris) {
+      guides.push({body});
+      continue;
+    }
+    const points = orbitPath(body,parent?.position,segments);
+    if (!points.length) continue;
+    // A moon's guide keeps its local shape as its parent moves around the Sun.
+    if (parent) for (const point of points) {
+      for (let axis=0; axis<3; axis++) point[axis] -= parent.position[axis];
+    }
+    guides.push({body,parent,points});
   }
-  const geometry = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  const attribute = new THREE.BufferAttribute(new Float32Array(guides.length*segments*6),3);
+  const geometry = new THREE.BufferGeometry().setAttribute('position',attribute);
+  function refreshSolarOrbits() {
+    let vertex = 0;
+    for (const guide of guides) {
+      const points = guide.points || orbitPath(guide.body,undefined,segments);
+      const [x,y,z] = guide.parent?.position || [0,0,0];
+      for (let k=0; k<segments; k++) {
+        const a = points[k], b = points[k+1];
+        attribute.setXYZ(vertex++,a[0]+x,a[1]+y,a[2]+z);
+        attribute.setXYZ(vertex++,b[0]+x,b[1]+y,b[2]+z);
+      }
+    }
+    attribute.needsUpdate = true;
+    geometry.computeBoundingSphere();
+  }
+  refreshSolarOrbits();
   const material = new THREE.LineBasicMaterial({color: '#85b4ad', transparent: true, opacity: .13, depthWrite: false});
   material.userData.baseOpacity = .13;
-  const orbits = new THREE.LineSegments(geometry, material); orbits.name = 'combined-solar-orbits';
-  return orbits;
+  const lines=new THREE.LineSegments(geometry,material);
+  lines.name='combined-solar-orbits';
+  return {lines,refreshSolarOrbits};
 }
 
 /** A walkable schematic Solar System surrounded by catalogue sky directions. */
@@ -261,7 +287,8 @@ export function createCombinedMap({catalogue = {}, planets = [], exoplanets = []
     hit.raycast = function (raycaster, intersections) {if (visibleInTree(this)) raycast.call(this, raycaster, intersections);};
     body.add(hit); targets.push(hit); layers[object.combinedLayer].add(body);
   }
-  layers.planets.add(solarOrbits(solar));
+  const {lines,refreshSolarOrbits} = solarOrbits(solar);
+  layers.planets.add(lines);
   const stars = progressive?[]:skyRecords(catalogue.stars || [], 'stars');
   const nebulae = progressive?[]:skyRecords(catalogue.nebulae || [], 'nebulae');
   const hosts = skyRecords(exoplanets, 'planets', true);
@@ -340,6 +367,7 @@ export function createCombinedMap({catalogue = {}, planets = [], exoplanets = []
   return {
     get ready(){return ready;}, get loading(){return loading;}, get waiting(){return waiting;}, setCatalogue, update, cancelLoading:group.userData.cancelLoading,
     group, objects, targets, context, radius: RADIUS, layers, byId,
+    refreshSolarOrbits,
     setLayer(name, visible) {if (!Object.hasOwn(layers, name)) throw new RangeError(`Unknown combined map layer: ${name}`);layers[name].visible = Boolean(visible);},
     getObject(id) {
       const source=catalogue.byId?.get(id);

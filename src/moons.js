@@ -1,3 +1,4 @@
+import {planetOrbit, orbitPoint} from './planet-ephemeris.js';
 import { catalog } from './data.js';
 import { t, formatNumber } from './i18n.js';
 
@@ -82,7 +83,7 @@ export const solarMoons = Object.entries(records).flatMap(([parentId, moons]) =>
       parentId, parentName: parent.name,
       type: t('Natural satellite', 'Satellite naturale'),
       radiusKm, semiMajorAxisKm, periodDays, retrograde,
-      color, size, orbitRadius, orbitInclinationRad, phase,
+      color, size, orbitRadius, orbitInclinationRad, phase, localPosition,
       position: parent.position.map((coordinate, axis) => coordinate + localPosition[axis]),
       distance: t(`${number(semiMajorAxisKm)} km from ${parent.name}`, `${number(semiMajorAxisKm)} km da ${parent.name}`),
       detail: t(
@@ -116,3 +117,16 @@ export const moonCatalogMetadata = {
   retrievedOn: '2026-09-11',
   positionNote,
 };
+
+// Local moon phases remain illustrative as their parent follows its ephemeris.
+export function updateSolarPositions(utcMs) {
+  for (const planet of catalog.solar) {
+    if (!planet.ephemeris) continue;
+    planet.ephemeris = planetOrbit(planet.id,utcMs);
+    planet.position = orbitPoint(planet.ephemeris,planet.orbit);
+  }
+  for (const moon of solarMoons) {
+    const parent = catalog.solar.find(body => body.id === moon.parentId);
+    moon.position = moon.localPosition.map((offset,i) => offset+parent.position[i]);
+  }
+}

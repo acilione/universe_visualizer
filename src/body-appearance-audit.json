@@ -203,7 +203,7 @@
     ],
     "finding": "The LROC mosaic preserves the near-side maria and the densely cratered far side in the four longitude views. Separate LOLA elevation data supplies physical-scale surface-normal shading, instead of treating dark maria as depressions.",
     "action": "Retain the NASA LROC/LOLA products and the physical elevation scale.",
-    "limitations": "The colour mosaic is adjusted for visual presentation, with lower-resolution monochrome polar fill and small repaired dropouts. Relief affects shading, not the ellipsoidal silhouette; lighting and rotational phase are schematic.",
+    "limitations": "The colour mosaic is adjusted for visual presentation, with lower-resolution monochrome polar fill and small repaired dropouts. The mesh samples LOLA elevation at finite resolution and smaller features affect shading; lighting and rotational phase are schematic.",
     "status": "verified",
     "reference": {
       "title": "CGI Moon Kit",

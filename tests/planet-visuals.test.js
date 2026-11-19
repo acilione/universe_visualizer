@@ -287,3 +287,30 @@ test('Venus cloud display suppresses false-colour yellow bands while retaining s
     assert.equal(material.emissiveIntensity, 0);
   } finally { dispose(visual); }
 });
+
+test('lunar terrain uses measured LOLA heights at physical scale with a shared GPU texture', () => {
+  const visual = make('moon',{bodyKind:'moon'});
+  try {
+    const mesh = surface(visual);
+    const {heightMinKm,heightRangeKm,heightReferenceRadiusKm,bumpSourceUrl} = officialSurfaces.moon;
+    assert.equal(mesh.material.displacementMap,mesh.material.bumpMap);
+    assert.equal(mesh.material.displacementMap.name,officialSurfaces.moon.bumpMap);
+    close(mesh.material.displacementScale,heightRangeKm/heightReferenceRadiusKm);
+    close(mesh.material.displacementBias,heightMinKm/heightReferenceRadiusKm);
+    assert.equal(visual.userData.appearance.shapeSource,bumpSourceUrl);
+    const terrain=mesh.parent, camera=new THREE.PerspectiveCamera();
+    for (const scale of [1,.03]) {
+      visual.scale.setScalar(scale);
+      visual.updateMatrixWorld(true);
+      camera.position.z=100*scale;
+      camera.updateMatrixWorld(true);
+      terrain.update(camera);
+      assert.equal(terrain.getCurrentLevel(),1);
+      camera.position.z=3*scale;
+      camera.updateMatrixWorld(true);
+      terrain.update(camera);
+      assert.equal(terrain.getCurrentLevel(),0);
+    }
+    assert.ok(mesh.geometry.boundingSphere.radius >= 1+(heightMinKm+heightRangeKm)/heightReferenceRadiusKm-1e-6);
+  } finally {dispose(visual);}
+});

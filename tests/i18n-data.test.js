@@ -10,6 +10,7 @@ function snapshot(preference = null, blockedStorage = false) {
     : `globalThis.localStorage = { getItem: () => ${JSON.stringify(preference)}, setItem: (key, value) => { globalThis.saved = { key, value }; } };`;
   return JSON.parse(execFileSync(process.execPath, ['--input-type=module', '--eval', `
     ${setup}
+    Date.now=()=>Date.UTC(2026,10,19); // Compare both language runs at the same orbital epoch.
     Object.defineProperty(globalThis, 'navigator', { value: { language: 'it-IT' }, configurable: true });
     const { readFile } = await import('node:fs/promises');
     globalThis.fetch = async path => ({ ok: true, json: async () => JSON.parse(await readFile('./public' + path, 'utf8')) });

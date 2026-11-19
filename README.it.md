@@ -30,6 +30,8 @@ L'atlante normale e le viste immersive partono dalla mappa combinata di pianeti,
 
 **Mappa combinata** riapre la mappa completa dal Sistema Solare o dalle altre scale di riferimento. Il comando **Gaia DR3** prepara la regione osservata prima della dissolvenza; **Torna alla mappa** ripristina la precedente inquadratura. I cataloghi mantengono le rispettive epoche: non viene simulata una trasformazione fisica fra i due rilievi.
 
+La vista Gaia DR3 apre una panoramica locale (G ≤ 5,5, circa 493 KiB prima della compressione). Se il servizio HiPS non risponde, i campi con raggio fino a 2° caricano al massimo 1.500 sorgenti dal mirror VizieR di Harvard. Lo stato indica la provenienza dei dati e il limite raggiunto.
+
 [Studio per Gaia completo](GAIA_STREAMING_STUDY.md) e [note sui dati Gaia](DATA_GAIA_DR3.md).
 
 ## Esperimento immagini ufficiali e Gaia DR3
@@ -44,7 +46,7 @@ Dieci satelliti usano modelli 3D NASA o prodotti scientifici NASA PDS, inclusa l
 
 Pianeti e satelliti usano mappe e prodotti di visualizzazione NASA dove disponibili. La Luna combina immagini LRO e altimetria misurata. I semiassi NASA/JPL riproducono lo schiacciamento dei pianeti e le proporzioni dei satelliti irregolari; Saturno e Urano includono anelli con raggi documentati.
 
-Le schede indicano fonte delle immagini, bande osservative, copertura e dati di forma. Venere e Titano mostrano gli strati opachi di nubi e foschia; le superfici degli esopianeti restano illustrative. La luce segue il Sole anche quando si sposta la mappa in VR. Le rotazioni planetarie rispettano i periodi misurati con tempo accelerato; le orientazioni delle lune restano fisse nelle orbite schematiche.
+Le schede indicano fonte delle immagini, bande osservative, copertura e dati di forma. Venere e Titano mostrano gli strati opachi di nubi e foschia; le superfici degli esopianeti restano illustrative. La luce segue il Sole anche quando si sposta la mappa in VR. Le posizioni eliocentriche degli otto pianeti seguono l’orologio del dispositivo, usando gli elementi approssimati JPL 1800–2050. Il calcolo locale viene aggiornato ogni minuto, al ritorno nella scheda e al ricaricamento. La Terra usa il baricentro Terra–Luna. Le orbite sono ellittiche con distanze compresse. Gli assi e la rotazione seguono i termini lineari IAU, con aggiornamento ogni secondo. Le fasi delle lune e degli esopianeti restano illustrative. Il rilievo LOLA deforma la superficie lunare in scala fisica.
 
 [Confronto con immagini NASA per ciascun corpo](BODY_APPEARANCE_AUDIT.md) · [Fonti e copertura](REALISTIC_SURFACES.md) · [Crediti delle texture](TEXTURE_SOURCES.md).
 
